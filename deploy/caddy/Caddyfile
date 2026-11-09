@@ -1,0 +1,26 @@
+{
+	auto_https disable_redirects
+}
+
+http://:80 {
+	handle /ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}
+
+{$OTS_HOSTNAME}, {$OTS_IP} {
+	tls internal
+	encode zstd gzip
+	request_body {
+		max_size 210MB
+	}
+	reverse_proxy app:8000 {
+		flush_interval -1
+	}
+}

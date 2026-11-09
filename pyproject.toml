@@ -22,8 +22,17 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "pytest", "pytest-django", "pytest-asyncio", "factory-boy", "freezegun", "respx",
-  "ruff", "mypy", "django-stubs",
+  "pytest",
+  "pytest-django",
+  "pytest-asyncio",
+  "factory-boy",
+  "freezegun",
+  "respx",
+  "ruff",
+  "mypy",
+  "django-stubs",
+  "pyyaml>=6.0.3",
+  "types-pyyaml>=6.0.12.20261103",
 ]
 
 [tool.ruff]
@@ -53,3 +62,7 @@ django_settings_module = "config.settings.test"
 [[tool.mypy.overrides]]
 module = ["ots.core.*", "ots.storage.*", "ots.backup.*"]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["environ", "environ.*"]
+ignore_missing_imports = true

@@ -1,0 +1,99 @@
+name: ots
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "10"
+
+x-ots-env: &ots-env
+  env_file: ${OTS_ENV_FILE:-/etc/ots/.env}
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    mem_limit: 64m
+    ports: ["80:80", "443:443"]
+    <<: *ots-env
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app: { condition: service_healthy }
+    logging: *logging
+
+  app:
+    image: ots-app:${OTS_TAG:-latest}
+    init: true
+    build: { context: .., dockerfile: app/Dockerfile }
+    restart: unless-stopped
+    mem_limit: 600m
+    command: ["app"]
+    <<: *ots-env
+    volumes:
+      - ${OTS_HOST_DATA:-/srv/data}/blobs:/srv/data/blobs
+      - ${OTS_HOST_DATA:-/srv/data}/staging:/srv/data/staging
+      - ${OTS_HOST_DATA:-/srv/data}/selfies:/srv/data/selfies
+      - ${OTS_HOST_ETC:-/etc/ots}:/etc/ots:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      db: { condition: service_healthy }
+    logging: *logging
+
+  worker:
+    image: ots-app:${OTS_TAG:-latest}
+    init: true
+    restart: unless-stopped
+    mem_limit: 350m
+    command: ["worker"]
+    <<: *ots-env
+    volumes:
+      - ${OTS_HOST_DATA:-/srv/data}/blobs:/srv/data/blobs
+      - ${OTS_HOST_DATA:-/srv/data}/staging:/srv/data/staging
+      - ${OTS_HOST_DATA:-/srv/data}/selfies:/srv/data/selfies
+      - ${OTS_HOST_DATA:-/srv/data}/wal-spool:/srv/data/wal-spool
+      - ${OTS_HOST_DATA:-/srv/data}/wal-local:/srv/data/wal-local
+      - ${OTS_HOST_DATA:-/srv/data}/backup-staging:/srv/data/backup-staging
+      - ${OTS_HOST_DATA:-/srv/data}/backup-local:/srv/data/backup-local
+      - ${OTS_HOST_ETC:-/etc/ots}:/etc/ots:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime('/tmp/worker-heartbeat')<60 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      db: { condition: service_healthy }
+    logging: *logging
+
+  db:
+    image: ots-db:${OTS_TAG:-latest}
+    build: { context: .., dockerfile: deploy/postgres/Dockerfile }
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      POSTGRES_DB: ots
+      POSTGRES_USER: ots_migrator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - ${OTS_HOST_DATA:-/srv/data}/pg:/var/lib/postgresql/data
+      - ${OTS_HOST_DATA:-/srv/data}/wal-spool:/srv/data/wal-spool
+      - ${OTS_HOST_DATA:-/srv/data}/wal-local:/srv/data/wal-local
+      - ${OTS_HOST_ETC:-/etc/ots}:/etc/ots:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ots_migrator -d ots"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:

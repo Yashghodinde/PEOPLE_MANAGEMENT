@@ -1,0 +1,3 @@
+{ "name": "ots-assets", "private": true,
+  "scripts": { "build": "tailwindcss -c tailwind.config.js -i app.css -o ../static/css/app.css --minify" },
+  "devDependencies": { "tailwindcss": "3.4.14" } }

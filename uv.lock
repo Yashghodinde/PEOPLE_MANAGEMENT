@@ -915,8 +915,10 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-django" },
+    { name = "pyyaml" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -946,8 +948,10 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-django" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20261103" },
 ]
 
 [[package]]
