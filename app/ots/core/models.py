@@ -43,3 +43,42 @@ class OutboxEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.type}#{self.id}"
+
+
+class Job(models.Model):
+    name = models.CharField(max_length=100, primary_key=True)
+    schedule = models.CharField(max_length=100)  # cron (Asia/Kolkata) or "continuous"
+    enabled = models.BooleanField(default=True)
+    last_started_at = models.DateTimeField(null=True, blank=True)
+    last_finished_at = models.DateTimeField(null=True, blank=True)
+    last_status = models.CharField(max_length=10, blank=True, default="")
+    last_error = models.TextField(blank=True, default="")
+    next_run_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "jobs"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class JobRun(models.Model):
+    class Status(models.TextChoices):
+        RUNNING = "RUNNING"
+        SUCCESS = "SUCCESS"
+        FAILED = "FAILED"
+        ABORTED = "ABORTED"
+
+    id = models.BigAutoField(primary_key=True)
+    job_name = models.CharField(max_length=100)
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.RUNNING)
+    detail = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = "job_runs"
+        indexes = [models.Index(fields=["job_name", "-started_at"], name="job_runs_job_started_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.job_name}#{self.id} {self.status}"
