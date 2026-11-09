@@ -11,12 +11,13 @@ from ots.core.models import OutboxEvent
 @pytest.fixture(autouse=True)
 def clean_registry():
     saved = {k: list(v) for k, v in events._HANDLERS.items()}
+    wired = dp.alert_hook
     events._HANDLERS.clear()
     dp.alert_hook = None
     yield
     events._HANDLERS.clear()
     events._HANDLERS.update(saved)
-    dp.alert_hook = None
+    dp.alert_hook = wired
 
 
 def make(type_="t.created", payload=None):

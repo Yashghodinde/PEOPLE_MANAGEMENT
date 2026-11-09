@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 BATCH = 100
 MAX_ATTEMPTS = 10
-AlertHook = Callable[[str, str, str, str], None]  # key, severity, title, detail
+AlertHook = Callable[..., object]  # (key, severity, title, detail)
 # M00.8 sets this to alerts.raise_alert so failures surface to the Super Admin.
 alert_hook: AlertHook | None = None
 

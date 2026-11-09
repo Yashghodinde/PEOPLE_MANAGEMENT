@@ -15,12 +15,13 @@ IST = ZoneInfo("Asia/Kolkata")
 @pytest.fixture(autouse=True)
 def clean_registry():
     saved = dict(jobs._JOBS)
+    wired = (jobs.alert_hook, jobs.resolve_hook)
     jobs._JOBS.clear()
     jobs.alert_hook = jobs.resolve_hook = None
     yield
     jobs._JOBS.clear()
     jobs._JOBS.update(saved)
-    jobs.alert_hook = jobs.resolve_hook = None
+    jobs.alert_hook, jobs.resolve_hook = wired
 
 
 def test_schedule_evaluated_in_ist_across_midnight():

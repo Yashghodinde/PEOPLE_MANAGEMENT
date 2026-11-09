@@ -82,3 +82,27 @@ class JobRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.job_name}#{self.id} {self.status}"
+
+
+class Alert(models.Model):
+    class Severity(models.TextChoices):
+        INFO = "INFO"
+        WARNING = "WARNING"
+        CRITICAL = "CRITICAL"
+
+    id = models.BigAutoField(primary_key=True)
+    key = models.CharField(max_length=150, unique=True)  # stable dedupe key, e.g. backup.rpo
+    severity = models.CharField(max_length=10, choices=Severity.choices)
+    title = models.CharField(max_length=300)
+    detail = models.TextField(blank=True, default="")
+    first_seen_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField()
+    count = models.PositiveIntegerField(default=1)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "alerts"
+        indexes = [models.Index(fields=["resolved_at", "severity"], name="alerts_open_idx")]
+
+    def __str__(self) -> str:
+        return f"[{self.severity}] {self.key}"

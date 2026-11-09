@@ -26,8 +26,8 @@ OVERDUE_AFTER = timedelta(minutes=30)
 MAX_THREADS = 4
 
 # M00.8 wires these to alerts.raise_alert / alerts.resolve_alert.
-alert_hook: Callable[[str, str, str, str], None] | None = None
-resolve_hook: Callable[[str], None] | None = None
+alert_hook: Callable[..., object] | None = None
+resolve_hook: Callable[..., object] | None = None
 
 
 @dataclass(frozen=True)
