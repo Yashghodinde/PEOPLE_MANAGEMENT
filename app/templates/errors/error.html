@@ -1,0 +1,11 @@
+{% extends "base_plain.html" %}
+{% block title %}{{ status }} · OTS{% endblock %}
+{% block body %}
+<main class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-[377px] bg-canvas border border-line rounded-lg shadow-card p-5 text-center flex flex-col gap-3">
+    <p class="text-fig font-semibold text-ink-400">{{ status }}</p>
+    <p class="text-body text-ink-900">{{ message }}</p>
+    <p class="text-cap text-ink-600">Reference: {{ request_id }}</p>
+  </div>
+</main>
+{% endblock %}

@@ -1,0 +1,2 @@
+{% comment %}avatar.html: params name (full name; initials derived), size (4 default → 34px, 5 → 55px).{% endcomment %}
+<span class="inline-flex items-center justify-center rounded-full bg-line text-ink-900 font-semibold {% if size == '5' %}w-6 h-6 text-sec{% else %}w-5 h-5 text-cap{% endif %}" title="{{ name }}" aria-label="{{ name }}">{% for part in name.split|slice:":2" %}{{ part|first|upper }}{% endfor %}</span>

@@ -5,6 +5,8 @@ COPY app/static_src/package.json ./
 RUN npm install --no-audit --no-fund
 COPY app/static_src/ ./
 COPY app/templates/ ../templates/
+COPY app/ots/ ../ots/
+COPY app/static/js/ ../static/js/
 RUN mkdir -p ../static/css && npm run build
 
 FROM python:3.12-slim AS runtime

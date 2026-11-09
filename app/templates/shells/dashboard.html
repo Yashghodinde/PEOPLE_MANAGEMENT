@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4" data-shell="stat-row-3">
+    {% for label, value in stats3 %}{% card title=label %}<p class="text-fig font-semibold tabular-nums">{{ value }}</p>{% endcard %}{% endfor %}
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4" data-shell="stat-row-5">
+    {% for label, value in stats5 %}{% card title=label %}<p class="text-fig font-semibold tabular-nums">{{ value }}</p>{% endcard %}{% endfor %}
+  </div>
+  {% card title="Recent activity" %}{% include "components/empty_state.html" with icon="activity" text="Activity appears here once work starts." %}{% endcard %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base_plain.html" %}
+{% block title %}500 · OTS{% endblock %}
+{% block body %}
+<main class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-[377px] bg-canvas border border-line rounded-lg shadow-card p-5 text-center flex flex-col gap-3">
+    <p class="text-fig font-semibold text-ink-400">500</p>
+    <h1 class="text-title font-semibold">Something went wrong</h1>
+    <p class="text-body text-ink-600">The server had a problem. Try again in a moment.</p>
+    <a href="/" class="inline-flex items-center justify-center h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Go to the start page</a>
+  </div>
+</main>
+{% endblock %}

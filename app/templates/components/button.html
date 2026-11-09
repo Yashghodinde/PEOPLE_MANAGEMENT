@@ -1,0 +1,18 @@
+{% comment %}
+button.html
+  label     text (required)
+  variant   primary | secondary | danger | ghost   (default primary)
+  type      button | submit (default button); href renders a link instead
+  href      optional URL
+  attrs     optional extra attributes, e.g. 'hx-post="/app/x" hx-target="#y"'  (pass as a template literal)
+  icon      optional lucide id        disabled / loading  booleans
+Loading and htmx-requesting states disable the button; htmx adds the Idempotency-Key (static/js/app.js).
+{% endcomment %}{% load ots_ui %}
+{% if href %}<a href="{{ href }}"{% else %}<button type="{{ type|default:'button' }}"{% if disabled or loading %} disabled{% endif %} hx-disabled-elt="this"{% endif %} {{ attrs }}
+  class="inline-flex items-center justify-center gap-2 h-5 px-4 rounded-full text-body font-medium transition-colors duration-fast disabled:opacity-50 disabled:cursor-not-allowed
+  {% if variant == 'secondary' %}border border-accent text-accent bg-canvas hover:bg-line
+  {% elif variant == 'danger' %}bg-bad text-canvas hover:bg-ink-900
+  {% elif variant == 'ghost' %}text-ink-600 hover:bg-line
+  {% else %}bg-accent text-canvas hover:bg-ink-900{% endif %}">
+  {% if loading %}{% icon "refresh-cw" "4" "animate-spin" %}{% elif icon %}{% icon icon %}{% endif %}{{ label }}
+{% if href %}</a>{% else %}</button>{% endif %}

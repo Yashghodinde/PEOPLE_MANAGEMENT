@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-split gap-4" data-shell="list-detail">
+  <section aria-label="List">
+    {% include "components/table.html" with id="list" columns=cols rows=rows empty="No items." %}
+  </section>
+  <section aria-label="Detail">
+    {% card title="Select an item" %}{% include "components/empty_state.html" with icon="list-checks" text="Pick a row to see its details here." %}{% endcard %}
+  </section>
+</div>
+{% endblock %}

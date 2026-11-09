@@ -6,13 +6,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 env = environ.Env()
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")  # noqa: S105
-DEBUG = False
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 ROOT_URLCONF = "config.urls"
 ASGI_APPLICATION = "config.asgi.application"
 
 INSTALLED_APPS = [
     "ots.core",
+    "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
@@ -41,6 +42,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "ots.ui.context.ui",
             ]
         },
     }
@@ -73,5 +75,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_AUTOREFRESH = DEBUG
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 OTS_DATA_DIR = Path(env("OTS_DATA_DIR", default="/srv/data"))

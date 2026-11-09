@@ -1,0 +1,11 @@
+{% comment %}drawer.html (use {% drawer id="d1" title="Day detail" %}...{% enddrawer %}): right panel, 38.2% wide. Open with data-open-drawer="d1".{% endcomment %}{% load ots_ui %}
+<div x-data="drawer" data-drawer-id="{{ id }}" @open-drawer.window="onOpen" @keydown.escape.window="hide" x-cloak>
+  <div x-show="open" class="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-labelledby="{{ id }}_title">
+    <div class="fixed inset-0 bg-ink-900/50" @click="hide"></div>
+    <aside class="fixed top-0 right-0 bottom-0 w-full md:w-[38.2%] bg-canvas border-l border-line p-4 flex flex-col gap-3 overflow-y-auto">
+      <header class="flex items-center justify-between"><h2 id="{{ id }}_title" class="text-sec font-semibold">{{ title }}</h2>
+        <button type="button" @click="hide" class="rounded-full p-1 text-ink-600 hover:bg-line" aria-label="Close">{% icon "x" %}</button></header>
+      <div class="text-body text-ink-900">{{ body }}</div>
+    </aside>
+  </div>
+</div>

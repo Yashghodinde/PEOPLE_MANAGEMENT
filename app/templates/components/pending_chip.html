@@ -1,0 +1,2 @@
+{% comment %}pending_chip.html (M09 fills the count): param count (0 hides it).{% endcomment %}{% load ots_ui %}
+{% if count %}<span class="inline-flex items-center gap-2 rounded-full border border-warn text-warn px-3 h-4 text-cap font-medium" role="status">{% icon "clock" "3" %}{{ count }} change{{ count|pluralize }} waiting</span>{% endif %}

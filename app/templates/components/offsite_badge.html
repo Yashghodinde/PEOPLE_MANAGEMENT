@@ -1,0 +1,4 @@
+{% comment %}offsite_badge.html: params state (FileState). Shows "Not yet off-site" until ARCHIVED; "Off-site" only after ARCHIVED.{% endcomment %}{% load ots_ui %}
+{% if state == "ARCHIVED" %}<span class="inline-flex items-center gap-1 rounded-full border border-ok text-ok px-3 h-4 text-cap font-medium">{% icon "circle-check" "3" %}Off-site</span>
+{% elif state == "MISSING" or state == "DRIFTED" or state == "FAILED" %}<span class="inline-flex items-center gap-1 rounded-full border border-bad text-bad px-3 h-4 text-cap font-medium">{% icon "triangle-alert" "3" %}Off-site problem</span>
+{% else %}<span class="inline-flex items-center gap-1 rounded-full border border-warn text-warn px-3 h-4 text-cap font-medium">{% icon "upload" "3" %}Not yet off-site</span>{% endif %}

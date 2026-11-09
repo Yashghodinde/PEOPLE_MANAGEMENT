@@ -1,0 +1,86 @@
+{% extends "base.html" %}{% load ots_ui static %}
+{% block content %}
+<div class="flex flex-col gap-5">
+  <p class="text-body text-ink-600">Every component in every state. Visible in DEBUG, or to the Super Admin.</p>
+
+  {% card title="Buttons" %}
+  <div class="flex flex-wrap items-center gap-3">
+    {% include "components/button.html" with label="Primary" %}
+    {% include "components/button.html" with label="Secondary" variant="secondary" %}
+    {% include "components/button.html" with label="Danger" variant="danger" %}
+    {% include "components/button.html" with label="Ghost" variant="ghost" %}
+    {% include "components/button.html" with label="With icon" icon="plus" %}
+    {% include "components/button.html" with label="Disabled" disabled=True %}
+    {% include "components/button.html" with label="Saving…" loading=True %}
+    {% include "components/button.html" with label="As link" href="#main" variant="secondary" %}
+  </div>
+  {% endcard %}
+
+  {% card title="Badges (fixed enum → colour mapping)" %}
+  <div class="flex flex-wrap gap-2">
+    {% badge "APPROVED" %}{% badge "ARCHIVED" %}{% badge "SUBMITTED" %}{% badge "BLOCKED" %}{% badge "PAUSED" %}
+    {% badge "FAILED" %}{% badge "MISSING" %}{% badge "ASSIGNED" %}{% badge "IN_PROGRESS" %}{% badge "L" "Late" %}
+  </div>
+  {% endcard %}
+
+  {% card title="Off-site badge and pending chip" %}
+  <div class="flex flex-wrap items-center gap-3">
+    {% include "components/offsite_badge.html" with state="STAGED" %}
+    {% include "components/offsite_badge.html" with state="ARCHIVED" %}
+    {% include "components/offsite_badge.html" with state="MISSING" %}
+    {% include "components/pending_chip.html" with count=3 %}
+  </div>
+  {% endcard %}
+
+  {% card title="Form fields" %}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {% include "components/form_field.html" with name="login_id" label="Login ID" help="Your employee login" required=True %}
+    {% include "components/form_field.html" with name="pw" label="Password" type="password" error="Password is too short" %}
+    {% include "components/form_field.html" with name="note" label="Note" type="textarea" placeholder="Optional" %}
+  </div>
+  {% endcard %}
+
+  {% card title="Table" footer="Rows are 55px high; numbers right-aligned." %}
+  {% include "components/table.html" with id="sg-table" columns=sg_columns rows=sg_rows right_cols=sg_right next_url="#" %}
+  {% endcard %}
+  {% card title="Table: empty state" %}
+  {% include "components/table.html" with id="sg-empty" columns=sg_columns rows=sg_none empty="No tasks yet." %}
+  {% endcard %}
+
+  {% card title="Avatars and empty state" %}
+  <div class="flex items-center gap-4">
+    {% include "components/avatar.html" with name="Rahul Sharma" %}
+    {% include "components/avatar.html" with name="Priya Nair" size="5" %}
+    {% include "components/empty_state.html" with icon="folder" text="No files attached." action_label="Upload a file" action_href="#main" %}
+  </div>
+  {% endcard %}
+
+  {% card title="Overlays and toasts" %}
+  <div class="flex flex-wrap gap-3">
+    <button type="button" data-open-modal="sg-modal" class="h-5 px-4 rounded-full border border-accent text-accent hover:bg-line">Open modal</button>
+    <button type="button" data-open-drawer="sg-drawer" class="h-5 px-4 rounded-full border border-accent text-accent hover:bg-line">Open drawer</button>
+    <button type="button" id="sg-toast-ok" class="h-5 px-4 rounded-full bg-ok text-canvas">Success toast</button>
+    <button type="button" id="sg-toast-warn" class="h-5 px-4 rounded-full bg-warn text-canvas">Warning toast</button>
+    <button type="button" id="sg-toast-err" class="h-5 px-4 rounded-full bg-bad text-canvas">Error toast</button>
+  </div>
+  {% endcard %}
+
+  {% card title="Tokens" %}
+  <div class="grid grid-cols-3 md:grid-cols-5 gap-3 text-cap">
+    {% for name, cls in sg_colors %}<div class="flex flex-col gap-1"><div class="h-6 rounded-sm border border-line {{ cls }}"></div><span>{{ name }}</span></div>{% endfor %}
+  </div>
+  <p class="mt-4 text-cap text-ink-600">Type scale:</p>
+  <p class="text-cap">cap 13/18</p><p class="text-body">body 16/24</p><p class="text-sec">sec 21/29</p><p class="text-title">title 26/34</p><p class="text-fig">fig 34/40</p>
+  {% endcard %}
+</div>
+{% endblock %}
+{% block overlays %}
+{% modal id="sg-modal" title="Confirm action" %}
+<p class="mb-3">Are you sure? Esc closes this dialog; Tab stays inside it.</p>
+{% include "components/button.html" with label="Confirm" %}
+{% endmodal %}
+{% drawer id="sg-drawer" title="Day detail" %}
+<p>This panel is 38.2% of the width, used for attendance days and file trails.</p>
+{% enddrawer %}
+<script src="{% static 'js/styleguide.js' %}" defer></script>
+{% endblock %}

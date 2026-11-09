@@ -1,0 +1,6 @@
+{% comment %}card.html (use {% card title="Title" footer="Footer text" %}...{% endcard %}): params title, footer, body (the block).{% endcomment %}
+<section class="bg-canvas border border-line rounded-md shadow-card">
+  {% if title %}<header class="px-4 pt-4 pb-2"><h2 class="text-sec font-semibold text-ink-900">{{ title }}</h2></header>{% endif %}
+  <div class="p-4 text-body text-ink-900">{{ body }}</div>
+  {% if footer %}<footer class="px-4 py-3 border-t border-line text-cap text-ink-600">{{ footer }}</footer>{% endif %}
+</section>

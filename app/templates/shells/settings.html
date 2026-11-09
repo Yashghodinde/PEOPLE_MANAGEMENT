@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-[755px]" data-shell="settings">
+  {% card title="General" footer="Changes apply after saving." %}
+  <form class="flex flex-col gap-3" method="post" action="#">
+    {% include "components/form_field.html" with name="office" label="Office name" value="Head office" %}
+    {% include "components/form_field.html" with name="policy" label="Attendance and selfie policy text" type="textarea" help="Shown once to each employee" %}
+    <div>{% include "components/button.html" with label="Save" type="submit" %}</div>
+  </form>
+  {% endcard %}
+  {% card title="Displays" %}{% include "components/empty_state.html" with icon="tv" text="No TV displays paired yet." action_label="Pair new display" action_href="#" %}{% endcard %}
+</div>
+{% endblock %}

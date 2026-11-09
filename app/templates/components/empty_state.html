@@ -1,0 +1,6 @@
+{% comment %}empty_state.html: params icon (lucide id), text (one line), action_label + action_href (optional).{% endcomment %}{% load ots_ui %}
+<div class="flex flex-col items-center gap-3 p-5 text-center text-ink-600">
+  {% icon icon|default:"inbox" "5" %}
+  <p class="text-body">{{ text }}</p>
+  {% if action_href %}{% include "components/button.html" with href=action_href label=action_label variant="secondary" %}{% endif %}
+</div>

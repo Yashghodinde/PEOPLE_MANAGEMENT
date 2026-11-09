@@ -1,0 +1,19 @@
+{% comment %}
+form_field.html
+  name (required), label (required), type (text|password|email|number|date|textarea; default text)
+  value, placeholder, help, error, required, autocomplete
+Errors render in the `bad` colour with the field described by aria-describedby.
+{% endcomment %}
+<div class="flex flex-col gap-1">
+  <label for="id_{{ name }}" class="text-cap font-medium text-ink-900">{{ label }}{% if required %} <span class="text-bad" aria-hidden="true">*</span>{% endif %}</label>
+  {% if type == 'textarea' %}
+  <textarea id="id_{{ name }}" name="{{ name }}" rows="4" placeholder="{{ placeholder }}"{% if required %} required{% endif %}
+    {% if error %}aria-invalid="true" {% endif %}aria-describedby="hint_{{ name }}"
+    class="w-full px-3 py-2 rounded-sm border {% if error %}border-bad{% else %}border-line{% endif %} bg-canvas text-body text-ink-900 placeholder:text-ink-400 focus:border-accent">{{ value|default:"" }}</textarea>
+  {% else %}
+  <input id="id_{{ name }}" name="{{ name }}" type="{{ type|default:'text' }}" value="{{ value|default:'' }}" placeholder="{{ placeholder }}"
+    {% if autocomplete %}autocomplete="{{ autocomplete }}" {% endif %}{% if required %}required {% endif %}{% if error %}aria-invalid="true" {% endif %}aria-describedby="hint_{{ name }}"
+    class="w-full h-5 px-3 rounded-sm border {% if error %}border-bad{% else %}border-line{% endif %} bg-canvas text-body text-ink-900 placeholder:text-ink-400 focus:border-accent">
+  {% endif %}
+  <p id="hint_{{ name }}" class="text-cap {% if error %}text-bad{% else %}text-ink-600{% endif %}">{% if error %}{{ error }}{% else %}{{ help }}{% endif %}</p>
+</div>

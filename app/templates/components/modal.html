@@ -1,0 +1,11 @@
+{% comment %}modal.html (use {% modal id="m1" title="Confirm" %}...{% endmodal %}). Open with any element carrying data-open-modal="m1". Esc closes; Tab is trapped.{% endcomment %}{% load ots_ui %}
+<div x-data="modal" data-modal-id="{{ id }}" @open-modal.window="onOpen" @keydown.escape.window="hide" x-cloak>
+  <div x-show="open" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="{{ id }}_title">
+    <div class="fixed inset-0 bg-ink-900/50" @click="hide"></div>
+    <div x-ref="panel" tabindex="-1" @keydown.tab="trap" class="relative w-full max-w-md bg-canvas rounded-lg shadow-card border border-line p-4 flex flex-col gap-3">
+      <header class="flex items-center justify-between"><h2 id="{{ id }}_title" class="text-sec font-semibold">{{ title }}</h2>
+        <button type="button" @click="hide" class="rounded-full p-1 text-ink-600 hover:bg-line" aria-label="Close">{% icon "x" %}</button></header>
+      <div class="text-body text-ink-900">{{ body }}</div>
+    </div>
+  </div>
+</div>

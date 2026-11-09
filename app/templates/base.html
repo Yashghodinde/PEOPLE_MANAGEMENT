@@ -1,0 +1,57 @@
+{% load static ots_ui %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#FFFFFF">
+  <title>{% block title %}{{ page_title|default:"Office Task System" }} · OTS{% endblock %}</title>
+  <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <script src="{% static 'js/app.js' %}" defer></script>
+  <script src="{% static 'js/ui.js' %}"></script>
+  <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
+</head>
+{# hx-headers carries the CSRF token on every HTMX request #}
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="sidebar" class="bg-canvas text-ink-900">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-3 focus:bg-canvas">Skip to content</a>
+  <div class="flex min-h-screen">
+    <aside class="shrink-0 border-r border-line bg-canvas hidden md:flex md:flex-col gap-4 p-3 transition-all duration-panel"
+           :class="sidebarClass" aria-label="Main navigation">
+      <div class="flex items-center justify-between h-5">
+        <span class="text-sec font-semibold text-ink-900" x-show="expanded">OTS</span>
+        <button type="button" @click="toggle" class="rounded-full p-1 text-ink-600 hover:bg-line" aria-label="Collapse sidebar">{% icon "panel-left" %}</button>
+      </div>
+      <nav class="flex flex-col gap-1">
+        {% for n in nav_items %}
+        <a href="{{ n.item.path }}" class="flex items-center gap-3 h-5 px-3 rounded-sm text-body {% if n.active %}bg-line text-ink-900 font-medium{% else %}text-ink-600 hover:bg-line{% endif %}" {% if n.active %}aria-current="page"{% endif %}>
+          {% icon n.item.icon %}<span x-show="expanded">{{ n.item.label }}</span>
+        </a>{% endfor %}
+      </nav>
+    </aside>
+    <div class="flex-1 min-w-0 flex flex-col">
+      <header class="flex items-center justify-between h-6 px-5 border-b border-line bg-canvas">
+        <button type="button" @click="toggleMobile" class="md:hidden rounded-full p-2 text-ink-600 hover:bg-line" aria-label="Open menu">{% icon "menu" "5" %}</button>
+        <h1 class="text-title font-semibold text-ink-900">{% block heading %}{{ page_title }}{% endblock %}</h1>
+        <div class="flex items-center gap-3">
+          {% include "components/pending_chip.html" with count=pending_count %}
+          <a href="#" class="relative rounded-full p-2 text-ink-600 hover:bg-line" aria-label="Notifications">{% icon "bell" "5" %}</a>
+          <div x-data="dropdown" class="relative" @keydown.escape.window="close" @click.outside="close">
+            <button type="button" @click="toggle" class="flex items-center gap-2 rounded-full hover:bg-line p-1" aria-haspopup="menu" aria-label="User menu">
+              {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" %}{% icon "chevron-down" "3" %}
+            </button>
+            <div x-show="open" x-cloak class="absolute right-0 mt-2 w-[233px] bg-canvas border border-line rounded-md shadow-card p-2 z-40" role="menu">
+              <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "user" %}Profile</a>
+              <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "download" %}Install app</a>
+              <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out</a>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main id="main" class="flex-1 p-5 w-full max-w-page mx-auto">{% block content %}{% endblock %}</main>
+    </div>
+  </div>
+  {% include "components/toast.html" %}
+  {% block overlays %}{% endblock %}
+</body>
+</html>

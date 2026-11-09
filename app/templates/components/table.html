@@ -1,0 +1,23 @@
+{% comment %}
+table.html
+  id (required, used as the HTMX swap target), columns: list of {label, align ("right" for numbers), sort_url},
+  rows: list of lists of cell values, empty: text for the empty state, next_url: cursor pagination link.
+Rows are 55px high (h-6); numbers right-aligned with tabular-nums. Sorting and "Load more" are HTMX GETs.
+{% endcomment %}{% load ots_ui %}
+<div id="{{ id }}" class="bg-canvas border border-line rounded-md overflow-hidden">
+  <table class="w-full text-body">
+    <thead class="bg-canvas border-b border-line"><tr>
+      {% for col in columns %}<th scope="col" class="h-6 px-4 text-cap font-medium text-ink-600 {% if col.align == 'right' %}text-right{% else %}text-left{% endif %}">
+        {% if col.sort_url %}<a href="{{ col.sort_url }}" hx-get="{{ col.sort_url }}" hx-target="#{{ id }}" class="inline-flex items-center gap-1 hover:text-ink-900">{{ col.label }}{% icon "chevron-down" "3" %}</a>{% else %}{{ col.label }}{% endif %}
+      </th>{% endfor %}
+    </tr></thead>
+    <tbody>
+      {% for row in rows %}<tr class="h-6 border-b border-line last:border-b-0">
+        {% for cell in row %}<td class="px-4 text-ink-900 {% if forloop.counter0 in right_cols %}text-right tabular-nums{% endif %}">{{ cell }}</td>{% endfor %}
+      </tr>{% empty %}<tr><td colspan="{{ columns|length }}" class="p-0">
+        {% include "components/empty_state.html" with icon="inbox" text=empty|default:"Nothing here yet." %}
+      </td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% if next_url %}<div class="p-3 border-t border-line text-center"><a href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#{{ id }}" class="text-cap font-medium text-accent hover:text-ink-900">Load more</a></div>{% endif %}
+</div>

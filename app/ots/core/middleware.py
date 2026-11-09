@@ -43,12 +43,6 @@ def wants_json(request: HttpRequest) -> bool:
     )
 
 
-_PAGE = (
-    "<!doctype html><html lang='en'><meta charset='utf-8'><title>{status}</title>"
-    "<body><h1>{status}</h1><p>{message}</p><p><small>Request {rid}</small></p></body></html>"
-)
-
-
 class ErrorMappingMiddleware:
     """Map OtsError to a response. Never exposes stack traces or exception internals."""
 
@@ -63,11 +57,14 @@ class ErrorMappingMiddleware:
             return None
         if wants_json(request):
             return JsonResponse(exception.to_dict(), status=exception.status)
-        from django.utils.html import escape
+        from django.template.loader import render_to_string
 
-        html = _PAGE.format(
-            status=exception.status,
-            message=escape(exception.message),
-            rid=escape(getattr(request, "request_id", "-")),
+        html = render_to_string(
+            "errors/error.html",
+            {
+                "status": exception.status,
+                "message": exception.message,
+                "request_id": getattr(request, "request_id", "-"),
+            },
         )
         return HttpResponse(html, status=exception.status)

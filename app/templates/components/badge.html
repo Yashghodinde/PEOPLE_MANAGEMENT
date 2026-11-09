@@ -1,0 +1,3 @@
+{% comment %}badge.html: params tone (ok|warn|bad|neutral), label. Use {% badge ENUM_VALUE %} for the fixed enum→colour mapping.{% endcomment %}
+<span class="inline-flex items-center rounded-full px-3 h-4 text-cap font-medium border
+  {% if tone == 'ok' %}border-ok text-ok{% elif tone == 'warn' %}border-warn text-warn{% elif tone == 'bad' %}border-bad text-bad{% else %}border-line text-ink-600{% endif %}">{{ label }}</span>

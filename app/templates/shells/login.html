@@ -1,0 +1,17 @@
+{% extends "base_plain.html" %}{% load ots_ui %}
+{% block body %}
+<main class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-[377px] bg-canvas border border-line rounded-lg shadow-card p-5 flex flex-col gap-4">
+    <header class="text-center"><h1 class="text-title font-semibold">Office Task System</h1><p class="text-body text-ink-600">Sign in to continue</p></header>
+    <form class="flex flex-col gap-3" method="post" action="#">
+      {% include "components/form_field.html" with name="login_id" label="Login ID" required=True autocomplete="username" %}
+      {% include "components/form_field.html" with name="password" label="Password" type="password" required=True autocomplete="current-password" %}
+      {% include "components/button.html" with label="Continue" type="submit" %}
+    </form>
+    <section class="flex flex-col items-center gap-2" aria-label="Attendance selfie (step 2, after the password)">
+      <div class="w-7 h-7 rounded-full border border-line bg-line flex items-center justify-center text-ink-400">{% icon "camera" "5" %}</div>
+      <p class="text-cap text-ink-600 text-center">A selfie is taken after your password to record attendance.</p>
+    </section>
+  </div>
+</main>
+{% endblock %}

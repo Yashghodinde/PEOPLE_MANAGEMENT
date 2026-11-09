@@ -1,0 +1,16 @@
+{% comment %}
+toast.html: the toast region, included once by base.html. Client code calls otsToast("success"|"warning"|"error", "text").
+Django messages are rendered as server toasts (success/warning auto-dismiss after 5 s; errors stay until closed).
+{% endcomment %}{% load ots_ui %}
+<div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-[377px] max-w-full" aria-live="polite" x-data="toastRegion" @ots-toast.window="add">
+  {% for m in messages %}
+  <div x-data="serverToast" data-kind="{{ m.level_tag }}" class="flex items-start gap-3 bg-canvas rounded-md border shadow-card p-3 {% if m.level_tag == 'error' %}border-bad text-bad{% elif m.level_tag == 'warning' %}border-warn text-warn{% else %}border-ok text-ok{% endif %}" role="status">
+    <p class="flex-1 text-body text-ink-900">{{ m }}</p><button type="button" @click="close" aria-label="Dismiss" class="text-ink-600">{% icon "x" %}</button>
+  </div>{% endfor %}
+  <template x-for="t in items" :key="t.id">
+    <div class="flex items-start gap-3 bg-canvas rounded-md border border-line shadow-card p-3" role="status">
+      <p class="flex-1 text-body text-ink-900" x-text="t.message"></p>
+      <button type="button" :data-id="t.id" @click="dismiss" aria-label="Dismiss" class="text-ink-600">{% icon "x" %}</button>
+    </div>
+  </template>
+</div>

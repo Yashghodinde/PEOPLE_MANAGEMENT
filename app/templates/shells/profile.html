@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4" x-data="tabs" data-initial="work" data-shell="profile">
+  {% card %}
+  <div class="flex items-center gap-4">
+    {% include "components/avatar.html" with name="Rahul Sharma" size="5" %}
+    <div><p class="text-sec font-semibold">Rahul Sharma</p><p class="text-body text-ink-600">Accountant · Reports to Priya Nair</p></div>
+  </div>
+  {% endcard %}
+  <div role="tablist" class="flex gap-2 border-b border-line">
+    {% for tab in tabs %}<button type="button" role="tab" data-tab="{{ tab.0 }}" @click="select" aria-selected="{% if tab.0 == initial_tab %}true{% else %}false{% endif %}" class="h-5 px-4 text-body border-b {% if tab.0 == initial_tab %}text-ink-900 border-accent{% else %}text-ink-600 border-transparent{% endif %} hover:text-ink-900">{{ tab.1 }}</button>{% endfor %}
+  </div>
+  {% for tab in tabs %}<div role="tabpanel" data-panel="{{ tab.0 }}"{% if tab.0 != initial_tab %} hidden{% endif %}>
+    {% card title=tab.1 %}{% include "components/empty_state.html" with icon="inbox" text="This tab is filled by its module later." %}{% endcard %}
+  </div>{% endfor %}
+</div>
+{% endblock %}
