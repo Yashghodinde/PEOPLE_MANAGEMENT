@@ -1,4 +1,4 @@
-.PHONY: up test lint typecheck migrate worker e2e-failure e2e-docker
+.PHONY: up test lint typecheck migrate worker e2e-failure e2e-docker shellcheck
 up:
 	docker compose -f deploy/compose.yaml up -d
 test:
@@ -16,3 +16,5 @@ e2e-failure:
 
 e2e-docker:
 	tests/failure/test_F_IN_3.sh
+shellcheck:
+	shellcheck -x --source-path=SCRIPTDIR deploy/scripts/*.sh tests/failure/*.sh

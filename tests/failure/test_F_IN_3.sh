@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015  # "cmd && pass || fail" is intentional: pass never fails
 # F-IN-3: a bad release is rolled back automatically and the previous version keeps serving.
 # Needs the dev/prod stack running with the images ots-app:latest. Run: make e2e-docker
 set -euo pipefail
