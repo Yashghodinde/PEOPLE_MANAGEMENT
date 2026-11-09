@@ -43,6 +43,27 @@ TEMPLATES = [
     }
 ]
 DATABASES = {"default": env.db("DATABASE_URL", default="postgres://localhost/ots")}
+DATABASES["default"]["CONN_MAX_AGE"] = 60
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+DATABASES["default"]["ATOMIC_REQUESTS"] = False
+
+PASSWORD_HASHERS = ["ots.core.hashers.OtsArgon2Hasher"]
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"ctx": {"()": "ots.core.logging.ContextFilter"}},
+    "formatters": {"json": {"()": "ots.core.logging.OtsJsonFormatter"}},
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "json",
+            "filters": ["ctx"],
+        }
+    },
+    "root": {"handlers": ["stdout"], "level": "INFO"},
+}
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Kolkata"
 USE_TZ = True
