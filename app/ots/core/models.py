@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import Now
 
 
 class IdempotencyRecord(models.Model):
@@ -19,3 +20,26 @@ class IdempotencyRecord(models.Model):
 
     def __str__(self) -> str:
         return f"{self.method} {self.path} [{self.key}]"
+
+
+class OutboxEvent(models.Model):
+    """Append-only event log; only published_at/payload (dead-letter marker) change, via DB functions."""
+
+    id = models.BigAutoField(primary_key=True)
+    at = models.DateTimeField(db_default=Now())
+    type = models.CharField(max_length=100)
+    aggregate_type = models.CharField(max_length=60)
+    aggregate_id = models.CharField(max_length=64)
+    payload = models.JSONField(default=dict)
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "outbox_events"
+        indexes = [
+            models.Index(
+                fields=["id"], name="outbox_unpublished_idx", condition=models.Q(published_at__isnull=True)
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.type}#{self.id}"
