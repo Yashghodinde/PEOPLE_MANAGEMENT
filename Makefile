@@ -1,4 +1,4 @@
-.PHONY: up test lint typecheck migrate worker e2e-failure
+.PHONY: up test lint typecheck migrate worker e2e-failure e2e-docker
 up:
 	docker compose -f deploy/compose.yaml up -d
 test:
@@ -13,3 +13,6 @@ worker:
 	uv run python app/manage.py run_worker
 e2e-failure:
 	uv run pytest tests/failure -q
+
+e2e-docker:
+	tests/failure/test_F_IN_3.sh

@@ -6,7 +6,9 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 REF="${1:?usage: deploy.sh <git-ref>}"
-TAG="$(printf '%s' "$REF" | tr -c 'A-Za-z0-9_.-' '-')"
+# Resolve a git ref to its short SHA so image tags identify the exact commit; otherwise sanitise the name.
+if sha="$(git -C "$ROOT" rev-parse --short "$REF^{commit}" 2>/dev/null)"; then TAG="$sha"
+else TAG="$(printf '%s' "$REF" | tr -c 'A-Za-z0-9_.-' '-')"; fi
 mkdir -p "$STATE_DIR" "$OTS_HOST_DATA/backup-local"
 
 log "1/7 tagging current image as ots-app:previous"
