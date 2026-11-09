@@ -1,0 +1,55 @@
+[project]
+name = "ots"
+version = "0.1.0"
+description = "Office Task System"
+requires-python = ">=3.12"
+dependencies = [
+  "django>=5.2,<5.3",
+  "psycopg[binary]>=3.2",
+  "uvicorn[standard]",
+  "django-environ",
+  "django-htmx",
+  "argon2-cffi",
+  "msal",
+  "httpx",
+  "croniter",
+  "uuid6",
+  "zstandard",
+  "python-json-logger",
+  "cryptography",
+  "whitenoise",
+]
+
+[dependency-groups]
+dev = [
+  "pytest", "pytest-django", "pytest-asyncio", "factory-boy", "freezegun", "respx",
+  "ruff", "mypy", "django-stubs",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["app", "."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+mypy_path = "app"
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[[tool.mypy.overrides]]
+module = ["ots.core.*", "ots.storage.*", "ots.backup.*"]
+strict = true
