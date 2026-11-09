@@ -26,6 +26,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "ots.core.middleware.RequestIdMiddleware",
+    "ots.core.middleware.ErrorMappingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 TEMPLATES = [
