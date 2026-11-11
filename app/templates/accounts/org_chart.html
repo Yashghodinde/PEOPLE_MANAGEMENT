@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<section aria-label="Organisation chart" class="flex flex-col gap-3">
+  {% include "accounts/_org_nodes.html" with nodes=tree %}
+</section>
+{% endblock %}

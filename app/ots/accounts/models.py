@@ -153,6 +153,12 @@ class User(AbstractBaseUser):
     def __str__(self) -> str:
         return f"{self.full_name} ({self.employee_id})"
 
+    def get_full_name(self) -> str:
+        return self.full_name
+
+    def get_short_name(self) -> str:
+        return self.full_name.split(" ")[0] if self.full_name else self.login_id
+
     @property
     def rank(self) -> int:
         return ROLE_RANK[Role(self.role)]

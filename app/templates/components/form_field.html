@@ -1,12 +1,18 @@
 {% comment %}
 form_field.html
-  name (required), label (required), type (text|password|email|number|date|textarea; default text)
+  name (required), label (required), type (text|password|email|number|date|time|select|textarea; default text); options (select): list of (value, label), value = selected value
   value, placeholder, help, error, required, autocomplete
 Errors render in the `bad` colour with the field described by aria-describedby.
 {% endcomment %}
 <div class="flex flex-col gap-1">
   <label for="id_{{ name }}" class="text-cap font-medium text-ink-900">{{ label }}{% if required %} <span class="text-bad" aria-hidden="true">*</span>{% endif %}</label>
-  {% if type == 'textarea' %}
+  {% if type == 'select' %}
+  <select id="id_{{ name }}" name="{{ name }}"{% if required %} required{% endif %} {{ attrs }}
+    {% if error %}aria-invalid="true" {% endif %}aria-describedby="hint_{{ name }}"
+    class="w-full h-5 px-3 rounded-sm border {% if error %}border-bad{% else %}border-line{% endif %} bg-canvas text-body text-ink-900 focus:border-accent">
+    {% for opt in options %}<option value="{{ opt.0 }}"{% if opt.0|stringformat:"s" == value|default:""|stringformat:"s" %} selected{% endif %}>{{ opt.1 }}</option>{% endfor %}
+  </select>
+  {% elif type == 'textarea' %}
   <textarea id="id_{{ name }}" name="{{ name }}" rows="4" placeholder="{{ placeholder }}"{% if required %} required{% endif %}
     {% if error %}aria-invalid="true" {% endif %}aria-describedby="hint_{{ name }}"
     class="w-full px-3 py-2 rounded-sm border {% if error %}border-bad{% else %}border-line{% endif %} bg-canvas text-body text-ink-900 placeholder:text-ink-400 focus:border-accent">{{ value|default:"" }}</textarea>

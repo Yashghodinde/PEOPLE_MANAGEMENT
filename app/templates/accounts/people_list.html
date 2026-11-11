@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <form method="get" action="/app/people" class="flex items-end gap-2 flex-wrap" aria-label="Filters">
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Role
+        <select name="role" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">All</option>{% for r in roles %}<option value="{{ r.0 }}"{% if f.role == r.0 %} selected{% endif %}>{{ r.1 }}</option>{% endfor %}
+        </select></label>
+      {% if departments %}<label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Department
+        <select name="department" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">All</option>{% for d in departments %}<option value="{{ d.pk }}"{% if f.department == d.pk|stringformat:"s" %} selected{% endif %}>{{ d.name }}</option>{% endfor %}
+        </select></label>{% endif %}
+      {% if managers %}<label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Manager
+        <select name="manager" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">All</option>{% for m in managers %}<option value="{{ m.pk }}"{% if f.manager == m.pk|stringformat:"s" %} selected{% endif %}>{{ m.full_name }}</option>{% endfor %}
+        </select></label>{% endif %}
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Status
+        <select name="active" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="1"{% if f.active == "1" %} selected{% endif %}>Active</option>
+          <option value="0"{% if f.active == "0" %} selected{% endif %}>Inactive</option>
+          <option value="all"{% if f.active == "all" %} selected{% endif %}>All</option>
+        </select></label>
+      {% include "components/button.html" with label="Filter" type="submit" variant="secondary" %}
+    </form>
+    {% if can_create %}{% include "components/button.html" with label="New person" href="/app/people/new" icon="plus" %}{% endif %}
+  </div>
+  {% include "components/table.html" with id="people" columns=columns rows=rows empty="No people match these filters." %}
+  {% if prev_url or next_url %}<nav class="flex items-center justify-between text-cap text-ink-600" aria-label="Pages">
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} people</span>
+    <span class="flex gap-3">{% if prev_url %}<a class="text-accent hover:text-ink-900" href="{{ prev_url }}">Previous</a>{% endif %}{% if next_url %}<a class="text-accent hover:text-ink-900" href="{{ next_url }}">Next</a>{% endif %}</span>
+  </nav>{% endif %}
+</div>
+{% endblock %}

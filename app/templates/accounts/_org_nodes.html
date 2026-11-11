@@ -1,0 +1,18 @@
+{% load ots_ui %}
+<ul class="flex flex-col gap-2 {% if nested %}pl-5 border-l border-line{% endif %}">
+  {% for n in nodes %}
+  <li id="node-{{ n.u.pk }}" data-level-node>
+    <div class="flex items-center gap-3 bg-canvas border border-line rounded-md p-3 shadow-card">
+      {% include "components/avatar.html" with name=n.u.full_name %}
+      <div class="min-w-0">
+        <p class="text-body font-medium truncate">{% if n.detail %}<a class="hover:text-accent" href="/app/people/{{ n.u.pk }}">{{ n.u.full_name }}</a>{% else %}{{ n.u.full_name }}{% endif %}</p>
+        {% if n.detail %}<p class="text-cap text-ink-600 truncate">{{ n.u.designation|default:n.u.get_role_display }} · {{ n.u.employee_id }}</p>{% endif %}
+      </div>
+      {% if n.has_children and not n.kids %}
+      <button type="button" class="ml-auto rounded-full p-1 text-ink-600 hover:bg-line" aria-label="Show team of {{ n.u.full_name }}"
+              hx-get="/app/org/children/{{ n.u.pk }}" hx-target="#kids-{{ n.u.pk }}" hx-swap="innerHTML">{% icon "chevron-right" %}</button>
+      {% endif %}
+    </div>
+    <div id="kids-{{ n.u.pk }}" class="mt-2">{% if n.kids %}{% include "accounts/_org_nodes.html" with nodes=n.kids nested=True %}{% endif %}</div>
+  </li>{% endfor %}
+</ul>

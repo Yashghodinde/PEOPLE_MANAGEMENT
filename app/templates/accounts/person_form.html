@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<form id="person-form" class="flex flex-col gap-4 max-w-[610px]" method="post"
+      action="{% if target %}/app/people/{{ target.pk }}/update{% else %}/app/people/new{% endif %}"
+      hx-post="{% if target %}/app/people/{{ target.pk }}/update{% else %}/app/people/new{% endif %}" hx-target="#person-form" hx-swap="outerHTML">
+  {% csrf_token %}
+  <input type="hidden" name="_form" value="person">
+  {% if target %}<input type="hidden" name="version" value="{{ target.version }}">{% endif %}
+  {% if message %}<p role="alert" class="text-body text-bad">{{ message }}</p>{% endif %}
+  {% if not target %}
+  <fieldset class="flex flex-col gap-3 border border-line rounded-md p-4"><legend class="px-2 text-sec font-semibold">Sign-in</legend>
+    {% include "components/form_field.html" with name="login_id" label="Login ID" value=v.login_id required=True error=errors.login_id.0 autocomplete="off" %}
+    {% include "components/form_field.html" with name="password" label="Temporary password" type="password" required=True error=errors.password.0 help="At least 10 characters. They must change it at first login." autocomplete="new-password" %}
+  </fieldset>
+  {% endif %}
+  {% for group, fields in groups %}
+  <fieldset class="flex flex-col gap-3 border border-line rounded-md p-4"><legend class="px-2 text-sec font-semibold">{{ group }}</legend>
+    {% for name, label, kind, req in fields %}
+      {% if kind == "manager" %}{% include "accounts/_manager_field.html" %}
+      {% elif name == "role" %}{% include "components/form_field.html" with name=name label=label type="select" options=roles value=v.role required=True error=errors.role.0 attrs='hx-get="/app/people/manager-options" hx-trigger="change" hx-target="#manager-field" hx-swap="outerHTML" hx-include="[name=role]"' %}
+      {% elif name == "department" %}<div class="flex flex-col gap-1">
+        <label for="id_department" class="text-cap font-medium text-ink-900">{{ label }}</label>
+        <select id="id_department" name="department" class="w-full h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">—</option>{% for d in departments %}<option value="{{ d.pk }}"{% if d.pk|stringformat:"s" == v.department %} selected{% endif %}>{{ d.name }}</option>{% endfor %}
+        </select></div>
+      {% elif name == "highest_qualification" %}{% include "components/form_field.html" with name=name label=label type="select" options=qualifications value=v.highest_qualification %}
+      {% elif kind == "days" %}<div class="flex flex-col gap-1"><span class="text-cap font-medium text-ink-900">{{ label }}</span>
+        <div class="flex gap-3 flex-wrap">{% for n, d in weekdays %}<label class="flex items-center gap-1 text-body"><input type="checkbox" name="weekly_off" value="{{ n }}"{% if n in weekly_off %} checked{% endif %}> {{ d }}</label>{% endfor %}</div></div>
+      {% else %}{% include "components/form_field.html" with name=name label=label type=kind value=v|get_item:name error=errors|get_item:name|first required=req %}
+      {% endif %}
+    {% endfor %}
+  </fieldset>
+  {% endfor %}
+  <div class="flex gap-3">
+    {% include "components/button.html" with label="Save" type="submit" %}
+    {% include "components/button.html" with label="Cancel" href="/app/people" variant="ghost" %}
+  </div>
+</form>
+{% endblock %}

@@ -7,12 +7,10 @@ from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 
-from ots.core import permissions
 from ots.core.errors import Locked, ValidationFailed
 from ots.core.idempotency import idempotency_exempt
 
 from . import auth, services
-from .models import User
 
 BACKEND = "django.contrib.auth.backends.ModelBackend"
 
@@ -77,22 +75,11 @@ def change_password_view(request: HttpRequest) -> HttpResponse:
     return render(request, "accounts/change_password.html", ctx)
 
 
-UPDATABLE_FORM_FIELDS = [
-    "full_name", "designation", "employee_id", "role", "mobile", "email",
-    "qualification_detail", "institution",
-]  # fmt: skip
-
-
-@require_http_methods(["POST"])
-def person_update(request: HttpRequest, pk: object) -> HttpResponse:
-    """Update a person's profile (Super Admin only; the policy check runs before the row is fetched)."""
+@require_http_methods(["GET"])
+def home(request: HttpRequest) -> HttpResponse:
+    """Landing page after login: admins start at the people list, everyone else at their own profile."""
     if not request.user.is_authenticated:
         return redirect("/login")
-    permissions.require(request.user, "user.update")
-    target = User.objects.get(pk=pk)
-    changes = {k: request.POST[k] for k in UPDATABLE_FORM_FIELDS if k in request.POST}
-    version = request.POST.get("version")
-    services.update_profile(
-        request.user, target, expected_version=int(version) if version else None, request=request, **changes
-    )
-    return redirect(f"/app/people/{target.pk}")
+    if request.user.role == "EMPLOYEE":
+        return redirect(f"/app/people/{request.user.pk}")
+    return redirect("/app/people")
