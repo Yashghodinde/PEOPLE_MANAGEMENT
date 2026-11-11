@@ -31,6 +31,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "ots.core.middleware.RequestIdMiddleware",
     "ots.core.middleware.ErrorMappingMiddleware",
+    "ots.accounts.middleware.MustChangePasswordMiddleware",
     "ots.core.idempotency.IdempotencyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
@@ -55,6 +56,14 @@ DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DATABASES["default"]["ATOMIC_REQUESTS"] = False
 
 AUTH_USER_MODEL = "accounts.User"
+LOGIN_URL = "/login"
+OTS_HOME_URL = "/"
+OTS_SELFIE_STAGE_ENABLED = False  # M06 enables the selfie step after the password
+SESSION_COOKIE_AGE = 12 * 3600  # absolute ceiling
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = True
 PASSWORD_HASHERS = ["ots.core.hashers.OtsArgon2Hasher"]
 
 LOGGING = {

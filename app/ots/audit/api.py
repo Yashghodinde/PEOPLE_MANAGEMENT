@@ -6,6 +6,7 @@ from typing import Any
 
 from django.db import connection
 
+from ots.core.clock import now
 from ots.core.logging import request_id_var
 
 from .models import AuditLog
@@ -39,6 +40,7 @@ def record(
     target_type, target_id = _target(target)
     rid = getattr(request, "request_id", None) or request_id_var.get()
     return AuditLog.objects.create(
+        at=now(),
         actor_id=getattr(actor, "pk", actor),
         action=action,
         target_type=target_type,
