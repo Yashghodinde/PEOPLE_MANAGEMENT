@@ -38,6 +38,12 @@ def badge(value: Any, label: str = "") -> str:
 
 
 @register.filter
+def get_item(mapping: Any, key: str) -> Any:
+    """{{ values|get_item:name }}: dict lookup with a name held in a variable; missing gives ''."""
+    return mapping.get(key, "") if hasattr(mapping, "get") else ""
+
+
+@register.filter
 def tone(value: Any) -> str:
     return status.tone(value)
 

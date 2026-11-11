@@ -41,9 +41,9 @@
               {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" %}{% icon "chevron-down" "3" %}
             </button>
             <div x-show="open" x-cloak class="absolute right-0 mt-2 w-[233px] bg-canvas border border-line rounded-md shadow-card p-2 z-40" role="menu">
-              <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "user" %}Profile</a>
+              <a href="/app/people/{{ request.user.pk }}" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "user" %}Profile</a>
               <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "download" %}Install app</a>
-              <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out</a>
+              <form method="post" action="/logout">{% csrf_token %}<button type="submit" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out</button></form>
             </div>
           </div>
         </div>

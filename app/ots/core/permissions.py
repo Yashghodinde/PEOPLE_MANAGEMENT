@@ -41,6 +41,6 @@ def can(user: Any, action: str, obj: Any = None) -> bool:
 def require(user: Any, action: str, obj: Any = None) -> None:
     fn = _REGISTRY.get(action)
     if fn is None:
-        raise UnknownAction(f"no policy registered for '{action}'")
+        raise UnknownAction(f"no policy registered for '{action}'", action=action)
     if not fn(user, obj):
         raise PermissionDenied(f"not allowed: {action}", action=action)

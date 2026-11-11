@@ -13,6 +13,8 @@ ASGI_APPLICATION = "config.asgi.application"
 
 INSTALLED_APPS = [
     "ots.core",
+    "ots.accounts",
+    "ots.audit",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -29,6 +31,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "ots.core.middleware.RequestIdMiddleware",
     "ots.core.middleware.ErrorMappingMiddleware",
+    "ots.accounts.middleware.MustChangePasswordMiddleware",
     "ots.core.idempotency.IdempotencyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
@@ -52,6 +55,21 @@ DATABASES["default"]["CONN_MAX_AGE"] = 60
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DATABASES["default"]["ATOMIC_REQUESTS"] = False
 
+AUTH_USER_MODEL = "accounts.User"
+LOGIN_URL = "/login"
+OTS_HOME_URL = "/"
+OTS_SELFIE_STAGE_ENABLED = False  # M06 enables the selfie step after the password
+SESSION_COOKIE_AGE = 12 * 3600  # absolute ceiling
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = True
+# Number of reverse proxies in front of the app (Caddy = 1; plain dev server = 0). With 1 or more we trust
+# Caddy's X-Forwarded-Proto (so HTTPS requests are seen as secure and CSRF origin checks pass) and take the
+# client IP for the audit log from the entry Caddy added, never from a header the client could forge.
+OTS_TRUSTED_PROXY_HOPS = env.int("OTS_TRUSTED_PROXY_HOPS", default=0)
+if OTS_TRUSTED_PROXY_HOPS > 0:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 PASSWORD_HASHERS = ["ots.core.hashers.OtsArgon2Hasher"]
 
 LOGGING = {

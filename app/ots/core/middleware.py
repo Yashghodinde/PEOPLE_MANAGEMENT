@@ -1,9 +1,10 @@
+import logging
 import re
 from collections.abc import Callable
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from .errors import OtsError
+from .errors import OtsError, PermissionDenied
 from .ids import uuid7
 from .logging import request_id_var, user_id_var
 
@@ -43,6 +44,11 @@ def wants_json(request: HttpRequest) -> bool:
     )
 
 
+# Set by ots.audit at startup: writes security.denied. The view's savepoint is rolled back on a 403,
+# so the hook must write on its own connection (see ots.audit.denied).
+denied_hook: Callable[[HttpRequest, PermissionDenied], None] | None = None
+
+
 class ErrorMappingMiddleware:
     """Map OtsError to a response. Never exposes stack traces or exception internals."""
 
@@ -55,6 +61,11 @@ class ErrorMappingMiddleware:
     def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
         if not isinstance(exception, OtsError):
             return None
+        if isinstance(exception, PermissionDenied) and denied_hook is not None:
+            try:
+                denied_hook(request, exception)
+            except Exception:  # noqa: BLE001  (auditing must never turn a 403 into a 500)
+                logging.getLogger(__name__).exception("could not record security.denied")
         if wants_json(request):
             return JsonResponse(exception.to_dict(), status=exception.status)
         from django.template.loader import render_to_string

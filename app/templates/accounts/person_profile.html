@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4" x-data="tabs" data-initial="{{ initial_tab }}">
+  {% card %}
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-4">
+      {% include "components/avatar.html" with name=target.full_name size="5" %}
+      <div>
+        <p class="text-sec font-semibold">{{ target.full_name }}{% if not target.is_active %} {% badge "CANCELLED" "Inactive" %}{% endif %}</p>
+        <p class="text-body text-ink-600">{{ target.designation|default:"No designation" }}{% if qualification %} · {{ qualification }}{% endif %}</p>
+        <p class="text-body text-ink-600">{% if target.reports_to %}Reports to {{ target.reports_to.full_name }}{% else %}Top of the organisation{% endif %} · {{ target.employee_id }}</p>
+      </div>
+    </div>
+    {% if is_admin %}
+    <div class="flex items-center gap-2 flex-wrap">
+      {% include "components/button.html" with label="Edit" href=edit_url variant="secondary" %}
+      {% if target.is_active and not is_self %}
+      {% include "components/button.html" with label="Deactivate" variant="danger" attrs=deactivate_attrs %}
+      {% elif not target.is_active %}
+      {% include "components/button.html" with label="Reactivate" variant="secondary" attrs=reactivate_attrs %}
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endcard %}
+  {% if is_admin %}
+  {% card title="Reset password" footer="They will be asked to choose a new password at next sign-in." %}
+  <form class="flex items-end gap-3 flex-wrap" method="post" action="/app/people/{{ target.pk }}/reset-password" hx-post="/app/people/{{ target.pk }}/reset-password" hx-swap="none">
+    {% csrf_token %}<input type="hidden" name="version" value="{{ target.version }}">
+    {% include "components/form_field.html" with name="new_password" label="Temporary password" type="password" required=True autocomplete="new-password" %}
+    {% include "components/button.html" with label="Reset" type="submit" variant="secondary" %}
+  </form>
+  {% endcard %}
+  {% endif %}
+  <div role="tablist" class="flex gap-2 border-b border-line">
+    {% for tab in tabs %}<button type="button" role="tab" data-tab="{{ tab.0 }}" @click="select" aria-selected="{% if tab.0 == initial_tab %}true{% else %}false{% endif %}" class="h-5 px-4 text-body border-b {% if tab.0 == initial_tab %}text-ink-900 border-accent{% else %}text-ink-600 border-transparent{% endif %} hover:text-ink-900">{{ tab.1 }}</button>{% endfor %}
+  </div>
+  {% for tab in tabs %}<div role="tabpanel" data-panel="{{ tab.0 }}"{% if tab.0 != initial_tab %} hidden{% endif %}>
+    {% card title=tab.1 %}{% include "components/empty_state.html" with icon="inbox" text="This tab is filled by its module later." %}{% endcard %}
+  </div>{% endfor %}
+</div>
+{% endblock %}

@@ -24,6 +24,11 @@
     if (verb !== "get" && !e.detail.headers["Idempotency-Key"]) e.detail.headers["Idempotency-Key"] = uuid7();
   });
 
+  // Validation errors (422) carry the corrected form: swap them in place instead of dropping them.
+  document.body.addEventListener("htmx:beforeSwap", function (e) {
+    if (e.detail.xhr.status === 422) { e.detail.shouldSwap = true; e.detail.isError = false; }
+  });
+
   // Server error responses surface as toasts instead of failing silently.
   document.body.addEventListener("htmx:responseError", function (e) {
     var msg = "Request failed (" + e.detail.xhr.status + ")";

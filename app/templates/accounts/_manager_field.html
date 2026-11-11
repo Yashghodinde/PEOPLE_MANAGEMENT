@@ -1,0 +1,10 @@
+{% load ots_ui %}
+<div id="manager-field" class="flex flex-col gap-1">
+  <label for="id_reports_to" class="text-cap font-medium text-ink-900">Reports to{% if role != "SUPER_ADMIN" %} <span class="text-bad" aria-hidden="true">*</span>{% endif %}</label>
+  <select id="id_reports_to" name="reports_to" {% if role == "SUPER_ADMIN" %}disabled{% endif %}
+    class="w-full h-5 px-3 rounded-sm border {% if errors.reports_to %}border-bad{% else %}border-line{% endif %} bg-canvas text-body text-ink-900 focus:border-accent">
+    <option value="">{% if role == "SUPER_ADMIN" %}No manager{% else %}Choose a manager{% endif %}</option>
+    {% for m in managers %}<option value="{{ m.pk }}"{% if m.pk|stringformat:"s" == manager_id %} selected{% endif %}>{{ m.full_name }} · {{ m.get_role_display }}</option>{% endfor %}
+  </select>
+  <p class="text-cap {% if errors.reports_to %}text-bad{% else %}text-ink-600{% endif %}">{% if errors.reports_to %}{{ errors.reports_to.0 }}{% else %}Only active people with a higher role are listed.{% endif %}</p>
+</div>
