@@ -63,8 +63,28 @@ def _default_weekly_off() -> list[int]:
     return [6]  # Sunday; 0=Mon … 6=Sun
 
 
+class UserQuerySet(models.QuerySet["User"]):
+    def visible_to(self, viewer: User | None) -> UserQuerySet:
+        """Rows `viewer` may see: Super Admin all; Sub-Admin own subtree + self; Employee self only."""
+        from . import selectors
+
+        if viewer is None or not viewer.is_active:
+            return self.none()
+        if viewer.role == Role.SUPER_ADMIN:
+            return self.all()
+        if viewer.role == Role.SUB_ADMIN:
+            return self.filter(models.Q(pk=viewer.pk) | models.Q(pk__in=selectors.subtree_ids(viewer.pk)))
+        return self.filter(pk=viewer.pk)
+
+
 class UserManager(BaseUserManager["User"]):
     use_in_migrations = False
+
+    def get_queryset(self) -> UserQuerySet:
+        return UserQuerySet(self.model, using=self._db)
+
+    def visible_to(self, viewer: User | None) -> UserQuerySet:
+        return self.get_queryset().visible_to(viewer)
 
 
 class User(AbstractBaseUser):
