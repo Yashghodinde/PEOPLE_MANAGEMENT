@@ -13,6 +13,7 @@ ASGI_APPLICATION = "config.asgi.application"
 
 INSTALLED_APPS = [
     "ots.core",
+    "ots.accounts",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -52,6 +53,7 @@ DATABASES["default"]["CONN_MAX_AGE"] = 60
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DATABASES["default"]["ATOMIC_REQUESTS"] = False
 
+AUTH_USER_MODEL = "accounts.User"
 PASSWORD_HASHERS = ["ots.core.hashers.OtsArgon2Hasher"]
 
 LOGGING = {
