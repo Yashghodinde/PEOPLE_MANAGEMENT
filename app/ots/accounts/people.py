@@ -244,6 +244,18 @@ def _pick_manager(raw: str) -> User | None:
     return manager
 
 
+def _display(value: Any) -> Any:
+    """A form value as the HTML input expects it. Templates would otherwise localise times and dates
+    ("9:30 a.m.") and show a Department object where the select compares ids, blanking the field."""
+    if isinstance(value, datetime.time):
+        return value.strftime("%H:%M")
+    if isinstance(value, datetime.date):
+        return value.isoformat()
+    if isinstance(value, Department):
+        return str(value.pk)
+    return value
+
+
 def _form_ctx(
     request: HttpRequest,
     *,
@@ -260,7 +272,7 @@ def _form_ctx(
         "page_title": "Edit person" if target else "New person",
         "target": target,
         "groups": GROUPS,
-        "v": values,
+        "v": {k: _display(val) for k, val in values.items()},
         "errors": errors,
         "message": message,
         "roles": ROLE_CHOICES,

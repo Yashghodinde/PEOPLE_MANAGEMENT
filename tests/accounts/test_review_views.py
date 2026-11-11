@@ -239,3 +239,21 @@ def test_profile_actions_send_the_version_they_were_rendered_with(org):
     body = login("boss").get(f"/app/people/{emp.pk}").content.decode()
     assert f"&quot;version&quot;: {emp.version}" in body or f'"version": {emp.version}' in body
     assert f'name="version" value="{emp.version}"' in body
+
+
+def test_error_rerender_keeps_times_dates_and_department_in_input_format(org):
+    from ots.accounts.models import Department
+
+    emp = org["emp"]
+    dept = Department.objects.create(company=emp.company, name="Operations")
+    r = login("boss").post(
+        f"/app/people/{emp.pk}/update",
+        form(emp, employee_id=org["sa"].employee_id, department=str(dept.pk), date_of_joining="2026-03-04",
+             shift_start="09:30", shift_end="18:45"),
+        **key(),
+    )  # fmt: skip
+    body = r.content.decode()
+    assert r.status_code == 422
+    assert 'value="09:30"' in body and 'value="18:45"' in body and 'value="2026-03-04"' in body
+    assert re.search(rf'<option value="{dept.pk}" selected', body)
+    assert "a.m." not in body and "p.m." not in body
