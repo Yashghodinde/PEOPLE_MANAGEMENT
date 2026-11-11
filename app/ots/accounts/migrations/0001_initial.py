@@ -15,7 +15,7 @@ import ots.core.ids
 class Migration(migrations.Migration):
     initial = True
 
-    dependencies = []
+    dependencies = [("ots_core", "0001_roles")]
 
     operations = [
         migrations.CreateModel(

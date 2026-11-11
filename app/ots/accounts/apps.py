@@ -12,3 +12,4 @@ class AccountsConfig(AppConfig):
         from django.contrib.auth.models import update_last_login
 
         user_logged_in.disconnect(update_last_login, dispatch_uid="update_user_last_login")
+        from . import permissions  # noqa: F401  (registers policies)

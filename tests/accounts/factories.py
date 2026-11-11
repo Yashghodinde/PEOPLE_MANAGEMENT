@@ -1,8 +1,9 @@
 """Test helpers: build users with unique codes. Bypasses services on purpose (services come in M02.2)."""
 
+import datetime
 import itertools
 
-from ots.accounts.models import Company, Role, User
+from ots.accounts.models import Company, ReportingHistory, Role, User
 
 _n = itertools.count(1)
 
@@ -21,4 +22,5 @@ def make_user(role: str = Role.EMPLOYEE, reports_to: User | None = None, **kw) -
     u = User(company=company(), role=role, reports_to=reports_to, **kw)
     u.set_password("correct horse battery")
     u.save()
+    ReportingHistory.objects.create(user=u, manager=reports_to, effective_from=datetime.date(2000, 1, 1))
     return u

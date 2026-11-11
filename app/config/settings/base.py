@@ -14,6 +14,7 @@ ASGI_APPLICATION = "config.asgi.application"
 INSTALLED_APPS = [
     "ots.core",
     "ots.accounts",
+    "ots.audit",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",
