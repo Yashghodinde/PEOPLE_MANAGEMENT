@@ -54,7 +54,10 @@ def test_failures_outside_window_do_not_lock(emp):
         assert User.objects.get(pk=emp.pk).locked_until is None
 
 
-def test_every_attempt_is_audited_with_ip(emp):
+def test_every_attempt_is_audited_with_ip(emp, settings):
+    settings.OTS_TRUSTED_PROXY_HOPS = (
+        1  # one proxy (Caddy) in front: its entry is the last in X-Forwarded-For
+    )
     c = Client(HTTP_X_FORWARDED_FOR="10.1.2.3")
     _post(c, "asha", "wrong")
     _post(c, "nobody", "wrong")

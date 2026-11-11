@@ -64,6 +64,12 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
+# Number of reverse proxies in front of the app (Caddy = 1; plain dev server = 0). With 1 or more we trust
+# Caddy's X-Forwarded-Proto (so HTTPS requests are seen as secure and CSRF origin checks pass) and take the
+# client IP for the audit log from the entry Caddy added, never from a header the client could forge.
+OTS_TRUSTED_PROXY_HOPS = env.int("OTS_TRUSTED_PROXY_HOPS", default=0)
+if OTS_TRUSTED_PROXY_HOPS > 0:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 PASSWORD_HASHERS = ["ots.core.hashers.OtsArgon2Hasher"]
 
 LOGGING = {

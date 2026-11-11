@@ -13,8 +13,8 @@ COMMON_FILE = Path(__file__).parent / "data" / "common_passwords.txt"
 
 @lru_cache(maxsize=1)
 def _common() -> frozenset[str]:
-    if not COMMON_FILE.exists():
-        return frozenset()
+    if not COMMON_FILE.exists():  # never silently turn the check off: a missing file is a broken install
+        raise RuntimeError(f"common password list is missing: {COMMON_FILE}")
     return frozenset(x.strip().lower() for x in COMMON_FILE.read_text().splitlines() if x.strip())
 
 

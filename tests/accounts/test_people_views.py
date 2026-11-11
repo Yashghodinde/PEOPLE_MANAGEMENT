@@ -153,7 +153,7 @@ def test_create_person_errors_rerender_form(org):
          "role": "EMPLOYEE", "reports_to": ""},
         **key(),
     )  # fmt: skip
-    assert r.status_code == 200
+    assert r.status_code == 422  # errors are shown in place, but the status says it was not saved
     body = r.content.decode()
     assert "Choose who this person reports to." in body or "login ID is already used" in body
     assert User.objects.filter(login_id__iexact="boss").count() == 1
@@ -220,12 +220,11 @@ def test_org_chart_renders_three_levels_with_lazy_children(org):
     assert "Asha Employee" in kids  # level 3 arrives through HTMX
 
 
-def test_org_chart_permissions_and_names_only_outside_subtree(org):
+def test_org_chart_permissions_and_own_team_for_sub_admin(org):
     assert login("emp").get("/app/org").status_code == 403
     body = login("sub").get("/app/org").content.decode()
-    assert "Asha Employee" not in body
-    assert "Other Sub" in body and "Other Sub</a>" not in body  # name only: no link, no details
-    assert "Sub Admin</a>" in body  # own node keeps its link
+    assert "Asha Employee" in body  # their own team starts right under them
+    assert "Sub Admin</a>" in body and "Other Sub" not in body and "Boss Person" not in body
     assert not link(body, org["sub2"])
 
 

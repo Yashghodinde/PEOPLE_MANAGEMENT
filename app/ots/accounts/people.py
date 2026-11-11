@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import datetime
+import uuid
 from typing import Any
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -16,11 +17,30 @@ from django.views.decorators.http import require_http_methods
 
 from ots.core import permissions
 from ots.core.errors import NotFound, ValidationFailed
+from ots.core.idempotency import idempotency_optional
 
 from . import selectors, services
 from .models import ROLE_RANK, Department, Qualification, Role, User
 
 PAGE_SIZE = 50
+
+
+def _uuid_or_none(raw: Any) -> uuid.UUID | None:
+    """A UUID from user text, or None when it is blank or not a UUID (never raises)."""
+    try:
+        return uuid.UUID(str(raw).strip())
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _parse_version(raw: str | None) -> int:
+    """The edit form always sends the version it loaded with. Without it the lock protects nobody."""
+    try:
+        return int((raw or "").strip())
+    except ValueError:
+        raise ValidationFailed("This form is out of date. Reload the page and try again.") from None
+
+
 WEEKDAYS = [(0, "Mon"), (1, "Tue"), (2, "Wed"), (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun")]
 ROLE_CHOICES = [(v, label) for v, label in Role.choices]
 QUAL_CHOICES = [("", "—"), *[(v, label) for v, label in Qualification.choices]]
@@ -81,6 +101,12 @@ def _visible_or_404(request: HttpRequest, pk: Any) -> User:
 # ---------------------------------------------------------------- list
 
 
+def _page_url(params: Any, number: int) -> str:
+    """Link to another page that keeps the current filters."""
+    keep = [(k, v) for k, v in params.items() if k != "page" and v != ""]
+    return "?" + urlencode([*keep, ("page", number)])
+
+
 @login_required
 @require_http_methods(["GET"])
 def people_list(request: HttpRequest) -> HttpResponse:
@@ -90,13 +116,14 @@ def people_list(request: HttpRequest) -> HttpResponse:
     if g.get("role") in Role.values:
         qs = qs.filter(role=g["role"])
     if g.get("department"):
-        qs = (
-            qs.filter(department_id=g["department"])
-            if g["department"] != "none"
-            else qs.filter(department__isnull=True)
-        )
+        if g["department"] == "none":
+            qs = qs.filter(department__isnull=True)
+        else:
+            dept_id = _uuid_or_none(g["department"])
+            qs = qs.filter(department_id=dept_id) if dept_id else qs.none()
     if g.get("manager"):
-        qs = qs.filter(reports_to_id=g["manager"])
+        mgr_id = _uuid_or_none(g["manager"])
+        qs = qs.filter(reports_to_id=mgr_id) if mgr_id else qs.none()
     active = g.get("active", "1")
     if active in ("0", "1"):
         qs = qs.filter(is_active=active == "1")
@@ -140,8 +167,8 @@ def people_list(request: HttpRequest) -> HttpResponse:
         if is_admin
         else [],
         "can_create": permissions.can(request.user, "user.create"),
-        "prev_url": f"?page={page.previous_page_number()}" if page.has_previous() else "",
-        "next_url": f"?page={page.next_page_number()}" if page.has_next() else "",
+        "prev_url": _page_url(g, page.previous_page_number()) if page.has_previous() else "",
+        "next_url": _page_url(g, page.next_page_number()) if page.has_next() else "",
     }
     return render(request, "accounts/people_list.html", ctx)
 
@@ -179,10 +206,6 @@ def _parse(post: Any) -> tuple[dict[str, Any], dict[str, list[str]]]:
                 v[name] = parse(raw) if raw else None
             except ValueError:
                 errors[name] = ["Invalid value."]
-    if "shift_start" in v and v["shift_start"] is None:
-        v.pop("shift_start")
-    if "shift_end" in v and v["shift_end"] is None:
-        v.pop("shift_end")
     if "qualification_year" in post:
         raw = post["qualification_year"].strip()
         try:
@@ -190,14 +213,35 @@ def _parse(post: Any) -> tuple[dict[str, Any], dict[str, list[str]]]:
         except ValueError:
             errors["qualification_year"] = ["Enter a year."]
     if post.get("_form") == "person":  # checkboxes and selects are only meaningful on the full form
-        v["weekly_off"] = sorted(
-            {int(x) for x in post.getlist("weekly_off") if x.isdigit() and 0 <= int(x) <= 6}
-        )
-        dept = post.get("department", "")
-        v["department"] = Department.objects.filter(pk=dept, is_active=True).first() if dept else None
+        v["weekly_off"] = sorted({int(x) for x in post.getlist("weekly_off") if x in set("0123456")})
+        dept = post.get("department", "").strip()
+        dept_id = _uuid_or_none(dept)
+        v["department"] = Department.objects.filter(pk=dept_id, is_active=True).first() if dept_id else None
         if dept and v["department"] is None:
             errors["department"] = ["Unknown department."]
     return v, errors
+
+
+def _form_response(request: HttpRequest, ctx: dict[str, Any]) -> HttpResponse:
+    """Re-show the form with its errors (422). HTMX gets only the form, so the page does not nest."""
+    template = (
+        "accounts/_person_form.html"
+        if request.headers.get("HX-Request") == "true"
+        else "accounts/person_form.html"
+    )
+    return render(request, template, ctx, status=422)
+
+
+def _pick_manager(raw: str) -> User | None:
+    """The chosen manager as a user, None when blank. Bad or unknown text is a field error, never a 500."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    manager_id = _uuid_or_none(raw)
+    manager = User.objects.filter(pk=manager_id, is_active=True).first() if manager_id else None
+    if manager is None:
+        raise ValidationFailed("Choose a valid manager.", fields={"reports_to": ["Unknown manager."]})
+    return manager
 
 
 def _form_ctx(
@@ -243,8 +287,8 @@ def _initial(t: User) -> dict[str, Any]:
         "qualification_detail": t.qualification_detail,
         "institution": t.institution,
         "qualification_year": t.qualification_year or "",
-        "shift_start": t.shift_start.strftime("%H:%M"),
-        "shift_end": t.shift_end.strftime("%H:%M"),
+        "shift_start": t.shift_start.strftime("%H:%M") if t.shift_start else "",
+        "shift_end": t.shift_end.strftime("%H:%M") if t.shift_end else "",
         "weekly_off": t.weekly_off,
         "mobile": t.mobile,
         "email": t.email,
@@ -268,6 +312,7 @@ def manager_options(request: HttpRequest) -> HttpResponse:
     )
 
 
+@idempotency_optional
 @login_required
 @require_http_methods(["GET", "POST"])
 def person_new(request: HttpRequest) -> HttpResponse:
@@ -285,7 +330,7 @@ def person_new(request: HttpRequest) -> HttpResponse:
     try:
         if errors:
             raise ValidationFailed("Please fix the highlighted fields.", fields=errors)
-        manager = User.objects.filter(pk=values["reports_to"]).first() if values["reports_to"] else None
+        manager = _pick_manager(values["reports_to"])
         profile = {
             k: val
             for k, val in values.items()
@@ -300,7 +345,7 @@ def person_new(request: HttpRequest) -> HttpResponse:
         ctx = _form_ctx(
             request, target=None, values=values, errors=exc.extra.get("fields", {}), message=exc.message
         )
-        return render(request, "accounts/person_form.html", ctx)
+        return _form_response(request, ctx)
     return _done(request, f"/app/people/{user.pk}")
 
 
@@ -318,44 +363,38 @@ def person_edit(request: HttpRequest, pk: Any) -> HttpResponse:
     )
 
 
+@idempotency_optional
 @login_required
 @require_http_methods(["POST"])
 def person_update(request: HttpRequest, pk: Any) -> HttpResponse:
     """Save an edit. The policy check runs before the row is fetched, so a denied caller learns nothing."""
     permissions.require(request.user, "user.update")
-    target = User.objects.filter(pk=pk).first()
+    target = User.objects.visible_to(request.user).select_related("reports_to").filter(pk=pk).first()
     if target is None:
         raise NotFound("Person not found.")
     values, errors = _parse(request.POST)
     values["reports_to"] = request.POST.get("reports_to", "")
-    version = request.POST.get("version")
     try:
         if errors:
             raise ValidationFailed("Please fix the highlighted fields.", fields=errors)
-        manager = User.objects.filter(pk=values["reports_to"]).first() if values["reports_to"] else None
+        expected = _parse_version(request.POST.get("version"))
+        manager = _pick_manager(values["reports_to"])
         changes = {k: val for k, val in values.items() if k != "reports_to"}
-        new_role = changes.get("role", target.role)
-        promote = new_role in Role.values and ROLE_RANK[Role(new_role)] > ROLE_RANK[Role(target.role)]
-        with transaction.atomic():
-            cur = target
-            expected = int(version) if version else None
-            if promote and manager is not None and manager.pk != target.reports_to_id:
-                cur = services.set_manager(
-                    request.user, cur, manager, expected_version=expected, request=request
-                )
-                expected = cur.version
-            cur = services.update_profile(
-                request.user, cur, expected_version=expected, request=request, **changes
-            )
-            if manager is not None and manager.pk != cur.reports_to_id:
-                services.set_manager(
-                    request.user, cur, manager, expected_version=cur.version, request=request
-                )
+        # role and manager are saved together, so a Super Admin can be demoted (needs a manager at once)
+        # and a promotion gets its higher-ranked manager in the same save
+        services.update_profile(
+            request.user,
+            target,
+            expected_version=expected,
+            reports_to=services.KEEP if manager is None else manager,
+            request=request,
+            **changes,
+        )
     except ValidationFailed as exc:
         ctx = _form_ctx(
             request, target=target, values=values, errors=exc.extra.get("fields", {}), message=exc.message
         )
-        return render(request, "accounts/person_form.html", ctx)
+        return _form_response(request, ctx)
     return _done(request, f"/app/people/{target.pk}")
 
 
@@ -381,15 +420,23 @@ def person_profile(request: HttpRequest, pk: Any) -> HttpResponse:
         "is_admin": permissions.can(request.user, "user.update", target),
         "is_self": target.pk == request.user.pk,
         "edit_url": f"/app/people/{target.pk}/edit",
-        "deactivate_attrs": f'hx-post="/app/people/{target.pk}/deactivate" hx-swap="none"',
-        "reactivate_attrs": f'hx-post="/app/people/{target.pk}/reactivate" hx-swap="none"',
+        "deactivate_attrs": f'hx-post="/app/people/{target.pk}/deactivate" hx-swap="none" '
+        f"hx-vals='{{\"version\": {target.version}}}'",
+        "reactivate_attrs": f'hx-post="/app/people/{target.pk}/reactivate" hx-swap="none" '
+        f"hx-vals='{{\"version\": {target.version}}}'",
     }
     return render(request, "accounts/person_profile.html", ctx)
 
 
+def _optional_version(request: HttpRequest) -> int | None:
+    """Row actions (deactivate, reactivate, reset) send the version the page showed; bad text is a 422."""
+    raw = request.POST.get("version")
+    return _parse_version(raw) if raw not in (None, "") else None
+
+
 def _admin_target(request: HttpRequest, pk: Any, action: str) -> User:
     permissions.require(request.user, action)
-    target = User.objects.filter(pk=pk).first()
+    target = User.objects.visible_to(request.user).filter(pk=pk).first()
     if target is None:
         raise NotFound("Person not found.")
     return target
@@ -399,7 +446,9 @@ def _admin_target(request: HttpRequest, pk: Any, action: str) -> User:
 @require_http_methods(["POST"])
 def person_deactivate(request: HttpRequest, pk: Any) -> HttpResponse:
     target = _admin_target(request, pk, "user.deactivate")
-    services.deactivate_user(request.user, target, request=request)
+    services.deactivate_user(
+        request.user, target, expected_version=_optional_version(request), request=request
+    )
     return _done(request, f"/app/people/{target.pk}")
 
 
@@ -407,33 +456,53 @@ def person_deactivate(request: HttpRequest, pk: Any) -> HttpResponse:
 @require_http_methods(["POST"])
 def person_reactivate(request: HttpRequest, pk: Any) -> HttpResponse:
     target = _admin_target(request, pk, "user.update")
-    services.reactivate_user(request.user, target, request=request)
+    services.reactivate_user(
+        request.user, target, expected_version=_optional_version(request), request=request
+    )
     return _done(request, f"/app/people/{target.pk}")
 
 
+@idempotency_optional
 @login_required
 @require_http_methods(["POST"])
 def person_reset_password(request: HttpRequest, pk: Any) -> HttpResponse:
     target = _admin_target(request, pk, "user.reset_password")
-    services.reset_password(request.user, target, request.POST.get("new_password", ""), request=request)
+    services.reset_password(
+        request.user,
+        target,
+        request.POST.get("new_password", ""),
+        expected_version=_optional_version(request),
+        request=request,
+    )
     return _done(request, f"/app/people/{target.pk}")
 
 
 # ---------------------------------------------------------------- org chart
 
 
+def _node_user(u: User, detail: bool) -> Any:
+    """What the org-chart template may see. Outside a Sub-Admin's subtree only the name and id are handed
+    over, so a later template edit cannot leak designation, employee ID or anything else by accident."""
+    return u if detail else {"pk": u.pk, "full_name": u.full_name}
+
+
 def _nodes(viewer: User, parent_ids: list[Any]) -> dict[Any, list[dict[str, Any]]]:
     """Children grouped by parent, one query. `detail` is False for people outside a Sub-Admin's subtree."""
     kids = (
-        User.objects.filter(reports_to_id__in=parent_ids, is_active=True)
-        .annotate(has_children=Exists(User.objects.filter(reports_to_id=OuterRef("pk"), is_active=True)))
+        User.objects.filter(reports_to_id__in=parent_ids, is_active=True, is_break_glass=False)
+        .annotate(
+            has_children=Exists(
+                User.objects.filter(reports_to_id=OuterRef("pk"), is_active=True, is_break_glass=False)
+            )
+        )
         .order_by("full_name")
     )
     own = selectors.subtree_ids(viewer.pk) | {viewer.pk} if viewer.role == Role.SUB_ADMIN else None
     out: dict[Any, list[dict[str, Any]]] = {}
     for k in kids:
+        detail = own is None or k.pk in own
         out.setdefault(k.reports_to_id, []).append(
-            {"u": k, "detail": own is None or k.pk in own, "has_children": k.has_children, "kids": []}
+            {"u": _node_user(k, detail), "detail": detail, "has_children": k.has_children, "kids": []}
         )
     return out
 
@@ -442,9 +511,14 @@ def _nodes(viewer: User, parent_ids: list[Any]) -> dict[Any, list[dict[str, Any]
 @require_http_methods(["GET"])
 def org_chart(request: HttpRequest) -> HttpResponse:
     permissions.require(request.user, "org.view_chart")
-    roots = list(
-        User.objects.filter(role=Role.SUPER_ADMIN, is_active=True, is_break_glass=False).order_by("full_name")
-    )
+    if request.user.role == Role.SUB_ADMIN:  # a Sub-Admin's chart starts at themselves: own team only
+        roots = [request.user]
+    else:
+        roots = list(
+            User.objects.filter(role=Role.SUPER_ADMIN, is_active=True, is_break_glass=False).order_by(
+                "full_name"
+            )
+        )
     own = (
         selectors.subtree_ids(request.user.pk) | {request.user.pk}
         if request.user.role == Role.SUB_ADMIN
@@ -453,7 +527,7 @@ def org_chart(request: HttpRequest) -> HttpResponse:
     level2 = _nodes(request.user, [r.pk for r in roots])
     tree = [
         {
-            "u": r,
+            "u": _node_user(r, own is None or r.pk in own),
             "detail": own is None or r.pk in own,
             "has_children": r.pk in level2,
             "kids": level2.get(r.pk, []),
@@ -467,6 +541,12 @@ def org_chart(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET"])
 def org_children(request: HttpRequest, pk: Any) -> HttpResponse:
     permissions.require(request.user, "org.view_chart")
+    if not User.objects.filter(pk=pk, is_active=True, is_break_glass=False).exists():
+        raise NotFound("Person not found.")
+    if request.user.role == Role.SUB_ADMIN and pk not in selectors.subtree_ids(request.user.pk) | {
+        request.user.pk
+    }:
+        raise NotFound("Person not found.")  # outside their own team: same answer as a missing person
     return render(
         request, "accounts/_org_nodes.html", {"nodes": _nodes(request.user, [pk]).get(pk, []), "nested": True}
     )

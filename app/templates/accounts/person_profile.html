@@ -26,7 +26,7 @@
   {% if is_admin %}
   {% card title="Reset password" footer="They will be asked to choose a new password at next sign-in." %}
   <form class="flex items-end gap-3 flex-wrap" method="post" action="/app/people/{{ target.pk }}/reset-password" hx-post="/app/people/{{ target.pk }}/reset-password" hx-swap="none">
-    {% csrf_token %}
+    {% csrf_token %}<input type="hidden" name="version" value="{{ target.version }}">
     {% include "components/form_field.html" with name="new_password" label="Temporary password" type="password" required=True autocomplete="new-password" %}
     {% include "components/button.html" with label="Reset" type="submit" variant="secondary" %}
   </form>

@@ -111,8 +111,8 @@ class User(AbstractBaseUser):
     institution = models.CharField(max_length=200, blank=True, default="")
     qualification_year = models.PositiveSmallIntegerField(null=True, blank=True)
 
-    shift_start = models.TimeField(default=datetime.time(9, 30))
-    shift_end = models.TimeField(default=datetime.time(18, 30))
+    shift_start = models.TimeField(null=True, blank=True, default=datetime.time(9, 30))
+    shift_end = models.TimeField(null=True, blank=True, default=datetime.time(18, 30))
     weekly_off = ArrayField(models.SmallIntegerField(), default=_default_weekly_off, blank=True)
 
     mobile = models.CharField(max_length=20, blank=True, default="")
@@ -184,7 +184,12 @@ class ReportingHistory(models.Model):
                 fields=["user"],
                 condition=models.Q(effective_to__isnull=True),
                 name="reporting_history_one_current",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(effective_to__isnull=True)
+                | models.Q(effective_to__gt=models.F("effective_from")),
+                name="reporting_history_interval_valid",
+            ),
         ]
         indexes = [models.Index(fields=["manager", "effective_from"], name="rephist_manager_idx")]
 

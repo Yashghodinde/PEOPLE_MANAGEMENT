@@ -59,6 +59,9 @@ class AppendOnly(migrations.operations.base.Operation):
     def database_backwards(self, app_label, schema_editor, from_state, to_state):  # type: ignore[no-untyped-def]
         t = self.table
         schema_editor.execute(f"DROP TRIGGER IF EXISTS {t}_append_only ON {t}")
+        # restore what database_forwards took away, so the reverse really undoes it.
+        # (the shared ots_append_only function stays: other tables use it.)
+        schema_editor.execute(f"GRANT UPDATE, DELETE, TRUNCATE ON {t} TO ots_app")
 
     def describe(self) -> str:
         return f"Make {self.table} append-only"

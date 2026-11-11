@@ -33,6 +33,21 @@ def idempotency_exempt(view: F) -> F:  # noqa: UP047
     return view
 
 
+def idempotency_optional(view: F) -> F:  # noqa: UP047
+    """Plain HTML form posts (no JavaScript) carry no key. A key is not required, but when one is sent it is
+    enforced and replayed as usual."""
+    view.idempotency_optional = True  # type: ignore[attr-defined]
+    return view
+
+
+def _is_optional(path: str) -> bool:
+    try:
+        match = resolve(path)
+    except Resolver404:
+        return False
+    return bool(getattr(match.func, "idempotency_optional", False))
+
+
 def _is_exempt(path: str) -> bool:
     try:
         match = resolve(path)
@@ -56,6 +71,8 @@ class IdempotencyMiddleware:
             return self.get_response(request)
 
         raw = request.headers.get(HEADER)
+        if not raw and _is_optional(request.path_info):
+            return self.get_response(request)
         if not raw:
             return _error(428, "idempotency_key_required", f"{HEADER} header is required")
         try:

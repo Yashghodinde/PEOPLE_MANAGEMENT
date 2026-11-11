@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -67,10 +67,16 @@ def change_password_view(request: HttpRequest) -> HttpResponse:
                 raise ValidationFailed(
                     "The two new passwords are different.", fields={"new_password2": ["Different."]}
                 )
-            services.change_password(request.user, request.POST.get("old_password", ""), new, request=request)
+            user = services.change_password(
+                request.user, request.POST.get("old_password", ""), new, request=request
+            )
+        except Locked as exc:  # too many wrong current passwords: same lock as /login, and sign out
+            logout(request)
+            return render(request, "accounts/login.html", {"error": exc.message, "login_id": ""}, status=423)
         except ValidationFailed as exc:
             ctx["error"] = exc.message
             return render(request, "accounts/change_password.html", ctx, status=422)
+        update_session_auth_hash(request, user)  # new password changes the session hash; keep this session
         return redirect(settings.OTS_HOME_URL)
     return render(request, "accounts/change_password.html", ctx)
 

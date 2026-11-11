@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.db import connection
 
 from ots.core.clock import now
@@ -13,11 +14,18 @@ from .models import AuditLog
 
 
 def _client_ip(request: Any) -> str | None:
+    """The caller's address. X-Forwarded-For is trusted only as far as OTS_TRUSTED_PROXY_HOPS says:
+    with N proxies in front, the real client is the Nth entry from the right (the one our own proxy
+    added). Entries further left were supplied by the client and are ignored."""
     if request is None:
         return None
+    hops = getattr(settings, "OTS_TRUSTED_PROXY_HOPS", 0)
     xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    ip = xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "")
-    return ip or None
+    if hops > 0 and xff:
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        if len(parts) >= hops:
+            return parts[-hops]
+    return request.META.get("REMOTE_ADDR", "") or None
 
 
 def _target(target: Any) -> tuple[str, str]:
