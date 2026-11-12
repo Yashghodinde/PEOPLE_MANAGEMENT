@@ -36,7 +36,14 @@
     {% for tab in tabs %}<button type="button" role="tab" data-tab="{{ tab.0 }}" @click="select" aria-selected="{% if tab.0 == initial_tab %}true{% else %}false{% endif %}" class="h-5 px-4 text-body border-b {% if tab.0 == initial_tab %}text-ink-900 border-accent{% else %}text-ink-600 border-transparent{% endif %} hover:text-ink-900">{{ tab.1 }}</button>{% endfor %}
   </div>
   {% for tab in tabs %}<div role="tabpanel" data-panel="{{ tab.0 }}"{% if tab.0 != initial_tab %} hidden{% endif %}>
-    {% card title=tab.1 %}{% include "components/empty_state.html" with icon="inbox" text="This tab is filled by its module later." %}{% endcard %}
+    {% if tab.0 == "activity" %}{% card title=tab.1 %}
+      <form class="flex items-end gap-2 flex-wrap mb-3" hx-get="/app/people/{{ target.pk }}/activity" hx-target="#activity-body" hx-swap="innerHTML" aria-label="Activity period">
+        <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">From <input type="date" name="from" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
+        <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">To <input type="date" name="to" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
+        {% include "components/button.html" with label="Show" type="submit" variant="secondary" %}
+      </form>
+      <div id="activity-body" hx-get="/app/people/{{ target.pk }}/activity" hx-trigger="load" hx-swap="innerHTML"><p class="text-cap text-ink-600">Loading…</p></div>
+    {% endcard %}{% else %}{% card title=tab.1 %}{% include "components/empty_state.html" with icon="inbox" text="This tab is filled by its module later." %}{% endcard %}{% endif %}
   </div>{% endfor %}
 </div>
 {% endblock %}

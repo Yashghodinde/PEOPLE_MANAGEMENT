@@ -18,6 +18,7 @@ ITEMS = [
     NavItem("Attendance", "calendar", "#"),
     NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "SUB_ADMIN")),
     NavItem("Org chart", "user", "/app/org", ("SUPER_ADMIN", "SUB_ADMIN")),
+    NavItem("Audit", "shield", "/audit"),
     NavItem("Reports", "activity", "#", ("SUPER_ADMIN", "SUB_ADMIN")),
     NavItem("System health", "hard-drive", "#", ("SUPER_ADMIN",)),
     NavItem("Settings", "settings", "/shells/settings", ("SUPER_ADMIN",)),

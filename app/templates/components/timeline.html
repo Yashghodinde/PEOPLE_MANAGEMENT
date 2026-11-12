@@ -1,0 +1,16 @@
+{% comment %}
+timeline.html: a person's activity, newest first.
+  events: list of {at, title, detail, url}; empty: text for the empty state; next_url: HTMX "Load more" link.
+"Load more" replaces itself with the next batch (the response is this same component), so earlier rows stay.
+{% endcomment %}{% load ots_ui %}
+{% if events %}<ol class="flex flex-col" data-timeline>
+  {% for e in events %}<li class="flex gap-3 py-3 border-b border-line last:border-b-0">
+    <span class="mt-1 text-ink-600">{% icon "clock" %}</span>
+    <div class="min-w-0">
+      <p class="text-body text-ink-900">{% if e.url %}<a class="text-accent hover:text-ink-900" href="{{ e.url }}">{{ e.title }}</a>{% else %}{{ e.title }}{% endif %}</p>
+      {% if e.detail %}<p class="text-cap text-ink-600">{{ e.detail }}</p>{% endif %}
+      <time class="text-cap text-ink-600" datetime="{{ e.at|date:'c' }}">{{ e.at|date:"d M Y, H:i" }}</time>
+    </div>
+  </li>{% endfor %}
+</ol>{% elif not append %}{% include "components/empty_state.html" with icon="inbox" text=empty|default:"Nothing here yet." %}{% endif %}
+{% if next_url %}<div class="tl-more pt-3 text-center"><a href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="closest .tl-more" hx-swap="outerHTML" class="text-cap font-medium text-accent hover:text-ink-900">Load more</a></div>{% endif %}
