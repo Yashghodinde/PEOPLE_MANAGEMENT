@@ -65,6 +65,24 @@ OPEN_STATUSES = (
 
 
 class TaskQuerySet(models.QuerySet["Task"]):
+    def visible_to(self, viewer: Any) -> TaskQuerySet:
+        """Tasks `viewer` may see: Super Admin all; Sub-Admin created by them or with an assignee in their
+        team (or themselves); Employee those where they hold or held an assignment."""
+        from ots.accounts import selectors
+        from ots.accounts.models import Role
+
+        if viewer is None or not getattr(viewer, "is_authenticated", False) or not viewer.is_active:
+            return self.none()
+        if viewer.role == Role.SUPER_ADMIN:
+            return self
+        if viewer.role == Role.SUB_ADMIN:
+            team = selectors.subtree_ids(viewer.pk) | {viewer.pk}
+            mine = Q(created_by_id=viewer.pk) | Exists(
+                TaskAssignment.objects.filter(task=OuterRef("pk"), user_id__in=team)
+            )
+            return self.filter(mine)
+        return self.filter(Exists(TaskAssignment.objects.filter(task=OuterRef("pk"), user_id=viewer.pk)))
+
     def overdue(self, at: datetime.datetime | None = None) -> TaskQuerySet:
         """Past its due time with an assignment still open. Overdue is never stored (M07 section 2)."""
         at = at or now()

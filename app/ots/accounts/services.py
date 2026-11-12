@@ -11,7 +11,7 @@ from ots.core import events, permissions
 from ots.core.clock import now, today_local
 from ots.core.errors import Conflict, Locked, ValidationFailed
 
-from . import auth, passwords, photos, selectors
+from . import auth, guards, passwords, photos, selectors
 from .models import ROLE_RANK, Company, Department, ReportingHistory, Role, User
 
 PROFILE_FIELDS = {
@@ -119,6 +119,17 @@ def _require_no_reports(user: User, what: str) -> None:
         raise ValidationFailed(
             f"{user.full_name} still has people reporting to them ({names}). Move them first, then {what}.",
             fields={"reports": [r.full_name for r in reports]},
+        )
+
+
+def _require_no_open_work(user: User) -> None:
+    """Refuse while another module (tasks) says this person still holds unfinished work, and list it."""
+    lines = guards.objections(user)
+    if lines:
+        shown = "; ".join(lines[:8]) + (f"; and {len(lines) - 8} more" if len(lines) > 8 else "")
+        raise ValidationFailed(
+            f"{user.full_name} still has open work: {shown}. Reassign it first.",
+            fields={"assignments": lines},
         )
 
 
@@ -316,6 +327,7 @@ def deactivate_user(
     if cur.pk == actor.pk:
         raise ValidationFailed("You cannot deactivate your own account.")
     _require_no_reports(cur, "deactivate")
+    _require_no_open_work(cur)
     _last_super_admin_guard(cur)
     cur.is_active = False
     cur.version += 1

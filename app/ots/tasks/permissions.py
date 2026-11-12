@@ -62,3 +62,49 @@ def _remover(user: Any, a: Any = None) -> bool:
 
 policy("assignment.remove")(_remover)
 policy("assignment.cancel")(_remover)
+
+
+# ---- task-level actions ----
+def _visible(user: Any, task: Any) -> bool:
+    """Super Admin: all. Sub-Admin: tasks they created, or with any assignee in their team (or themselves).
+    Employee: tasks where they hold or held an assignment."""
+    from ots.accounts import selectors
+
+    if not _active(user):
+        return False
+    if task is None or user.role == Role.SUPER_ADMIN:
+        return True  # None = "may open the tasks area"; rows are scoped by Task.objects.visible_to
+    if user.role == Role.SUB_ADMIN:
+        team = selectors.subtree_ids(user.pk) | {user.pk}
+        return task.created_by_id == user.pk or task.assignments.filter(user_id__in=team).exists()
+    return task.assignments.filter(user_id=user.pk).exists()
+
+
+policy("task.view")(_visible)
+
+
+@policy("task.create")
+def _create(user: Any, obj: Any = None) -> bool:
+    return _active(user) and user.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN)
+
+
+def _manage(user: Any, task: Any = None) -> bool:
+    """Update, cancel, add people: the Super Admin for any task, a Sub-Admin for tasks they created."""
+    if not _active(user) or task is None:
+        return False
+    return user.role == Role.SUPER_ADMIN or (user.role == Role.SUB_ADMIN and task.created_by_id == user.pk)
+
+
+for _a in ("task.update", "task.cancel", "assignment.add"):
+    policy(_a)(_manage)
+
+
+@policy("task.comment")
+def _comment(user: Any, task: Any = None) -> bool:
+    if not _active(user) or task is None:
+        return False
+    if user.role == Role.SUPER_ADMIN:
+        return True
+    if user.role == Role.SUB_ADMIN:
+        return _visible(user, task)
+    return task.assignments.filter(user_id=user.pk, removed_at__isnull=True).exists()  # own assigned tasks

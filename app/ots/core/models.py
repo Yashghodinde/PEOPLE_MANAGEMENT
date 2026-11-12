@@ -12,6 +12,8 @@ class IdempotencyRecord(models.Model):
     status_code = models.PositiveSmallIntegerField()
     content_type = models.CharField(max_length=100, default="application/json")
     response_body = models.BinaryField()  # gzip
+    # the headers a replay must repeat so a browser or HTMX does the same thing again (see REPLAY_HEADERS)
+    headers = models.JSONField(default=dict, db_default={})
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

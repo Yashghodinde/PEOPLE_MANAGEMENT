@@ -6,4 +6,8 @@ class TasksConfig(AppConfig):
     label = "tasks"
 
     def ready(self) -> None:
-        from . import permissions  # noqa: F401  (registers the task policies)
+        from ots.accounts import guards
+
+        from . import permissions, selectors  # noqa: F401  (permissions registers the task policies)
+
+        guards.register(selectors.open_assignment_lines)  # a person with open work cannot be deactivated
