@@ -17,7 +17,7 @@ from ots.core import events, permissions
 from ots.core.clock import now
 from ots.core.errors import Conflict, InvalidTransition, NotFound, PermissionDenied, ValidationFailed
 
-from . import hooks, selectors, state
+from . import hooks, notify, selectors, state
 from .codes import next_task_code
 from .models import (
     AssignmentStatus,
@@ -144,6 +144,7 @@ def _record(
         body["assignee_id"] = str(a.user_id)
         body["manager_id"] = str(a.user.reports_to_id) if a.user.reports_to_id else None
     events.publish(event_type, ("assignment", str(a.pk)) if a is not None else ("task", str(task.pk)), body)
+    notify.after_event(task, actor, event_type, a, payload)
 
 
 def _write_event(
@@ -201,6 +202,8 @@ def transition(
         permissions.require(actor, f"assignment.{action}", a)
     _move(a, task, trans, actor, inputs)
     recompute_task(task, now())
+    if action == "approve" and task.derived_status == DerivedStatus.COMPLETED:
+        notify.task_completed(task, actor)
     return a
 
 
@@ -513,4 +516,5 @@ def add_comment(actor: Any, task_id: Any, body: str, assignment_id: Any = None) 
     _record(
         task, actor, "comment.added", {"comment_id": str(comment.pk), "length": len(text)}, at, assignment
     )
+    notify.comment_added(task, actor, comment)
     return comment

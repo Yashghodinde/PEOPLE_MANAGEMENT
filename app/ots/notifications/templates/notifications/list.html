@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col gap-3 max-w-[610px]">
+  {% if items %}<form method="post" action="/app/notifications/read-all">{% csrf_token %}{% include "components/button.html" with label="Mark all as read" type="submit" variant="secondary" %}</form>{% endif %}
+  {% for n in items %}
+  <form method="post" action="/app/notifications/{{ n.pk }}/open">{% csrf_token %}
+    <button type="submit" class="w-full text-left bg-canvas border border-line rounded-md p-4 hover:bg-line flex gap-3 items-start">
+      <span class="ots-dot {% if n.read_at %}ots-dot-off{% elif n.kind == 'COMMENT' %}ots-dot-chat{% elif n.kind == 'APPROVED' or n.kind == 'COMPLETED' %}ots-dot-done{% else %}ots-dot-update{% endif %} mt-2"></span>
+      <span class="flex flex-col"><span class="text-body {% if not n.read_at %}font-semibold{% endif %}">{{ n.title }}</span>
+      {% if n.body %}<span class="text-cap text-ink-600">{{ n.body }}</span>{% endif %}
+      <span class="text-cap text-ink-600">{{ n.task.task_code }} · {{ n.created_at|date:"d M, H:i" }}</span></span>
+    </button>
+  </form>
+  {% empty %}<p class="text-body text-ink-600">Nothing new.</p>{% endfor %}
+</div>
+{% endblock %}

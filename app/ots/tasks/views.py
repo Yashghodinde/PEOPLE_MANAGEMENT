@@ -23,6 +23,9 @@ from ots.core import permissions
 from ots.core.clock import IST, now
 from ots.core.errors import NotFound, OtsError, ValidationFailed
 from ots.core.idempotency import idempotency_optional
+from ots.notifications import selectors as notes
+from ots.notifications import services as note_services
+from ots.ui.templatetags.ots_ui import dot
 
 from . import dashboard, selectors, services, state
 from .models import (
@@ -140,6 +143,7 @@ def task_list(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(Q(title__icontains=q) | Q(task_code__icontains=q))
     page = Paginator(qs.order_by("due_at", "-created_at"), PAGE_SIZE).get_page(g.get("page"))
     at = now()
+    dots = notes.dots_for(request.user, [t.pk for t in page])
     rows = []
     for t in page:
         names = [a.user.full_name for a in t.live]
@@ -147,7 +151,9 @@ def task_list(request: HttpRequest) -> HttpResponse:
         late = t.due_at < at and t.derived_status not in (DerivedStatus.COMPLETED, DerivedStatus.CANCELLED)
         due_text = t.due_at.astimezone(IST).strftime("%d %b, %H:%M")
         rows.append([
-            format_html('<a class="text-accent" href="/app/tasks/{}">{}</a>', t.pk, t.task_code),
+            format_html(
+                '{}<a class="text-accent" href="/app/tasks/{}">{}</a>', dot(dots, t.pk), t.pk, t.task_code
+            ),
             t.title,
             t.get_priority_display(),
             who,
@@ -290,6 +296,7 @@ def _detail_ctx(
 @require_http_methods(["GET"])
 def task_detail(request: HttpRequest, task_id: str) -> HttpResponse:
     task = _task_or_404(request, task_id)
+    note_services.mark_task_read(request.user, task.pk)  # opening the task clears its dot and bell entries
     return render(request, "tasks/task_detail.html", _detail_ctx(request, task))
 
 
@@ -392,6 +399,11 @@ def dashboard_view(request: HttpRequest) -> HttpResponse:
     else:
         ctx = {"page_title": "Dashboard", "employee": False, **dashboard.manager_dashboard(request.user)}
         ctx["status_counts"] = [(label, ctx["counts"][v], v) for v, label in DerivedStatus.choices]
+    fresh = notes.unread_tasks(request.user)
+    shown = {a.task_id for key in ("waiting", "recent_submissions", "today", "paused", "due_soon")
+             for a in ctx.get(key, [])} | {t.pk for t in fresh}  # fmt: skip
+    ctx["dots"] = notes.dots_for(request.user, shown)
+    ctx["fresh"] = fresh
     ctx["can_create"] = permissions.can(request.user, "task.create")
     return render(request, "tasks/dashboard.html", ctx)
 

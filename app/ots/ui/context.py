@@ -1,5 +1,7 @@
 from django.http import HttpRequest
 
+from ots.notifications.selectors import unread_count
+
 from .nav import items_for
 
 
@@ -9,5 +11,6 @@ def ui(request: HttpRequest) -> dict[str, object]:
     return {
         "nav_items": [
             {"item": i, "active": i.path != "#" and request.path.startswith(i.path)} for i in items_for(role)
-        ]
+        ],
+        "unread_count": unread_count(user),
     }
