@@ -132,8 +132,8 @@ NOW = "2030-01-01 06:00:00"
 
 @pytest.mark.parametrize(
     "days_left,severity",
-    # days_left + 1 hour remain, so "30" means just over 30 days: not yet "within 30 days"
-    [(400, None), (31, None), (30, None), (29, "WARNING"), (8, "WARNING"), (7, "WARNING"), (6, "CRITICAL"), (1, "CRITICAL")],
+    # days_left whole days (plus an hour) remain
+    [(400, None), (31, None), (30, "WARNING"), (29, "WARNING"), (8, "WARNING"), (7, "CRITICAL"), (6, "CRITICAL"), (1, "CRITICAL")],
 )  # fmt: skip
 def test_certificate_alert_levels(days_left, severity):
     with freeze_time(NOW):

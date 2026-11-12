@@ -8,6 +8,7 @@ space that is left, because recovery data comes first. Below 95% the archive blo
 
 Certificate (daily): the Graph app certificate expires on a known date. WARNING `storage.cert_expiring` at
 30 days left, CRITICAL at 7 days or when it has expired (sign-in would then fail and the queue would stop).
+"At 30 days" means as soon as 30 days (counting whole days) remain: the earlier, safer reading.
 """
 
 from __future__ import annotations
@@ -91,10 +92,10 @@ def check_certificate(
         return None
     not_after: datetime.datetime = expiry()
     days = (not_after - clock()).days
-    if days >= CERT_WARN_DAYS:
+    if days > CERT_WARN_DAYS:
         alerts.resolve_alert(c.ALERT_CERT)
     else:
-        severity = "CRITICAL" if days < CERT_CRITICAL_DAYS else "WARNING"
+        severity = "CRITICAL" if days <= CERT_CRITICAL_DAYS else "WARNING"
         when = "has EXPIRED" if not_after <= clock() else f"expires in {days} days"
         alerts.raise_alert(
             c.ALERT_CERT, severity, f"The Microsoft Graph certificate {when}",
