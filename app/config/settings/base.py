@@ -62,9 +62,11 @@ OTS_HOME_URL = "/"
 OTS_SELFIE_STAGE_ENABLED = False  # M06 enables the selfie step after the password
 SESSION_COOKIE_AGE = 12 * 3600  # absolute ceiling
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True
+# "Secure" cookies need HTTPS. Production keeps the default (True); a developer looking at the app over plain
+# http://localhost sets OTS_COOKIE_SECURE=false, because Safari will not keep a Secure cookie on plain http.
+SESSION_COOKIE_SECURE = env.bool("OTS_COOKIE_SECURE", default=True)
 SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 # Number of reverse proxies in front of the app (Caddy = 1; plain dev server = 0). With 1 or more we trust
 # Caddy's X-Forwarded-Proto (so HTTPS requests are seen as secure and CSRF origin checks pass) and take the
 # client IP for the audit log from the entry Caddy added, never from a header the client could forge.
