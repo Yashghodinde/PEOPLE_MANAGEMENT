@@ -1,0 +1,60 @@
+{
+  "generator": "sha256(seed || counter_be64) blocks",
+  "vectors": [
+    {
+      "seed": "vec-1",
+      "size": 1,
+      "quickxor": "LAAAAAAAAAAAAAAAAQAAAAAAAAA="
+    },
+    {
+      "seed": "vec-2",
+      "size": 2,
+      "quickxor": "vPgCAAAAAAAAAAAAAgAAAAAAAAA="
+    },
+    {
+      "seed": "vec-159",
+      "size": 159,
+      "quickxor": "W6WME0yhHqXPY8+FOs6HrjZtO9M="
+    },
+    {
+      "seed": "vec-160",
+      "size": 160,
+      "quickxor": "/PbF2igjAqh2CBpE3hRbR+z5BdQ="
+    },
+    {
+      "seed": "vec-161",
+      "size": 161,
+      "quickxor": "R/I7veeHO+oEPZaLUixL5I3WfDk="
+    },
+    {
+      "seed": "vec-320",
+      "size": 320,
+      "quickxor": "7OnVXKZoGrAQtV1ySqzry9SRFxQ="
+    },
+    {
+      "seed": "vec-1000",
+      "size": 1000,
+      "quickxor": "9ACSZg67VTFGu3WgyPYgRErLHS0="
+    },
+    {
+      "seed": "vec-4096",
+      "size": 4096,
+      "quickxor": "Jud8cyPyKqDodtbf12nPpyPt568="
+    },
+    {
+      "seed": "vec-65536",
+      "size": 65536,
+      "quickxor": "0dAf3wWPwBx6Ou2RgdKyPjfNzP0="
+    },
+    {
+      "seed": "vec-1000000",
+      "size": 1000000,
+      "quickxor": "XKs9i+iF5BQclBbOerg37U8R/vg="
+    },
+    {
+      "seed": "vec-4194304",
+      "size": 4194304,
+      "quickxor": "BJ82otUKobrBrgBuwjrQtfPvrRE="
+    }
+  ]
+}

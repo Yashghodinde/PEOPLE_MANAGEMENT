@@ -66,5 +66,5 @@ module = ["ots.core.*", "ots.storage.*", "ots.backup.*"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["environ", "environ.*", "croniter", "croniter.*"]
+module = ["environ", "environ.*", "croniter", "croniter.*", "msal", "msal.*"]
 ignore_missing_imports = true

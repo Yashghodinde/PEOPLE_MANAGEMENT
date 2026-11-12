@@ -21,10 +21,10 @@ def get_provider() -> StorageProvider:
         elif backend == "graph":
             from .graph import GraphProvider  # added in M05.2
 
-            _provider = GraphProvider.from_settings()  # type: ignore[assignment]  # real provider: M05.2
+            _provider = GraphProvider.from_settings()
         else:
             raise ConfigurationError(f"OTS_STORAGE_BACKEND must be 'graph' or 'fake', not {backend!r}")
-    return _provider  # type: ignore[return-value]  # set by the branch above
+    return _provider
 
 
 def reset_provider() -> None:
