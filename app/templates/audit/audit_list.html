@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4">
+  <div class="flex items-end justify-between gap-3 flex-wrap">
+    <form method="get" action="/audit" class="flex items-end gap-2 flex-wrap" aria-label="Filters">
+      {% if is_admin %}<label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Who
+        <select name="actor" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">Anyone</option>{% for u in actors %}<option value="{{ u.pk }}"{% if f.actor == u.pk|stringformat:"s" %} selected{% endif %}>{{ u.full_name }}</option>{% endfor %}
+        </select></label>{% endif %}
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Action starts with
+        <input name="action" value="{{ f.action }}" placeholder="auth." maxlength="80" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-[140px]"></label>
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">From
+        <input type="date" name="from" value="{{ f.from }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">To
+        <input type="date" name="to" value="{{ f.to }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
+      {% if is_admin %}<label class="flex flex-col gap-1 text-cap font-medium text-ink-900">About (ID)
+        <input name="target" value="{{ f.target }}" maxlength="64" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-[180px]"></label>{% endif %}
+      {% include "components/button.html" with label="Filter" type="submit" variant="secondary" %}
+    </form>
+    {% include "components/button.html" with label="Export CSV" href=export_url icon="download" variant="secondary" %}
+  </div>
+  {% include "components/table.html" with id="audit" columns=columns rows=rows empty="No records match these filters." %}
+  {% if next_url %}<nav class="flex items-center justify-between text-cap text-ink-600" aria-label="Pages">
+    <span>Showing the newest 100 that match. Older records follow.</span>
+    <a class="text-accent hover:text-ink-900" href="{{ next_url }}">Older records</a>
+  </nav>{% endif %}
+</div>
+{% endblock %}

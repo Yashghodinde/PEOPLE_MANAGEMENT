@@ -411,7 +411,3 @@ def change_password(user: User, old_password: str, new_password: str, *, request
             events.publish("user.updated", cur, {"fields": ["password"]})
             return cur
     raise failure
-
-
-def record_login_time(user: User) -> None:  # used by M02.3
-    User.objects.filter(pk=user.pk).update(last_login_at=now())
