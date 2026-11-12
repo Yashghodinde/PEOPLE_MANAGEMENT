@@ -47,9 +47,13 @@ class OperationState(Protocol):
     """
 
     id: Any
-    upload_url: str  # decrypted; "" when no session exists
     upload_expires_at: datetime.datetime | None
     confirmed_bytes: int
+
+    @property
+    def upload_url(self) -> str:
+        """The decrypted session URL; "" when no session exists."""
+        ...
 
     def save_session(self, upload_url: str, expires_at: datetime.datetime | None) -> None: ...
 

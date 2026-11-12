@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     "ots.core",
     "ots.accounts",
     "ots.audit",
+    "ots.storage",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",

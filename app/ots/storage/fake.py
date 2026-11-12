@@ -49,13 +49,13 @@ class LocalDirProvider:
         self._log: list[
             tuple[Library, str]
         ] = []  # (library, item_id) per change; the cursor is an index into it
-        self._failures: list[int | None] = []
+        self._failures: list[int | GraphError | None] = []
         self._expire_cursors = False
         self.calls: list[str] = []
 
     # ---- test controls -----------------------------------------------------------------------
-    def inject(self, statuses: list[int | None], *, retry_after: float | None = None) -> None:
-        """Queue failures for the next calls: a status code raises GraphError, None lets the call through."""
+    def inject(self, statuses: list[int | GraphError | None], *, retry_after: float | None = None) -> None:
+        """Queue failures for the next calls: a status code or GraphError raises, None lets the call pass."""
         self._failures.extend(statuses)
         self._retry_after = retry_after
 
@@ -103,6 +103,8 @@ class LocalDirProvider:
         self.calls.append(name)
         if self._failures:
             status = self._failures.pop(0)
+            if isinstance(status, GraphError):
+                raise status
             if status is not None:
                 raise GraphError(
                     status, code="injected", body="injected failure", retry_after=self._retry_after

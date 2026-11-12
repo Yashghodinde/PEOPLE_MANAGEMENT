@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from ots.storage.fake import LocalDirProvider
 
 
 @dataclass
@@ -28,11 +27,6 @@ class MemoryOp:
     def clear_session(self) -> None:
         self.upload_url, self.upload_expires_at, self.confirmed_bytes = "", None, 0
         self.log.append(("cleared", None))
-
-
-@pytest.fixture
-def fake(tmp_path: Path) -> LocalDirProvider:
-    return LocalDirProvider(tmp_path / "remote")
 
 
 @pytest.fixture

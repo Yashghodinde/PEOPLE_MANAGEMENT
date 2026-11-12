@@ -12,6 +12,7 @@ values are rotated into the register at the end. A 1 MiB chunk takes a few milli
 from __future__ import annotations
 
 import base64
+import os
 
 WIDTH_BITS = 160
 ROW = WIDTH_BITS  # bytes per row: the byte-position pattern repeats every 160 bytes
@@ -73,4 +74,13 @@ class QuickXorHash:
 def quickxor_b64(data: bytes) -> str:
     h = QuickXorHash()
     h.update(data)
+    return h.b64digest()
+
+
+def quickxor_file(path: str | os.PathLike[str], chunk: int = 1024 * 1024) -> str:
+    """QuickXorHash of a file, read in 1 MiB chunks (never the whole file in memory)."""
+    h = QuickXorHash()
+    with open(path, "rb") as fh:
+        while block := fh.read(chunk):
+            h.update(block)
     return h.b64digest()
