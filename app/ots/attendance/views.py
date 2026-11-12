@@ -10,7 +10,7 @@ from django.views.decorators.http import require_http_methods
 from ots.core.errors import OtsError
 from ots.core.idempotency import idempotency_exempt
 
-from . import services
+from . import services, sessions
 
 
 def _next(user: object) -> str:
@@ -65,3 +65,29 @@ def selfie_view(request: HttpRequest) -> HttpResponse:
     except OtsError as exc:
         return JsonResponse(exc.to_dict(), status=exc.status)
     return JsonResponse({"ok": True, "next": _next(user)})
+
+
+# ---- what the open page reports (M06 section 2) ----
+
+
+@require_http_methods(["POST"])
+def idle_view(request: HttpRequest) -> JsonResponse:
+    """The browser says the person went idle or came back. Only the state is read; its clock never is."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "login_required"}, status=401)
+    try:
+        out = sessions.report_state(request.session.session_key or "", request.POST.get("state", ""))
+    except OtsError as exc:
+        return JsonResponse(exc.to_dict(), status=exc.status)
+    return JsonResponse(out)
+
+
+@require_http_methods(["POST"])
+def mode_view(request: HttpRequest) -> JsonResponse:
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "login_required"}, status=401)
+    try:
+        sessions.set_mode(request.session.session_key or "", request.POST.get("idle_mode", ""))
+    except OtsError as exc:
+        return JsonResponse(exc.to_dict(), status=exc.status)
+    return JsonResponse({"ok": True})

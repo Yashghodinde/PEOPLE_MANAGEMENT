@@ -20,6 +20,7 @@ from django.utils.html import format_html
 from django.views.decorators.http import require_http_methods
 
 from ots.accounts.models import Role
+from ots.attendance import sessions as attendance_sessions
 from ots.core import permissions
 from ots.core.clock import IST, now
 from ots.core.errors import NotFound, OtsError, ValidationFailed
@@ -446,7 +447,8 @@ def day_close(request: HttpRequest) -> HttpResponse:
         except ValidationFailed as exc:
             ctx.update(values=choices, errors=exc.extra.get("fields", {}), message=exc.message)
             return render(request, "tasks/day_close.html", ctx, status=422)
-        logout(request)  # M06 will record this as the END_OF_DAY logout
+        attendance_sessions.end_current(request.session.session_key or "", "END_OF_DAY")
+        logout(request)
         return redirect("/login")
     return render(request, "tasks/day_close.html", ctx)
 

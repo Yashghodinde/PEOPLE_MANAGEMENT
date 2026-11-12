@@ -28,7 +28,17 @@ def _next_url(request: HttpRequest) -> str:
 def login_view(request: HttpRequest) -> HttpResponse:
     if request.user.is_authenticated:
         return redirect(settings.OTS_HOME_URL)
-    ctx = {"next": request.GET.get("next", ""), "login_id": ""}
+    reasons = {
+        "IDLE_45": "You were logged out after 45 minutes of no activity.",
+        "BROWSER_CLOSED": "You were logged out because the browser was closed.",
+        "FORCED": "An administrator ended your session.",
+        "ended": "Your session has ended.",
+    }
+    ctx = {
+        "next": request.GET.get("next", ""),
+        "login_id": "",
+        "notice": reasons.get(request.GET.get("reason", ""), ""),
+    }
     if request.method == "POST":
         login_id, password = request.POST.get("login_id", ""), request.POST.get("password", "")
         ctx["login_id"] = login_id
@@ -53,6 +63,9 @@ def login_view(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["POST"])
 @idempotency_exempt
 def logout_view(request: HttpRequest) -> HttpResponse:
+    from ots.attendance import sessions
+
+    sessions.end_current(request.session.session_key or "", "MANUAL")
     logout(request)
     return redirect("/login")
 

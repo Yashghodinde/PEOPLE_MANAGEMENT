@@ -10,10 +10,11 @@
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/app.js' %}" defer></script>
   <script src="{% static 'js/ui.js' %}"></script>
+  {% if request.user.is_authenticated %}<script src="{% static 'js/attendance-idle.js' %}" defer></script><script src="{% static 'js/live.js' %}" defer></script>{% endif %}
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
 </head>
 {# hx-headers carries the CSRF token on every HTMX request #}
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="sidebar" class="bg-canvas text-ink-900">
+<body data-attendance="{% if request.user.is_authenticated %}1{% endif %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="sidebar" class="bg-canvas text-ink-900">
   <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-3 focus:bg-canvas">Skip to content</a>
   <div class="flex min-h-screen">
     <aside class="shrink-0 border-r border-line bg-canvas hidden md:flex md:flex-col gap-4 p-3 transition-all duration-panel"
