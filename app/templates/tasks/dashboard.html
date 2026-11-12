@@ -8,6 +8,7 @@
   {% if employee %}
   {% if paused %}<section class="bg-canvas border border-warn rounded-md p-4 flex flex-col gap-2" aria-label="Resume today">
     <h3 class="text-sec font-semibold">Pick up where you left off</h3>
+    <form method="post" action="/app/day-resume">{% csrf_token %}{% include "components/button.html" with label="Resume all" type="submit" variant="secondary" %}</form>
     {% for a in paused %}{% dot dots a.task_id %}<a class="text-accent hover:text-ink-900" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }} {{ a.task.title }}</a>{% endfor %}</section>{% endif %}
   <section class="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="My work">
     {% for label, n in groups %}<div class="bg-canvas border border-line rounded-md p-4"><p class="text-cap text-ink-600">{{ label }}</p><p class="text-title font-semibold tabular-nums">{{ n }}</p></div>{% endfor %}

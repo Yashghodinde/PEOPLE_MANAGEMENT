@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<form method="post" action="/app/day-close" class="flex flex-col gap-4 max-w-[610px]">
+  {% csrf_token %}
+  {% if message %}<p role="alert" class="text-body text-bad">{{ message }}</p>{% endif %}
+  {% if not lines %}<p class="text-body text-ink-600">You have no open work. You can log out now.</p>{% endif %}
+  {% for a in lines %}
+  <fieldset class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2">
+    <legend class="px-2 text-sec font-semibold">{{ a.task.task_code }} {{ a.task.title }}</legend>
+    {% with e=errors|get_item:a.key %}
+    <p class="text-cap text-ink-600">Due {{ a.task.due_at|date:"d M, H:i" }}</p>
+    {% if a.status == "BLOCKED" %}<p class="text-body">You are waiting on this. It stays that way unless you change it.</p>{% endif %}
+    {% if a.status != "BLOCKED" %}<label class="flex items-center gap-2 text-body"><input type="radio" name="choice_{{ a.pk }}" value="complete"> Completed</label>{% endif %}
+    <label class="flex items-center gap-2 text-body"><input type="radio" name="choice_{{ a.pk }}" value="continue"> Continue tomorrow</label>
+    {% if a.status == "IN_PROGRESS" or a.status == "BLOCKED" %}<label class="flex items-center gap-2 text-body"><input type="radio" name="choice_{{ a.pk }}" value="waiting"> I am waiting for something</label>{% endif %}
+    <label class="flex flex-col gap-1 text-cap font-medium">Closing note (if completed)<textarea name="note_{{ a.pk }}" rows="2" class="px-3 py-2 rounded-sm border border-line bg-canvas text-body"></textarea></label>
+    <label class="flex flex-col gap-1 text-cap font-medium">If waiting: why
+      <select name="block_reason_{{ a.pk }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><option value="">Choose…</option>{% for bv, bl in block_reasons %}<option value="{{ bv }}">{{ bl }}</option>{% endfor %}</select></label>
+    <label class="flex flex-col gap-1 text-cap font-medium">If waiting: what do you need?<textarea name="block_note_{{ a.pk }}" rows="2" class="px-3 py-2 rounded-sm border border-line bg-canvas text-body"></textarea></label>
+    {% for field, msgs in e.items %}<p class="text-cap text-bad" role="alert">{{ msgs.0 }}</p>{% endfor %}
+    {% endwith %}
+  </fieldset>
+  {% endfor %}
+  <div class="flex gap-3">{% include "components/button.html" with label="Save and log out" type="submit" %}{% include "components/button.html" with label="Not now" href="/app/dashboard" variant="ghost" %}</div>
+</form>
+{% endblock %}

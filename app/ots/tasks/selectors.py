@@ -55,3 +55,24 @@ def team_assignments_on(manager_id: Any, on: datetime.date) -> Any:
         .exclude(removed_at__lt=day_start)  # taken off the task before that day began
         .select_related("task", "user")
     )
+
+
+def eod_lines(user: Any) -> list[TaskAssignment]:
+    """What a person must decide before logging out for the day (M07 section 4): work in progress, work sent
+    back for changes, and work that is waiting (those keep their wait unless changed)."""
+    from .models import AssignmentStatus
+
+    return list(
+        TaskAssignment.objects.filter(
+            user_id=user.pk,
+            removed_at__isnull=True,
+            task__is_cancelled=False,
+            status__in=(
+                AssignmentStatus.IN_PROGRESS,
+                AssignmentStatus.CHANGES_REQUESTED,
+                AssignmentStatus.BLOCKED,
+            ),
+        )
+        .select_related("task")
+        .order_by("task__due_at")
+    )

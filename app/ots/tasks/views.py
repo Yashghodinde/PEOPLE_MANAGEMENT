@@ -10,6 +10,7 @@ import uuid
 from typing import Any
 from urllib.parse import urlencode
 
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Prefetch, Q
@@ -413,3 +414,46 @@ def dashboard_view(request: HttpRequest) -> HttpResponse:
 def task_new_or_create(request: HttpRequest) -> HttpResponse:
     """One address for the form (GET) and its submission (POST)."""
     return task_create(request) if request.method == "POST" else task_new(request)
+
+
+# ---------------------------------------------------------------- end of day
+
+
+def _eod_choices(p: Any, lines: list[TaskAssignment]) -> dict[str, dict[str, str]]:
+    keys = ("choice", "note", "block_reason", "block_note")
+    return {str(a.pk): {k: p.get(f"{k}_{a.pk}", "").strip() for k in keys} for a in lines}
+
+
+@login_required
+@idempotency_optional
+@require_http_methods(["GET", "POST"])
+def day_close(request: HttpRequest) -> HttpResponse:
+    """'Log out for the day': one choice for every piece of open work, applied together, then log out."""
+    lines = selectors.eod_lines(request.user)
+    for a in lines:
+        a.key = str(a.pk)  # type: ignore[attr-defined]  (the template looks errors up by text id)
+    ctx: dict[str, Any] = {
+        "page_title": "Log out for the day",
+        "lines": lines,
+        "block_reasons": [(v, state.BLOCKED_LABELS[BlockReason(v)]) for v in BlockReason.values],
+        "values": {},
+        "errors": {},
+    }
+    if request.method == "POST":
+        choices = _eod_choices(request.POST, lines)
+        try:
+            services.close_day(request.user, choices)
+        except ValidationFailed as exc:
+            ctx.update(values=choices, errors=exc.extra.get("fields", {}), message=exc.message)
+            return render(request, "tasks/day_close.html", ctx, status=422)
+        logout(request)  # M06 will record this as the END_OF_DAY logout
+        return redirect("/login")
+    return render(request, "tasks/day_close.html", ctx)
+
+
+@login_required
+@idempotency_optional
+@require_http_methods(["POST"])
+def resume_all(request: HttpRequest) -> HttpResponse:
+    services.resume_paused(request.user)
+    return _done(request, "/app/dashboard")

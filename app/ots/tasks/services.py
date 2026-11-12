@@ -518,3 +518,61 @@ def add_comment(actor: Any, task_id: Any, body: str, assignment_id: Any = None) 
     )
     notify.comment_added(task, actor, comment)
     return comment
+
+
+# ---- end of day (M07 section 4) ----
+
+EOD_CHOICES = ("complete", "continue", "waiting")
+
+
+def _eod_apply(a: TaskAssignment, actor: Any, c: dict[str, str]) -> None:
+    choice = c.get("choice", "")
+    if a.status == AssignmentStatus.BLOCKED and choice in ("", "keep"):
+        return  # already waiting: keeps its wait
+    if choice not in EOD_CHOICES:
+        raise ValidationFailed("Choose what to do with this.", fields={"choice": ["Required."]})
+    if choice == "complete":
+        transition(a.pk, "submit", actor, note=c.get("note", ""))
+    elif choice == "waiting":
+        transition(
+            a.pk, "block", actor, block_reason=c.get("block_reason", ""), block_note=c.get("block_note", "")
+        )
+    elif a.status == AssignmentStatus.IN_PROGRESS:  # continue tomorrow
+        transition(a.pk, "pause_eod", actor, system=False)
+    # sent back for changes or already waiting: nothing to do, it stays as it is
+
+
+@transaction.atomic
+def close_day(actor: Any, choices: dict[str, dict[str, str]]) -> int:
+    """Apply every choice or none. Returns how many lines changed; raises ValidationFailed with the errors
+    per assignment id (and rolls everything back) when any choice is not valid."""
+    errors: dict[str, dict[str, list[str]]] = {}
+    changed = 0
+    for a in selectors.eod_lines(actor):
+        key = str(a.pk)
+        try:
+            with transaction.atomic():  # one bad line must not poison the transaction for the others' checks
+                _eod_apply(a, actor, choices.get(key, {}))
+            changed += 1
+        except ValidationFailed as exc:
+            errors[key] = exc.extra.get("fields") or {"choice": [exc.message]}
+        except (InvalidTransition, Conflict, PermissionDenied) as exc:
+            errors[key] = {"choice": [exc.message]}
+    if errors:
+        raise ValidationFailed("Some choices need your attention. Nothing was saved.", fields=errors)
+    return changed
+
+
+@transaction.atomic
+def resume_paused(actor: Any) -> int:
+    """'Resume all' on the next login: everything paused at end of day goes back to in progress."""
+    ids = list(
+        TaskAssignment.objects.filter(
+            user_id=actor.pk, status=AssignmentStatus.PAUSED, removed_at__isnull=True
+        )
+        .order_by("assigned_at")
+        .values_list("pk", flat=True)
+    )
+    for pk in ids:
+        transition(pk, "resume", actor)
+    return len(ids)
