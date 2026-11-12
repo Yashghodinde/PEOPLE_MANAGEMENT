@@ -147,7 +147,7 @@ def _remote_equals_local(provider: StorageProvider, meta: RemoteMeta, op: Op) ->
     """Same size and same content? Compare QuickXorHash; if Graph gave none, stream and compare SHA-256."""
     if meta.size != op.size_bytes:
         return False
-    if meta.quick_xor_hash is not None:
+    if meta.quick_xor_hash is not None and Path(op.local_path).is_file():
         return meta.quick_xor_hash == quickxor_file(op.local_path)
     digest = hashlib.sha256()
     for chunk in provider.open_read(meta.ref):
@@ -160,6 +160,26 @@ def _adopt_if_same(provider: StorageProvider, op: Op) -> RemoteMeta | None:
     if meta is not None and not meta.deleted and _remote_equals_local(provider, meta, op):
         return meta
     return None
+
+
+def adopt_existing(provider: StorageProvider, op: Op, meta: RemoteMeta, clock: Clock = server_now) -> str:
+    """The upload reached SharePoint but its database record never got finished (a crash between the two).
+
+    If the remote file is exactly ours, finish the operation now (its completion handler runs). Only an
+    operation that no worker holds is touched. Returns "adopted", "mismatch" or "busy".
+    """
+    with transaction.atomic():
+        locked = (
+            Op.objects.select_for_update(skip_locked=True)
+            .filter(pk=op.pk, state__in=[Op.State.PENDING, Op.State.RETRY_WAIT])
+            .first()
+        )
+        if locked is None:
+            return "busy"
+        if not _remote_equals_local(provider, meta, locked):
+            return "mismatch"
+        _finish(locked, meta.ref, clock)
+        return "adopted"
 
 
 def _resolve_conflict(provider: StorageProvider, op: Op, clock: Clock) -> str:

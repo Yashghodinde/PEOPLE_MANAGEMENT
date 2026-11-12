@@ -23,6 +23,7 @@ ALERT_CONFLICT = "storage.conflict"
 ALERT_CERT = "storage.cert_expiring"
 ALERT_DEAD_LETTER = "storage.dead_letter"
 ALERT_VERIFICATION = "storage.verification"
+ALERT_ORPHAN = "storage.orphan"  # an unknown file in Business-Files was moved to quarantine
 ALERT_MISSING = "storage.missing"  # a file we archived is gone from SharePoint
 ALERT_DRIFTED = "storage.drifted"  # renamed or moved in SharePoint (identity is the item id, so harmless)
 ALERT_CONTENT_CHANGED = "storage.content_changed"  # the bytes in SharePoint differ from what we uploaded
