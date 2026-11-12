@@ -19,3 +19,13 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
 }
+
+@layer components {
+  .ots-dot { display: inline-block; width: 10px; height: 10px; border-radius: 9999px; margin-right: 8px; flex: none; }
+  .ots-dot-chat { background: theme("colors.bad"); }
+  .ots-dot-done { background: theme("colors.ok"); }
+  .ots-dot-update { background: theme("colors.ink-600"); }
+  .ots-dot-off { background: theme("colors.line"); }
+  .ots-count { position: absolute; top: 0; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9999px;
+    background: theme("colors.bad"); color: theme("colors.canvas"); font-size: 11px; line-height: 18px; text-align: center; font-weight: 600; }
+}

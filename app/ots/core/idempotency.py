@@ -123,11 +123,17 @@ def _claim(key: uuid.UUID, user_id: Any, method: str, path: str) -> bool:
         return bool(cur.rowcount == 1)
 
 
+# Headers that change what the browser does. Without them a replayed redirect would have nowhere to go and a
+# replayed HTMX submit would not navigate, so a double click would leave the page stuck.
+REPLAY_HEADERS = ("Location", "HX-Redirect", "HX-Refresh", "HX-Location", "HX-Trigger", "HX-Push-Url")
+
+
 def _store(key: uuid.UUID, response: HttpResponse) -> None:
     IdempotencyRecord.objects.filter(key=key).update(
         status_code=response.status_code,
         content_type=response.get("Content-Type", "application/octet-stream"),
         response_body=gzip.compress(response.content),
+        headers={h: response[h] for h in REPLAY_HEADERS if response.has_header(h)},
     )
 
 
@@ -138,6 +144,8 @@ def _replay(key: uuid.UUID, user_id: Any, request: HttpRequest) -> HttpResponse:
     response = HttpResponse(
         gzip.decompress(bytes(rec.response_body)), status=rec.status_code, content_type=rec.content_type
     )
+    for name, value in (rec.headers or {}).items():
+        response[name] = value
     response["Idempotent-Replay"] = "true"
     return response
 

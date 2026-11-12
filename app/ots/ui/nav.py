@@ -12,8 +12,8 @@ class NavItem:
 
 
 ITEMS = [
-    NavItem("Dashboard", "layout-dashboard", "/shells/dashboard"),
-    NavItem("Tasks", "list-checks", "/shells/list-detail"),
+    NavItem("Dashboard", "layout-dashboard", "/app/dashboard"),
+    NavItem("Tasks", "list-checks", "/app/tasks"),
     NavItem("Files", "folder", "#"),
     NavItem("Attendance", "calendar", "#"),
     NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "SUB_ADMIN")),

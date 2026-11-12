@@ -11,7 +11,7 @@ from ots.core import events, permissions
 from ots.core.clock import now, today_local
 from ots.core.errors import Conflict, Locked, ValidationFailed
 
-from . import auth, passwords, selectors
+from . import auth, guards, passwords, photos, selectors
 from .models import ROLE_RANK, Company, Department, ReportingHistory, Role, User
 
 PROFILE_FIELDS = {
@@ -119,6 +119,17 @@ def _require_no_reports(user: User, what: str) -> None:
         raise ValidationFailed(
             f"{user.full_name} still has people reporting to them ({names}). Move them first, then {what}.",
             fields={"reports": [r.full_name for r in reports]},
+        )
+
+
+def _require_no_open_work(user: User) -> None:
+    """Refuse while another module (tasks) says this person still holds unfinished work, and list it."""
+    lines = guards.objections(user)
+    if lines:
+        shown = "; ".join(lines[:8]) + (f"; and {len(lines) - 8} more" if len(lines) > 8 else "")
+        raise ValidationFailed(
+            f"{user.full_name} still has open work: {shown}. Reassign it first.",
+            fields={"assignments": lines},
         )
 
 
@@ -316,6 +327,7 @@ def deactivate_user(
     if cur.pk == actor.pk:
         raise ValidationFailed("You cannot deactivate your own account.")
     _require_no_reports(cur, "deactivate")
+    _require_no_open_work(cur)
     _last_super_admin_guard(cur)
     cur.is_active = False
     cur.version += 1
@@ -411,3 +423,43 @@ def change_password(user: User, old_password: str, new_password: str, *, request
             events.publish("user.updated", cur, {"fields": ["password"]})
             return cur
     raise failure
+
+
+@transaction.atomic
+def set_reference_photo(
+    actor: User, user: User, data: bytes, *, expected_version: int | None = None, request: Any = None
+) -> User:
+    """Store a reference photo (a cropped 480 x 480 JPEG): staged before the commit, swapped in after it."""
+    permissions.require(actor, "user.update", user)
+    jpeg = photos.process(data)  # raises ValidationFailed before anything is touched
+    cur = _locked(user, expected_version)
+    _refuse_break_glass(cur)
+    # staged BEFORE the commit: a write problem fails the whole request and nothing is saved
+    photos.stage(cur.pk, jpeg)
+    cur.reference_photo_path = f"reference/{cur.pk}.jpg"
+    cur.version += 1
+    cur.save()
+    audit.record("user.photo_updated", actor, cur, {"bytes": len(jpeg)}, request)
+    events.publish("user.updated", cur, {"fields": ["reference_photo"]})
+    user_id = cur.pk
+    transaction.on_commit(lambda: photos.publish(user_id))  # after the commit: only a rename is left to do
+    return cur
+
+
+@transaction.atomic
+def remove_reference_photo(
+    actor: User, user: User, *, expected_version: int | None = None, request: Any = None
+) -> User:
+    permissions.require(actor, "user.update", user)
+    cur = _locked(user, expected_version)
+    _refuse_break_glass(cur)
+    if not cur.reference_photo_path:
+        return cur
+    cur.reference_photo_path = ""
+    cur.version += 1
+    cur.save()
+    audit.record("user.photo_removed", actor, cur, {}, request)
+    events.publish("user.updated", cur, {"fields": ["reference_photo"]})
+    user_id = cur.pk
+    transaction.on_commit(lambda: photos.delete(user_id))
+    return cur

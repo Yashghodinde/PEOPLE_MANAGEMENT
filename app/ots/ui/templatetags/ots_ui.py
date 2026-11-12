@@ -77,3 +77,15 @@ def _block_tag(tag_name: str, template_name: str) -> None:
 _block_tag("card", "components/card.html")
 _block_tag("modal", "components/modal.html")
 _block_tag("drawer", "components/drawer.html")
+
+
+@register.simple_tag
+def dot(dots: Any, task_id: Any) -> Any:
+    """The small coloured circle beside a task with something new: red message, green finished, grey other."""
+    kind = (dots or {}).get(str(task_id))
+    if not kind:
+        return ""
+    label = {"chat": "New message", "done": "Finished", "update": "Updated"}[kind]
+    return format_html(
+        '<span class="ots-dot ots-dot-{}" title="{}" role="img" aria-label="{}"></span>', kind, label, label
+    )

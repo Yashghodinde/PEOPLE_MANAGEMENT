@@ -11,6 +11,7 @@ from django.core.management.base import BaseCommand
 from ots.core import builtin_jobs  # noqa: F401  (registers core jobs)
 from ots.core.dispatcher import Listener
 from ots.core.jobs import Scheduler
+from ots.storage import jobs as storage_jobs  # registers the storage jobs
 
 HEARTBEAT = Path("/tmp/worker-heartbeat")  # noqa: S108
 LOOP_SECONDS = 5.0
@@ -33,6 +34,7 @@ class Command(BaseCommand):
         sched = Scheduler()
         sched.sync_registry()
         aborted = sched.startup_sweep()
+        storage_jobs.on_worker_start()
         log.info("worker started", extra={"event": "worker.started", "aborted_runs": aborted})
         listener = Listener()  # wakes the loop immediately on outbox NOTIFY
         try:

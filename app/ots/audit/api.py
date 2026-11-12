@@ -20,12 +20,13 @@ def _client_ip(request: Any) -> str | None:
     if request is None:
         return None
     hops = getattr(settings, "OTS_TRUSTED_PROXY_HOPS", 0)
-    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    xff: str = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if hops > 0 and xff:
         parts = [p.strip() for p in xff.split(",") if p.strip()]
         if len(parts) >= hops:
             return parts[-hops]
-    return request.META.get("REMOTE_ADDR", "") or None
+    remote: str = request.META.get("REMOTE_ADDR", "")
+    return remote or None
 
 
 def _target(target: Any) -> tuple[str, str]:

@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<form id="task-form" method="post" action="/app/tasks/new" class="flex flex-col gap-4 max-w-[610px]">
+  {% csrf_token %}
+  {% if message %}<p role="alert" class="text-body text-bad">{{ message }}</p>{% endif %}
+  {% include "components/form_field.html" with name="title" label="Title" value=v.title required=True error=errors.title.0 %}
+  {% include "components/form_field.html" with name="description" label="Description" type="textarea" value=v.description error=errors.description.0 %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {% include "components/form_field.html" with name="priority" label="Priority" type="select" options=priorities value=v.priority error=errors.priority.0 %}
+    {% include "components/form_field.html" with name="category" label="Category" value=v.category error=errors.category.0 %}
+    {% include "components/form_field.html" with name="scheduled_start_at" label="Start (optional)" type="datetime-local" value=v.scheduled_start_at error=errors.scheduled_start_at.0 %}
+    {% include "components/form_field.html" with name="due_at" label="Due" type="datetime-local" value=v.due_at required=True error=errors.due_at.0 %}
+  </div>
+  <fieldset class="flex flex-col gap-2 border border-line rounded-md p-4"><legend class="px-2 text-sec font-semibold">Assign to</legend>
+    {% for u in people %}<label class="flex items-center gap-2 text-body"><input type="checkbox" name="assignees" value="{{ u.pk }}"{% if u.pk|stringformat:"s" in chosen %} checked{% endif %}> {{ u.full_name }} <span class="text-cap text-ink-600">{{ u.designation }}</span></label>
+    {% empty %}<p class="text-body text-ink-600">You have nobody to assign work to.</p>{% endfor %}
+    {% if errors.assignees %}<p class="text-cap text-bad" role="alert">{{ errors.assignees.0 }}</p>{% endif %}
+  </fieldset>
+  <label class="flex items-center gap-2 text-body"><input type="checkbox" name="hide_from_display"{% if v.hide_from_display %} checked{% endif %}> Keep off the office TV board</label>
+  <div class="flex gap-3">{% include "components/button.html" with label="Create task" type="submit" %}{% include "components/button.html" with label="Cancel" href="/app/tasks" variant="ghost" %}</div>
+</form>
+{% endblock %}

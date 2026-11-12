@@ -35,7 +35,7 @@
         <h1 class="text-title font-semibold text-ink-900">{% block heading %}{{ page_title }}{% endblock %}</h1>
         <div class="flex items-center gap-3">
           {% include "components/pending_chip.html" with count=pending_count %}
-          <a href="#" class="relative rounded-full p-2 text-ink-600 hover:bg-line" aria-label="Notifications">{% icon "bell" "5" %}</a>
+          <a href="/app/notifications" class="relative rounded-full p-2 text-ink-600 hover:bg-line" aria-label="Notifications{% if unread_count %}, {{ unread_count }} unread{% endif %}">{% icon "bell" "5" %}{% if unread_count %}<span class="ots-count">{% if unread_count > 99 %}99+{% else %}{{ unread_count }}{% endif %}</span>{% endif %}</a>
           <div x-data="dropdown" class="relative" @keydown.escape.window="close" @click.outside="close">
             <button type="button" @click="toggle" class="flex items-center gap-2 rounded-full hover:bg-line p-1" aria-haspopup="menu" aria-label="User menu">
               {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" %}{% icon "chevron-down" "3" %}
@@ -43,6 +43,7 @@
             <div x-show="open" x-cloak class="absolute right-0 mt-2 w-[233px] bg-canvas border border-line rounded-md shadow-card p-2 z-40" role="menu">
               <a href="/app/people/{{ request.user.pk }}" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "user" %}Profile</a>
               <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "download" %}Install app</a>
+              <a href="/app/day-close" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out for the day</a>
               <form method="post" action="/logout">{% csrf_token %}<button type="submit" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out</button></form>
             </div>
           </div>
