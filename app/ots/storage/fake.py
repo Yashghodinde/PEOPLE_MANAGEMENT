@@ -114,7 +114,9 @@ class LocalDirProvider:
         return f"fake-drive-{library.value.lower()}"
 
     def _ref(self, item: _Item) -> RemoteRef:
-        return RemoteRef(item.library, self._drive(item.library), item.item_id, str(item.etag))
+        return RemoteRef(
+            item.library, self._drive(item.library), item.item_id, str(item.etag), item.quick_xor
+        )
 
     def _meta(self, item: _Item) -> RemoteMeta:
         return RemoteMeta(
@@ -191,7 +193,9 @@ class LocalDirProvider:
         if self._expire_cursors and cursor is not None:
             self._expire_cursors = False
             raise GraphError(410, code="resyncRequired")
-        start = int(cursor) if cursor else 0
+        if not cursor:  # a full listing, like Graph's: what exists now, and no word about what was deleted
+            return [self._meta(i) for i in self._items.values() if i.library == library], str(len(self._log))
+        start = int(cursor)
         seen: dict[str, None] = {}
         for lib, item_id in self._log[start:]:
             if lib == library:

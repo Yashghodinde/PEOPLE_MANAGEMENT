@@ -27,6 +27,7 @@ class RemoteRef:
     drive_id: str
     item_id: str
     etag: str | None = None
+    quick_xor_hash: str | None = None  # the verified hash at upload time; reconciliation compares against it
 
 
 @dataclass(frozen=True)

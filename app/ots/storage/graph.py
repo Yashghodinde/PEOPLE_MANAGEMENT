@@ -328,7 +328,9 @@ class GraphProvider:
         else:
             item = self._upload_session(library, remote_path, local_path, size, op, conflict)
         meta = self._verify(library, item, size, local_qx)
-        return meta.ref
+        return RemoteRef(
+            meta.ref.library, meta.ref.drive_id, meta.ref.item_id, meta.ref.etag, meta.quick_xor_hash
+        )
 
     def _next_expected(self, url: str) -> int:
         resp = self._request("GET", url, auth=False, url_kind="upload")  # pre-authenticated: no Authorization

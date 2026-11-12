@@ -114,6 +114,7 @@ def _finish(op: Op, ref: RemoteRef, clock: Clock) -> None:
     with transaction.atomic():
         op.state = Op.State.DONE
         op.drive_id, op.item_id, op.etag = ref.drive_id, ref.item_id, ref.etag or ""
+        op.remote_hash, op.remote_state = ref.quick_xor_hash or "", Op.RemoteState.OK
         op.upload_url_enc, op.upload_expires_at, op.last_error = "", None, ""
         op.save()
         handler = handler_for(op.kind)

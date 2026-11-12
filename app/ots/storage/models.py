@@ -27,6 +27,11 @@ class StorageOperation(models.Model):
         DONE = "DONE"
         FAILED = "FAILED"  # dead letter: needs a person
 
+    class RemoteState(models.TextChoices):  # what the nightly reconciliation last saw in SharePoint
+        OK = "OK"
+        MISSING = "MISSING"  # deleted in SharePoint
+        DRIFTED = "DRIFTED"  # content changed in SharePoint
+
     PRIORITY = {Kind.SHIP_WAL: 0, Kind.UPLOAD_BACKUP_OBJECT: 1, Kind.REPAIR_FILE: 2, Kind.ARCHIVE_FILE: 3}
     ACTIVE = (State.PENDING, State.RUNNING, State.RETRY_WAIT)
 
@@ -53,6 +58,8 @@ class StorageOperation(models.Model):
     drive_id = models.CharField(max_length=200, blank=True, default="")
     item_id = models.CharField(max_length=200, blank=True, default="")
     etag = models.CharField(max_length=100, blank=True, default="")
+    remote_hash = models.CharField(max_length=40, blank=True, default="")  # QuickXorHash verified at upload
+    remote_state = models.CharField(max_length=10, choices=RemoteState.choices, default="OK")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -94,3 +101,17 @@ class StorageOperation(models.Model):
     def clear_session(self) -> None:
         self.upload_url_enc, self.upload_expires_at, self.confirmed_bytes = "", None, 0
         self.save(update_fields=["upload_url_enc", "upload_expires_at", "confirmed_bytes", "updated_at"])
+
+
+class StorageCursor(models.Model):
+    """Where the Graph delta feed of each library left off."""
+
+    library = models.CharField(max_length=10, primary_key=True)
+    delta_link = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "storage_cursors"
+
+    def __str__(self) -> str:
+        return f"{self.library} delta cursor"

@@ -9,9 +9,10 @@ retried, so "off-site" can never be claimed for something the database does not 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .provider import RemoteRef
+from .provider import RemoteMeta, RemoteRef
 
 if TYPE_CHECKING:
     from .models import StorageOperation
@@ -33,3 +34,28 @@ def handler_for(kind: str) -> Handler | None:
 def clear_handlers() -> None:
     """For tests."""
     _HANDLERS.clear()
+    _RECONCILE.clear()
+
+
+@dataclass(frozen=True)
+class ReconcileHooks:
+    """What an owning module wants to know when reconciliation finds trouble with one of its uploads.
+
+    `files` (M08) uses these to mark a blob MISSING or DRIFTED and fix its stored path; `backup` (M04)
+    does the same for backup objects. All three are optional and run inside the reconciliation transaction.
+    """
+
+    on_missing: Callable[[StorageOperation, RemoteMeta | None], None] | None = None
+    on_drifted: Callable[[StorageOperation, RemoteMeta], None] | None = None
+    on_moved: Callable[[StorageOperation, RemoteMeta], None] | None = None
+
+
+_RECONCILE: dict[str, ReconcileHooks] = {}
+
+
+def register_reconcile_hooks(kind: str, hooks: ReconcileHooks) -> None:
+    _RECONCILE[kind] = hooks
+
+
+def reconcile_hooks_for(kind: str) -> ReconcileHooks:
+    return _RECONCILE.get(kind, ReconcileHooks())
