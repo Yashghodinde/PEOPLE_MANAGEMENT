@@ -63,6 +63,7 @@ DATABASES["default"]["ATOMIC_REQUESTS"] = False
 AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "/login"
 OTS_HOME_URL = "/"
+OTS_LATE_GRACE_MINUTES = env.int("OTS_LATE_GRACE_MINUTES", default=10)
 OTS_SELFIE_STAGE_ENABLED = env.bool(
     "OTS_SELFIE_STAGE_ENABLED", default=True
 )  # the selfie step after the password

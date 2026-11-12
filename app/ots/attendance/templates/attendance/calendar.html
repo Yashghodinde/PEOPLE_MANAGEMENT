@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="grid grid-cols-1 {% if day %}lg:grid-cols-split{% endif %} gap-4">
+  <section class="flex flex-col gap-3" aria-label="Month">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <div class="flex items-center gap-2">
+        <a class="text-accent" href="?month={{ grid.prev }}" aria-label="Previous month">&larr;</a>
+        <h2 class="text-sec font-semibold">{{ grid.first|date:"F Y" }}</h2>
+        {% if grid.has_next %}<a class="text-accent" href="?month={{ grid.next }}" aria-label="Next month">&rarr;</a>{% endif %}
+      </div>
+      {% if people %}<form method="get" action="/app/attendance" class="flex gap-2">
+        <select name="person" aria-label="Person" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          {% for p in people %}<option value="{{ p.pk }}"{% if p.pk == person.pk %} selected{% endif %}>{{ p.full_name }}</option>{% endfor %}
+        </select>{% include "components/button.html" with label="Show" type="submit" variant="secondary" %}</form>{% endif %}
+    </div>
+    <div class="bg-canvas border border-line rounded-md p-3">
+      <div class="grid grid-cols-7 gap-1 text-cap text-ink-600 text-center pb-1"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      {% for week in grid.weeks %}<div class="grid grid-cols-7 gap-1 mb-1">
+        {% for c in week %}{% if c.inside %}
+        <a href="?month={{ grid.first|date:'Y-m' }}&day={{ c.date|date:'Y-m-d' }}" title="{{ c.holiday }}"
+           class="h-7 rounded-sm border text-body flex flex-col items-center justify-center relative
+           {% if c.kind == 'present' %}bg-ok text-canvas border-ok{% elif c.kind == 'late' %}bg-ok text-canvas border-ok{% elif c.kind == 'absent' %}bg-bad text-canvas border-bad{% elif c.kind == 'off' %}bg-line text-ink-600 border-line{% else %}border-line text-ink-600{% endif %}
+           {% if c.today %}ring-2 ring-accent{% endif %}">
+          <span>{{ c.date.day }}</span>
+          <span class="text-cap">{{ c.status }}</span>
+          {% if c.kind == 'late' %}<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-warn" title="Late"></span>{% endif %}
+          {% if c.corrected %}<span class="absolute bottom-1 right-1 text-cap" title="Corrected">*</span>{% endif %}
+        </a>{% else %}<span class="h-7"></span>{% endif %}{% endfor %}
+      </div>{% endfor %}
+      <p class="text-cap text-ink-600 pt-2">P present · L late · A absent · WO weekly off · H holiday · * corrected</p>
+    </div>
+    <p class="text-cap text-ink-600">{% for k, n in grid.counts.items %}{{ k }}: {{ n }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+  </section>
+  {% if day %}
+  <aside class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Day">
+    <h3 class="text-sec font-semibold">{{ day|date:"D d M Y" }}</h3>
+    {% for s in detail.sessions %}
+    <div class="border border-line rounded-sm p-3 flex flex-col gap-1">
+      <p class="text-body">In {{ s.login_at|time:"H:i" }}{% if s.logout_at %} · out {{ s.logout_at|time:"H:i" }} <span class="text-cap text-ink-600">({{ s.get_logout_reason_display }})</span>{% else %} · still working{% endif %}</p>
+      <p class="text-cap text-ink-600">{{ s.live_active }} active minutes{% if s.idle_mode == "TAB_ONLY" %} · <span class="text-warn">tab only</span>{% endif %}</p>
+      {% if can_see_selfie %}<img src="/app/attendance/selfie/{{ s.pk }}" alt="Picture at login" width="96" height="72" loading="lazy" class="rounded-sm border border-line">{% endif %}
+      {% if can_force and not s.logout_at %}<form method="post" action="/app/attendance/sessions/{{ s.pk }}/force-logout" class="flex gap-2">{% csrf_token %}
+        <input name="reason" required minlength="5" placeholder="Reason" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body"><button class="text-cap text-bad">End session</button></form>{% endif %}
+    </div>
+    {% empty %}<p class="text-body text-ink-600">No sessions this day.</p>{% endfor %}
+    <p class="text-body font-medium">Total: {{ detail.total_minutes }} active minutes</p>
+    <div><h4 class="text-body font-medium">Work</h4>
+      {% for t in detail.tasks %}<p class="text-cap"><a class="text-accent" href="/app/tasks/{{ t.pk }}">{{ t.task_code }} {{ t.title }}</a></p>{% empty %}<p class="text-cap text-ink-600">No task activity.</p>{% endfor %}</div>
+    {% for c in detail.corrections %}<p class="text-cap text-ink-600">Correction to {{ c.get_new_status_display }}: {{ c.reason }}{% if not c.approved_at %} (waiting for approval){% endif %}</p>{% endfor %}
+    {% if can_correct %}<form method="post" action="/app/attendance/{{ person.pk }}/correction" class="flex flex-col gap-2 border-t border-line pt-2">{% csrf_token %}
+      <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+      <label class="text-cap font-medium">Change status to
+        <select name="new_status" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-full">{% for v, l in statuses %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+      <label class="text-cap font-medium">Reason<input name="reason" required minlength="5" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-full"></label>
+      <div>{% include "components/button.html" with label="Request correction" type="submit" variant="secondary" %}</div></form>{% endif %}
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}

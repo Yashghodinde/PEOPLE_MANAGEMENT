@@ -174,8 +174,10 @@ def audit_provider(
     limit: int,
 ) -> list[Event]:
     """`auth.*` rows where this person is the actor or the target (their sign-ins, lockouts)."""
-    qs = AuditLog.objects.filter(action__startswith="auth.").filter(
-        Q(actor_id=user_id) | Q(target_type="user", target_id=str(user_id))
+    qs = (
+        AuditLog.objects.filter(action__startswith="auth.")
+        .exclude(action__startswith="auth.session_")
+        .filter(Q(actor_id=user_id) | Q(target_type="user", target_id=str(user_id)))
     )
     qs = _apply_window(qs, "at", start, end)
     if cursor is not None:

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col gap-3 max-w-[610px]">
+  {% for c in items %}<form method="post" action="/app/attendance/corrections/{{ c.pk }}/approve" class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2">{% csrf_token %}
+    <p class="text-body"><strong>{{ c.user.full_name }}</strong> · {{ c.date|date:"d M Y" }} → {{ c.get_new_status_display }}</p>
+    <p class="text-cap text-ink-600">Asked by {{ c.requested_by.full_name }}: {{ c.reason }}</p>
+    <div>{% include "components/button.html" with label="Approve" type="submit" %}</div></form>
+  {% empty %}<p class="text-body text-ink-600">Nothing waiting for approval.</p>{% endfor %}
+</div>
+{% endblock %}

@@ -6,4 +6,4 @@ class AttendanceConfig(AppConfig):
     label = "attendance"
 
     def ready(self) -> None:
-        from . import permissions  # noqa: F401  (registers the policies)
+        from . import permissions, timeline  # noqa: F401  (policies and timeline providers)
