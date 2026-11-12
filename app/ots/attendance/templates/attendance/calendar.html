@@ -18,14 +18,14 @@
       {% for week in grid.weeks %}<div class="grid grid-cols-7 gap-1 mb-1">
         {% for c in week %}{% if c.inside %}
         <a href="?month={{ grid.first|date:'Y-m' }}&day={{ c.date|date:'Y-m-d' }}" title="{{ c.holiday }}"
-           class="h-7 rounded-sm border text-body flex flex-col items-center justify-center relative
+           class="h-6 rounded-sm border text-body flex flex-col items-center justify-center relative
            {% if c.kind == 'present' %}bg-ok text-canvas border-ok{% elif c.kind == 'late' %}bg-ok text-canvas border-ok{% elif c.kind == 'absent' %}bg-bad text-canvas border-bad{% elif c.kind == 'off' %}bg-line text-ink-600 border-line{% else %}border-line text-ink-600{% endif %}
            {% if c.today %}ring-2 ring-accent{% endif %}">
           <span>{{ c.date.day }}</span>
           <span class="text-cap">{{ c.status }}</span>
           {% if c.kind == 'late' %}<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-warn" title="Late"></span>{% endif %}
           {% if c.corrected %}<span class="absolute bottom-1 right-1 text-cap" title="Corrected">*</span>{% endif %}
-        </a>{% else %}<span class="h-7"></span>{% endif %}{% endfor %}
+        </a>{% else %}<span class="h-6"></span>{% endif %}{% endfor %}
       </div>{% endfor %}
       <p class="text-cap text-ink-600 pt-2">P present · L late · A absent · WO weekly off · H holiday · * corrected</p>
     </div>
