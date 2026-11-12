@@ -18,6 +18,7 @@ dependencies = [
   "python-json-logger",
   "cryptography",
   "whitenoise",
+  "pillow>=13.0.0",
 ]
 
 [dependency-groups]

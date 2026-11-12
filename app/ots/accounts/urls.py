@@ -16,6 +16,8 @@ urlpatterns = [
     path("app/people/<uuid:pk>/deactivate", people.person_deactivate),
     path("app/people/<uuid:pk>/reactivate", people.person_reactivate),
     path("app/people/<uuid:pk>/reset-password", people.person_reset_password),
+    path("app/people/<uuid:pk>/photo", people.person_photo),
+    path("app/people/<uuid:pk>/photo/update", people.person_photo_update),
     path("app/org", people.org_chart),
     path("app/org/children/<uuid:pk>", people.org_children),
 ]

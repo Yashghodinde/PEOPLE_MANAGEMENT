@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Exists, OuterRef
-from django.http import HttpRequest, HttpResponse
+from django.http import FileResponse, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.html import format_html
 from django.views.decorators.http import require_http_methods
@@ -19,7 +19,7 @@ from ots.core import permissions
 from ots.core.errors import NotFound, ValidationFailed
 from ots.core.idempotency import idempotency_optional
 
-from . import selectors, services
+from . import photos, selectors, services
 from .models import ROLE_RANK, Department, Qualification, Role, User
 
 PAGE_SIZE = 50
@@ -431,6 +431,9 @@ def person_profile(request: HttpRequest, pk: Any) -> HttpResponse:
         "initial_tab": "work",
         "is_admin": permissions.can(request.user, "user.update", target),
         "is_self": target.pk == request.user.pk,
+        "photo_url": f"/app/people/{target.pk}/photo?v={target.version}"
+        if target.reference_photo_path
+        else "",
         "edit_url": f"/app/people/{target.pk}/edit",
         "deactivate_attrs": f'hx-post="/app/people/{target.pk}/deactivate" hx-swap="none" '
         f"hx-vals='{{\"version\": {target.version}}}'",
@@ -487,6 +490,43 @@ def person_reset_password(request: HttpRequest, pk: Any) -> HttpResponse:
         request=request,
     )
     return _done(request, f"/app/people/{target.pk}")
+
+
+# ---------------------------------------------------------------- reference photo
+
+
+@idempotency_optional
+@login_required
+@require_http_methods(["POST"])
+def person_photo_update(request: HttpRequest, pk: Any) -> HttpResponse:
+    """Super Admin: upload (field `photo`) or remove (field `remove`) a person's reference photo."""
+    target = _admin_target(request, pk, "user.update")
+    version = _optional_version(request)
+    if request.POST.get("remove"):
+        services.remove_reference_photo(request.user, target, expected_version=version, request=request)
+    else:
+        if int(request.META.get("CONTENT_LENGTH") or 0) > photos.MAX_UPLOAD_BYTES + 512 * 1024:
+            raise ValidationFailed("The photo must be 2 MB or smaller.", fields={"photo": ["Too large."]})
+        upload = request.FILES.get("photo")
+        data = (
+            upload.read(photos.MAX_UPLOAD_BYTES + 1) if upload else b""
+        )  # never more than the limit in memory
+        services.set_reference_photo(request.user, target, data, expected_version=version, request=request)
+    return _done(request, f"/app/people/{target.pk}")
+
+
+@login_required
+@require_http_methods(["GET"])
+def person_photo(request: HttpRequest, pk: Any) -> HttpResponse:
+    """The picture, to anyone who may see that person's profile."""
+    target = _visible_or_404(request, pk)
+    path = photos.path_for(target.pk)
+    if not target.reference_photo_path or not path.is_file():
+        raise NotFound("No photo.")
+    response = FileResponse(path.open("rb"), content_type="image/jpeg")
+    response["Cache-Control"] = "private, max-age=300"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 # ---------------------------------------------------------------- org chart

@@ -15,3 +15,9 @@ def _field_key(settings):
     from cryptography.fernet import Fernet
 
     settings.OTS_FIELD_ENCRYPTION_KEY = Fernet.generate_key().decode()
+
+
+@pytest.fixture(autouse=True)
+def _photo_dir(settings, tmp_path):
+    """Reference photos go to a temporary folder in tests, never to /srv/data."""
+    settings.OTS_REFERENCE_PHOTO_DIR = tmp_path / "reference-photos"

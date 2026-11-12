@@ -4,7 +4,7 @@
   {% card %}
   <div class="flex items-center justify-between gap-4 flex-wrap">
     <div class="flex items-center gap-4">
-      {% include "components/avatar.html" with name=target.full_name size="5" %}
+      {% include "components/avatar.html" with name=target.full_name size="5" photo=photo_url %}
       <div>
         <p class="text-sec font-semibold">{{ target.full_name }}{% if not target.is_active %} {% badge "CANCELLED" "Inactive" %}{% endif %}</p>
         <p class="text-body text-ink-600">{{ target.designation|default:"No designation" }}{% if qualification %} · {{ qualification }}{% endif %}</p>
@@ -24,6 +24,23 @@
   </div>
   {% endcard %}
   {% if is_admin %}
+  {% card title="Reference photo" footer="A JPEG or PNG up to 2 MB. It is cropped square and shrunk to 480 x 480 to save space; the original is not kept." %}
+  <div class="flex items-end gap-3 flex-wrap">
+    <form class="flex items-end gap-3 flex-wrap" method="post" action="/app/people/{{ target.pk }}/photo/update" enctype="multipart/form-data" hx-post="/app/people/{{ target.pk }}/photo/update" hx-encoding="multipart/form-data" hx-swap="none">
+      {% csrf_token %}
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Picture
+        <input type="file" name="photo" accept="image/jpeg,image/png" required class="text-body">
+      </label>
+      {% include "components/button.html" with label="Upload" type="submit" variant="secondary" %}
+    </form>
+    {% if photo_url %}
+    <form method="post" action="/app/people/{{ target.pk }}/photo/update" hx-post="/app/people/{{ target.pk }}/photo/update" hx-swap="none">
+      {% csrf_token %}<input type="hidden" name="remove" value="1">
+      {% include "components/button.html" with label="Remove photo" type="submit" variant="ghost" %}
+    </form>
+    {% endif %}
+  </div>
+  {% endcard %}
   {% card title="Reset password" footer="They will be asked to choose a new password at next sign-in." %}
   <form class="flex items-end gap-3 flex-wrap" method="post" action="/app/people/{{ target.pk }}/reset-password" hx-post="/app/people/{{ target.pk }}/reset-password" hx-swap="none">
     {% csrf_token %}<input type="hidden" name="version" value="{{ target.version }}">

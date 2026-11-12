@@ -11,7 +11,7 @@ import pytest
 from django.core.management import call_command
 from django.test import Client
 from ots.accounts import services
-from ots.accounts.models import Role
+from ots.accounts.models import Role, User
 from ots.audit.models import AuditLog
 
 from tests.accounts.factories import make_user
@@ -37,6 +37,12 @@ def _create(w):
     )  # fmt: skip
 
 
+def _photo():
+    from tests.accounts.photo_helpers import picture
+
+    return picture((300, 300))
+
+
 SERVICE_CASES = {
     "create_user": ("user.created", _create),
     "update_profile": (
@@ -52,6 +58,17 @@ SERVICE_CASES = {
     "reset_password": (
         "user.password_reset",
         lambda w: services.reset_password(w["sa"], w["emp"], "temporary-pass-9"),
+    ),
+    "set_reference_photo": (
+        "user.photo_updated",
+        lambda w: services.set_reference_photo(w["sa"], w["emp"], _photo()),
+    ),
+    "remove_reference_photo": (
+        "user.photo_removed",
+        lambda w: (
+            services.set_reference_photo(w["sa"], w["emp"], _photo()),
+            services.remove_reference_photo(w["sa"], User.objects.get(pk=w["emp"].pk)),
+        ),
     ),
     "change_password": (
         "user.password_changed",

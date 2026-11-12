@@ -112,6 +112,9 @@ OTS_DATA_DIR = Path(env("OTS_DATA_DIR", default="/srv/data"))
 OTS_STORAGE_BACKEND = env("OTS_STORAGE_BACKEND", default="fake")  # "graph" in production
 OTS_STORAGE_FAKE_DIR = Path(env("OTS_STORAGE_FAKE_DIR", default=str(OTS_DATA_DIR / "fake-remote")))
 OTS_MANIFEST_DIR = Path(env("OTS_MANIFEST_DIR", default=str(OTS_DATA_DIR / "manifests")))  # monthly manifests
+OTS_REFERENCE_PHOTO_DIR = Path(
+    env("OTS_REFERENCE_PHOTO_DIR", default=str(OTS_DATA_DIR / "selfies" / "reference"))
+)  # one small JPEG per person
 OTS_VERSION = env("OTS_VERSION", default="dev")
 OTS_UPLINK_MBPS = env.int("OTS_UPLINK_MBPS", default=50)
 OTS_FIELD_ENCRYPTION_KEY = env("OTS_FIELD_ENCRYPTION_KEY", default="")  # encrypts uploadUrl at rest
