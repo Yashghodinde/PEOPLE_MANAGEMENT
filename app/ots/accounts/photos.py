@@ -9,6 +9,7 @@ location and device information.
 from __future__ import annotations
 
 import io
+import logging
 import os
 from pathlib import Path
 from uuid import UUID
@@ -16,7 +17,9 @@ from uuid import UUID
 from django.conf import settings
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from ots.core.errors import ValidationFailed
+from ots.core.errors import StorageUnavailable, ValidationFailed
+
+log = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 MAX_PIXELS = 40_000_000  # refuse absurd dimensions before decoding anything (decompression-bomb guard)
@@ -69,15 +72,37 @@ def path_for(user_id: UUID | str) -> Path:
     return Path(settings.OTS_REFERENCE_PHOTO_DIR) / f"{UUID(str(user_id))}.jpg"
 
 
-def write(user_id: UUID | str, jpeg: bytes) -> None:
-    """Replace the file atomically: a reader sees the old picture or the new one, never half of one."""
+def stage(user_id: UUID | str, jpeg: bytes) -> Path:
+    """Phase 1, BEFORE the database commit: write the new picture next to the old one under a temporary name.
+
+    Any problem here (no such folder, disk full, wrong permissions) raises while the request can still fail
+    cleanly and roll the database back, so the database never claims a photo that was not saved.
+    """
+    new = path_for(user_id).with_suffix(".jpg.new")
+    try:
+        new.parent.mkdir(parents=True, exist_ok=True)
+        new.write_bytes(jpeg)
+        new.chmod(0o640)
+    except OSError as exc:
+        log.exception("could not stage a reference photo", extra={"event": "photo.stage_failed"})
+        raise StorageUnavailable(
+            "The photo could not be saved on the server. Tell the administrator."
+        ) from exc
+    return new
+
+
+def publish(user_id: UUID | str) -> None:
+    """Phase 2, after the commit: swap the staged picture in. A rename in one folder, so a reader sees the old
+    picture or the new one, never half of one."""
     final = path_for(user_id)
-    final.parent.mkdir(parents=True, exist_ok=True)
-    tmp = final.with_suffix(".jpg.tmp")
-    tmp.write_bytes(jpeg)
-    tmp.chmod(0o640)
-    os.replace(tmp, final)
+    try:
+        os.replace(final.with_suffix(".jpg.new"), final)
+    except OSError:
+        log.exception("could not publish a reference photo", extra={"event": "photo.publish_failed"})
 
 
 def delete(user_id: UUID | str) -> None:
-    path_for(user_id).unlink(missing_ok=True)
+    try:
+        path_for(user_id).unlink(missing_ok=True)
+    except OSError:
+        log.exception("could not delete a reference photo", extra={"event": "photo.delete_failed"})

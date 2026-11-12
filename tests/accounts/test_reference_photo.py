@@ -8,7 +8,7 @@ from django.test import Client
 from ots.accounts import photos, services
 from ots.accounts.models import Role, User
 from ots.audit.models import AuditLog
-from ots.core.errors import Conflict, PermissionDenied, ValidationFailed
+from ots.core.errors import Conflict, PermissionDenied, StorageUnavailable, ValidationFailed
 from PIL import Image
 
 from tests.accounts.factories import make_user
@@ -109,20 +109,20 @@ def world():
     return sa, sub, emp
 
 
-def test_the_file_appears_only_after_the_database_commit(world, django_capture_on_commit_callbacks):
+def test_the_picture_goes_live_only_after_the_database_commit(world, django_capture_on_commit_callbacks):
     sa, _, emp = world
     with django_capture_on_commit_callbacks(execute=False) as callbacks:
         cur = services.set_reference_photo(sa, emp, picture())
     assert cur.reference_photo_path == f"reference/{emp.pk}.jpg" and cur.version == emp.version + 1
-    assert not photos.path_for(emp.pk).exists()  # still inside the transaction: nothing on disk yet
+    final = photos.path_for(emp.pk)
+    assert not final.exists() and final.with_suffix(".jpg.new").exists()  # staged, not yet live
     for cb in callbacks:
         cb()
-    stored = photos.path_for(emp.pk)
-    assert open_stored(stored.read_bytes()).size == (480, 480)
-    assert oct(stored.stat().st_mode & 0o777) == "0o640"
+    assert open_stored(final.read_bytes()).size == (480, 480)
+    assert oct(final.stat().st_mode & 0o777) == "0o640" and not final.with_suffix(".jpg.new").exists()
 
 
-def test_a_rolled_back_change_leaves_no_file(world, django_capture_on_commit_callbacks):
+def test_a_rolled_back_change_never_goes_live(world, django_capture_on_commit_callbacks):
     sa, _, emp = world
     from django.db import transaction
 
@@ -131,6 +131,32 @@ def test_a_rolled_back_change_leaves_no_file(world, django_capture_on_commit_cal
             services.set_reference_photo(sa, emp, picture())
             raise RuntimeError("the rest of the request failed")
     assert not photos.path_for(emp.pk).exists() and not User.objects.get(pk=emp.pk).reference_photo_path
+
+
+def test_a_folder_that_cannot_be_written_fails_the_request_and_changes_nothing(world, settings, tmp_path):
+    sa, _, emp = world
+    blocker = tmp_path / "a-file-not-a-folder"
+    blocker.write_text("x")
+    settings.OTS_REFERENCE_PHOTO_DIR = blocker / "reference"  # cannot be created
+    with pytest.raises(StorageUnavailable, match="could not be saved"):
+        services.set_reference_photo(sa, emp, picture())
+    fresh = User.objects.get(pk=emp.pk)
+    assert (
+        fresh.version == emp.version and not fresh.reference_photo_path
+    )  # the database never claimed a photo
+    assert not AuditLog.objects.filter(action="user.photo_updated").exists()
+
+
+def test_through_the_screen_an_unwritable_folder_is_a_clean_error_not_a_broken_picture(
+    world, settings, tmp_path
+):
+    _, _, emp = world
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x")
+    settings.OTS_REFERENCE_PHOTO_DIR = blocker / "reference"
+    r = upload(login("boss"), emp, picture())
+    assert r.status_code == 503 and "could not be saved" in r.content.decode()
+    assert "/photo?v=" not in login("boss").get(f"/app/people/{emp.pk}").content.decode()
 
 
 def test_replacing_keeps_exactly_one_file_and_audits_each_change(world, django_capture_on_commit_callbacks):

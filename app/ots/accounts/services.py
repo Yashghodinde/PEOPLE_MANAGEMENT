@@ -417,18 +417,20 @@ def change_password(user: User, old_password: str, new_password: str, *, request
 def set_reference_photo(
     actor: User, user: User, data: bytes, *, expected_version: int | None = None, request: Any = None
 ) -> User:
-    """Store a reference photo (a cropped 480 x 480 JPEG). The file is written only after commit."""
+    """Store a reference photo (a cropped 480 x 480 JPEG): staged before the commit, swapped in after it."""
     permissions.require(actor, "user.update", user)
     jpeg = photos.process(data)  # raises ValidationFailed before anything is touched
     cur = _locked(user, expected_version)
     _refuse_break_glass(cur)
+    # staged BEFORE the commit: a write problem fails the whole request and nothing is saved
+    photos.stage(cur.pk, jpeg)
     cur.reference_photo_path = f"reference/{cur.pk}.jpg"
     cur.version += 1
     cur.save()
     audit.record("user.photo_updated", actor, cur, {"bytes": len(jpeg)}, request)
     events.publish("user.updated", cur, {"fields": ["reference_photo"]})
     user_id = cur.pk
-    transaction.on_commit(lambda: photos.write(user_id, jpeg))
+    transaction.on_commit(lambda: photos.publish(user_id))  # after the commit: only a rename is left to do
     return cur
 
 
