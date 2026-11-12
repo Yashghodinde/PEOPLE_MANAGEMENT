@@ -31,6 +31,7 @@ class StorageOperation(models.Model):
         OK = "OK"
         MISSING = "MISSING"  # deleted in SharePoint
         DRIFTED = "DRIFTED"  # content changed in SharePoint
+        SUPERSEDED = "SUPERSEDED"  # a later replace of the same file (the monthly manifest) took its place
 
     PRIORITY = {Kind.SHIP_WAL: 0, Kind.UPLOAD_BACKUP_OBJECT: 1, Kind.REPAIR_FILE: 2, Kind.ARCHIVE_FILE: 3}
     ACTIVE = (State.PENDING, State.RUNNING, State.RETRY_WAIT)
@@ -59,7 +60,8 @@ class StorageOperation(models.Model):
     item_id = models.CharField(max_length=200, blank=True, default="")
     etag = models.CharField(max_length=100, blank=True, default="")
     remote_hash = models.CharField(max_length=40, blank=True, default="")  # QuickXorHash verified at upload
-    remote_state = models.CharField(max_length=10, choices=RemoteState.choices, default="OK")
+    remote_state = models.CharField(max_length=12, choices=RemoteState.choices, default="OK")
+    replace_existing = models.BooleanField(default=False)  # only the DR monthly manifest may set this
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

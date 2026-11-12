@@ -7,6 +7,7 @@ recovery copies in the DR library and refuses anything else.
 from __future__ import annotations
 
 import datetime
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
@@ -14,6 +15,20 @@ from pathlib import Path
 from typing import Any, Protocol
 
 CHUNK = 1024 * 1024  # streaming unit for downloads and hashing: 1 MiB
+
+# The ONLY file that may be replaced in place: the monthly manifest in the DR library. Everything else is
+# written once and never overwritten or deleted.
+REPLACEABLE = re.compile(r"^Manifests/\d{4}-\d{2}\.jsonl$")
+
+
+def assert_replaceable(library: Library, remote_path: str) -> None:
+    """Raise WrongLibrary unless `remote_path` is on the allowlist of replaceable files (DR library only)."""
+    from .errors import WrongLibrary
+
+    if library != Library.DR or not REPLACEABLE.match(remote_path.strip("/")):
+        raise WrongLibrary(
+            f"{library.value}:{remote_path} may not be replaced; only the monthly manifest can"
+        )
 
 
 class Library(StrEnum):

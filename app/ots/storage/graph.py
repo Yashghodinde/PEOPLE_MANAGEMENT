@@ -25,7 +25,7 @@ from ots.core.clock import now
 
 from .bandwidth import BandwidthLimiter
 from .errors import ConfigurationError, GraphError, TransportFailure, VerificationFailed, WrongLibrary
-from .provider import CHUNK, Library, OperationState, RemoteMeta, RemoteRef
+from .provider import CHUNK, Library, OperationState, RemoteMeta, RemoteRef, assert_replaceable
 from .quickxor import QuickXorHash
 
 GRAPH = "https://graph.microsoft.com/v1.0"
@@ -277,7 +277,8 @@ class GraphProvider:
         return self._upload(library, remote_path, local_path, size, sha256, op, conflict="fail")
 
     def replace_dr(self, remote_path: str, local_path: Path, size: int, sha256: str) -> RemoteRef:
-        """The one allowed replace: a file in the DR library (the monthly manifest)."""
+        """The one allowed replace: the monthly manifest in the DR library (allowlist enforced)."""
+        assert_replaceable(Library.DR, remote_path)
         return self._upload(
             Library.DR,
             remote_path,

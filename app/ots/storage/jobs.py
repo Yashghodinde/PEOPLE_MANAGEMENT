@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ots.core.jobs import CONTINUOUS, job
 
-from . import capacity, queue, reconcile, sweep
+from . import capacity, inventory, manifest, queue, reconcile, sweep
 
 
 @job("storage.process_queue", schedule=CONTINUOUS)
@@ -30,6 +30,16 @@ def capacity_check() -> None:
 @job("storage.cert_check", schedule="15 3 * * *")
 def cert_check() -> None:
     capacity.check_certificate()
+
+
+@job("storage.full_inventory", schedule="0 3 1 * *", heavy=True)
+def full_inventory() -> None:
+    inventory.run()
+
+
+@job("storage.manifest_upload", schedule="30 3 * * *")
+def manifest_upload() -> None:
+    manifest.upload_changed()
 
 
 def on_worker_start() -> int:

@@ -91,7 +91,9 @@ def _apply(
     ids = [m.ref.item_id for m in items]
     known = {
         op.item_id: op
-        for op in Op.objects.filter(target_library=library.value, state=Op.State.DONE, item_id__in=ids)
+        for op in Op.objects.filter(
+            target_library=library.value, state=Op.State.DONE, item_id__in=ids
+        ).exclude(remote_state=Op.RemoteState.SUPERSEDED)
     }
     for meta in items:
         op = known.get(meta.ref.item_id)
@@ -103,7 +105,10 @@ def _apply(
                 continue
             if meta.path and meta.path != op.remote_path:
                 stats["moved"] += _mark_moved(op, meta)
-            if meta.quick_xor_hash and op.remote_hash and meta.quick_xor_hash != op.remote_hash:
+            hash_differs = bool(
+                meta.quick_xor_hash and op.remote_hash and meta.quick_xor_hash != op.remote_hash
+            )
+            if meta.size != op.size_bytes or hash_differs:
                 stats["content_changed"] += _mark_content_changed(op, meta)
     if full:
         listed = {m.ref.item_id for m in items if not m.deleted}

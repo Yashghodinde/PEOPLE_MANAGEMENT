@@ -19,7 +19,7 @@ from pathlib import Path
 from ots.core.clock import now
 
 from .errors import GraphError, VerificationFailed, WrongLibrary
-from .provider import CHUNK, Library, OperationState, RemoteMeta, RemoteRef
+from .provider import CHUNK, Library, OperationState, RemoteMeta, RemoteRef, assert_replaceable
 from .quickxor import QuickXorHash
 
 QUARANTINE = "_quarantine"
@@ -230,6 +230,7 @@ class LocalDirProvider:
         return self._ref(item)
 
     def replace_dr(self, remote_path: str, local_path: Path, size: int, sha256: str) -> RemoteRef:
+        assert_replaceable(Library.DR, remote_path)
         self._enter("replace_dr")
         path = remote_path.strip("/")
         existing = self._by_path.get((Library.DR, path))

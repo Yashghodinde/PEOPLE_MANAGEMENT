@@ -109,6 +109,7 @@ def main() -> int:
     tmp.mkdir(parents=True, exist_ok=True)
     made: list[RemoteRef] = []
     quarantine_existed = provider.find_by_path(Library.DR, "_quarantine") is not None
+    manifests_existed = provider.find_by_path(Library.DR, "Manifests") is not None
     vectors: list[dict[str, object]] = []
 
     def local(name: str, data: bytes) -> tuple[Path, int, str]:
@@ -210,9 +211,12 @@ def main() -> int:
 
         # L10: the one allowed replace
         pm, nm, shm = local("m1", b"line 1\n")
-        r1 = provider.replace_dr(f"{base}/manifest.jsonl", pm, nm, shm)
+        test_manifest = (
+            "Manifests/0000-00.jsonl"  # the only name pattern replace is allowed for; deleted below
+        )
+        r1 = provider.replace_dr(test_manifest, pm, nm, shm)
         pm2, nm2, shm2 = local("m2", b"line 1\nline 2\n")
-        r2 = provider.replace_dr(f"{base}/manifest.jsonl", pm2, nm2, shm2)
+        r2 = provider.replace_dr(test_manifest, pm2, nm2, shm2)
         made.append(r2)
         content = b"".join(provider.open_read(r2))
         check(
@@ -229,6 +233,13 @@ def main() -> int:
         made.append(moved)
         check("L11 quarantine moves the item", where.path.startswith("_quarantine/"), where.path)
 
+        # L11b: the allowlist: nothing else can be replaced, and nothing is sent when it is refused
+        try:
+            provider.replace_dr(f"{base}/not-a-manifest.bin", pm, nm, shm)
+            check("L11b replace refused outside the manifest allowlist", False)
+        except WrongLibrary:
+            check("L11b replace refused outside the manifest allowlist", True)
+
         # L12: the business library is protected before any network call
         try:
             provider.delete_dr(RemoteRef(Library.BUSINESS, "x", "y"))
@@ -244,7 +255,11 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001
                 print(f"cleanup: could not delete {ref.item_id}: {exc}")
         # the throw-away folders (empty now)
-        folders = [base, "_ots-live-test"] + ([] if quarantine_existed else ["_quarantine"])
+        folders = (
+            [base, "_ots-live-test"]
+            + ([] if quarantine_existed else ["_quarantine"])
+            + ([] if manifests_existed else ["Manifests"])
+        )
         for folder in folders:
             meta = provider.find_by_path(Library.DR, folder)
             if meta is not None:

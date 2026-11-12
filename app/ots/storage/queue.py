@@ -26,7 +26,7 @@ from .gate import Permission, QueueGate
 from .gate import gate as default_gate
 from .handlers import handler_for
 from .models import StorageOperation as Op
-from .provider import Library, RemoteMeta, RemoteRef, StorageProvider
+from .provider import Library, RemoteMeta, RemoteRef, StorageProvider, assert_replaceable
 from .quickxor import quickxor_file
 
 log = logging.getLogger(__name__)
@@ -117,6 +117,10 @@ def _finish(op: Op, ref: RemoteRef, clock: Clock) -> None:
         op.remote_hash, op.remote_state = ref.quick_xor_hash or "", Op.RemoteState.OK
         op.upload_url_enc, op.upload_expires_at, op.last_error = "", None, ""
         op.save()
+        if op.replace_existing:  # the file it replaced is no longer what SharePoint holds
+            Op.objects.filter(
+                target_library=op.target_library, remote_path=op.remote_path, state=Op.State.DONE
+            ).exclude(pk=op.pk).update(remote_state=Op.RemoteState.SUPERSEDED)
         handler = handler_for(op.kind)
         if handler is not None:
             handler(op, ref)
@@ -215,6 +219,9 @@ def _upload(provider: StorageProvider, op: Op) -> RemoteRef:
     path = Path(op.local_path)
     if not path.is_file():
         raise StorageProviderError(f"the local file is missing: {op.local_path}")
+    if op.replace_existing:
+        assert_replaceable(Library(op.target_library), op.remote_path)  # a dead letter if anyone misuses it
+        return provider.replace_dr(op.remote_path, path, op.size_bytes, op.sha256)
     return provider.put(Library(op.target_library), op.remote_path, path, op.size_bytes, op.sha256, op)
 
 
