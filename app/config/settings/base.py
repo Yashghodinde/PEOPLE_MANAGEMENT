@@ -97,3 +97,17 @@ WHITENOISE_USE_FINDERS = DEBUG
 WHITENOISE_AUTOREFRESH = DEBUG
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 OTS_DATA_DIR = Path(env("OTS_DATA_DIR", default="/srv/data"))
+
+
+# --- Storage (M05) -------------------------------------------------------------------------------
+OTS_STORAGE_BACKEND = env("OTS_STORAGE_BACKEND", default="fake")  # "graph" in production
+OTS_STORAGE_FAKE_DIR = Path(env("OTS_STORAGE_FAKE_DIR", default=str(OTS_DATA_DIR / "fake-remote")))
+OTS_UPLINK_MBPS = env.int("OTS_UPLINK_MBPS", default=50)
+OTS_FIELD_ENCRYPTION_KEY = env("OTS_FIELD_ENCRYPTION_KEY", default="")  # encrypts uploadUrl at rest
+GRAPH_TENANT_ID = env("GRAPH_TENANT_ID", default="")
+GRAPH_CLIENT_ID = env("GRAPH_CLIENT_ID", default="")
+GRAPH_CERT_PATH = env("GRAPH_CERT_PATH", default="/etc/ots/graph.pem")
+GRAPH_KEY_PATH = env("GRAPH_KEY_PATH", default="/etc/ots/graph.key")
+GRAPH_SITE_ID = env("GRAPH_SITE_ID", default="")
+GRAPH_DRIVE_BUSINESS = env("GRAPH_DRIVE_BUSINESS", default="")
+GRAPH_DRIVE_DR = env("GRAPH_DRIVE_DR", default="")
