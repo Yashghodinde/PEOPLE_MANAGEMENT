@@ -137,3 +137,10 @@ def test_must_change_password_goes_there_after_the_selfie(emp):
     c = Client()
     stage_one(c)
     assert send(c).json()["next"] == "/password/change"
+
+
+def test_the_selfie_page_actually_shows_the_camera_and_button(emp):
+    c = Client()
+    stage_one(c)
+    body = c.get("/login/selfie").content.decode()
+    assert 'id="selfie-video"' in body and 'id="selfie-capture"' in body and "js/selfie.js" in body

@@ -1,5 +1,6 @@
-{% extends "base_plain.html" %}
-{% block content %}
+{% extends "base_plain.html" %}{% load static %}
+{% block title %}Take your picture · OTS{% endblock %}
+{% block body %}
 <main class="min-h-screen flex items-center justify-center p-5">
   <div id="selfie-root" data-url="/login/selfie" data-csrf="{{ csrf_token }}" class="w-full max-w-[520px] bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3">
     <h1 class="text-title font-semibold">Hello, {{ person.full_name }}</h1>
@@ -16,5 +17,5 @@
     <noscript><p class="text-body text-bad">This step needs JavaScript and a camera.</p></noscript>
   </div>
 </main>
-<script src="{% load static %}{% static 'js/selfie.js' %}"></script>
+<script src="{% static 'js/selfie.js' %}"></script>
 {% endblock %}
