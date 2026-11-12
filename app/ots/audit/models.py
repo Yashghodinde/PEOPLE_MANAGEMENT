@@ -46,6 +46,9 @@ class AuditLog(models.Model):
             models.Index(fields=["actor_id", "at"], name="audit_actor_idx"),
             models.Index(fields=["action", "at"], name="audit_action_idx"),
             models.Index(fields=["target_type", "target_id"], name="audit_target_idx"),
+            models.Index(
+                fields=["-at", "-id"], name="audit_at_id_idx"
+            ),  # the unfiltered viewer: newest first
         ]
 
     def __str__(self) -> str:

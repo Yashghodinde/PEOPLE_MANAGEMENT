@@ -6,10 +6,11 @@ import csv
 import datetime
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import urlencode
 
+from asgiref.sync import sync_to_async
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
@@ -22,6 +23,7 @@ from ots.core.clock import IST, now
 from ots.core.errors import NotFound
 
 from . import api, selectors, timeline
+from .models import AuditLog
 
 
 def _uuid_or_none(raw: Any) -> uuid.UUID | None:
@@ -134,38 +136,44 @@ def _safe_cell(value: Any) -> str:
     return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
-def _csv_rows(request: HttpRequest, f: selectors.AuditFilter) -> Iterator[str]:
+CSV_CHUNK = 500
+CSV_HEADER = [
+    "id", "time_ist", "actor_id", "actor", "action",
+    "target_type", "target_id", "client_ip", "request_id", "details",
+]  # fmt: skip
+
+
+def _csv_line(r: AuditLog, names: dict[str, str]) -> list[str]:
+    return [
+        str(r.id),
+        r.at.astimezone(IST).isoformat(timespec="seconds"),
+        str(r.actor_id or ""),
+        _safe_cell(names.get(str(r.actor_id), "")),
+        _safe_cell(r.action),
+        _safe_cell(r.target_type),
+        _safe_cell(r.target_id),
+        r.client_ip or "",
+        _safe_cell(r.request_id),
+        _safe_cell(json.dumps(r.payload, ensure_ascii=False, sort_keys=True) if r.payload else ""),
+    ]
+
+
+async def _csv_stream(viewer: Any, f: selectors.AuditFilter) -> AsyncIterator[str]:
+    """The CSV, one chunk of rows at a time. An async generator on purpose: under Uvicorn (ASGI) Django reads
+    a plain generator completely into memory before sending a byte, which would break the memory rule."""
     writer = csv.writer(_Echo())
-    yield writer.writerow(
-        [
-            "id",
-            "time_ist",
-            "actor_id",
-            "actor",
-            "action",
-            "target_type",
-            "target_id",
-            "client_ip",
-            "request_id",
-            "details",
-        ]
-    )
-    names = _who(set(User.objects.visible_to(request.user).values_list("pk", flat=True)))
-    for r in selectors.filtered(request.user, f).iterator(chunk_size=500):
-        yield writer.writerow(
-            [
-                r.id,
-                r.at.astimezone(IST).isoformat(timespec="seconds"),
-                r.actor_id or "",
-                _safe_cell(names.get(str(r.actor_id), "")),
-                _safe_cell(r.action),
-                _safe_cell(r.target_type),
-                _safe_cell(r.target_id),
-                r.client_ip or "",
-                _safe_cell(r.request_id),
-                _safe_cell(json.dumps(r.payload, ensure_ascii=False, sort_keys=True) if r.payload else ""),
-            ]
-        )
+    yield writer.writerow(CSV_HEADER)
+    names = await sync_to_async(
+        lambda: _who(set(User.objects.visible_to(viewer).values_list("pk", flat=True)))
+    )()
+    cursor: selectors.RowCursor | None = None
+    while True:
+        page = await sync_to_async(selectors.audit_page)(viewer, f, cursor, CSV_CHUNK)
+        for r in page.rows:
+            yield writer.writerow(_csv_line(r, names))
+        if page.next_cursor is None:
+            return
+        cursor = page.next_cursor
 
 
 @login_required
@@ -182,7 +190,7 @@ def audit_export(request: HttpRequest) -> HttpResponse:
             {k: v for k, v in _filter_query(request.GET)},
             request,
         )
-    response = StreamingHttpResponse(_csv_rows(request, f), content_type="text/csv; charset=utf-8")
+    response = StreamingHttpResponse(_csv_stream(request.user, f), content_type="text/csv; charset=utf-8")
     stamp = now().astimezone(IST).strftime("%Y%m%d-%H%M")
     response["Content-Disposition"] = f'attachment; filename="audit-{stamp}.csv"'
     response["Cache-Control"] = "no-store"

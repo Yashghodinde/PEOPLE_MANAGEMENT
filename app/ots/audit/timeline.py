@@ -25,6 +25,15 @@ from .models import AuditLog
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
+BIGINT_MAX = 2**63 - 1
+
+
+def bigint_key(text: str) -> int:
+    """A cursor key for a bigint id column. Anything else is a bad link, not a database error."""
+    n = int(text)
+    if not 0 <= n <= BIGINT_MAX:
+        raise ValueError(text)
+    return n
 
 
 @dataclass(frozen=True)
@@ -71,9 +80,11 @@ class Cursor:
     def older_than(self, source: str, at_field: str, key_field: str, key_type: Callable[[str], Any]) -> Q:
         """Filter for one source's rows that come after this cursor in the total order."""
         if source == self.source:
-            return Q(**{f"{at_field}__lt": self.at}) | Q(
-                **{at_field: self.at, f"{key_field}__lt": key_type(self.key)}
-            )
+            try:
+                key = key_type(self.key)
+            except (ValueError, TypeError):
+                raise ValidationFailed("That page link is not valid.") from None
+            return Q(**{f"{at_field}__lt": self.at}) | Q(**{at_field: self.at, f"{key_field}__lt": key})
         if source < self.source:  # same instant: a "lower" source sorts after a "higher" one
             return Q(**{f"{at_field}__lte": self.at})
         return Q(**{f"{at_field}__lt": self.at})
@@ -107,11 +118,9 @@ def day_bounds(
 ) -> tuple[datetime.datetime | None, datetime.datetime | None]:
     """Inclusive local dates -> [start, end) instants in Asia/Kolkata."""
     start = datetime.datetime.combine(date_from, datetime.time.min, IST) if date_from else None
-    end = (
-        datetime.datetime.combine(date_to + datetime.timedelta(days=1), datetime.time.min, IST)
-        if date_to
-        else None
-    )
+    end = None
+    if date_to is not None and date_to < datetime.date.max:  # the last representable day has no "next day"
+        end = datetime.datetime.combine(date_to + datetime.timedelta(days=1), datetime.time.min, IST)
     return start, end
 
 
@@ -170,7 +179,7 @@ def audit_provider(
     )
     qs = _apply_window(qs, "at", start, end)
     if cursor is not None:
-        qs = qs.filter(cursor.older_than("audit", "at", "id", int))
+        qs = qs.filter(cursor.older_than("audit", "at", "id", bigint_key))
     rows = qs.order_by("-at", "-id")[:limit]
     return [
         Event(

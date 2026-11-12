@@ -12,7 +12,7 @@ from django.db.models import Q
 from ots.core.errors import ValidationFailed
 
 from .models import AuditLog, AuditLogQuerySet
-from .timeline import day_bounds
+from .timeline import bigint_key, day_bounds
 
 PAGE_SIZE = 100
 
@@ -43,7 +43,7 @@ class RowCursor:
             parsed = datetime.datetime.fromisoformat(at)
             if parsed.tzinfo is None:
                 raise ValueError
-            return cls(parsed, int(row_id))
+            return cls(parsed, bigint_key(row_id))
         except ValueError:
             raise ValidationFailed("That page link is not valid.") from None
 

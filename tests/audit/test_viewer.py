@@ -6,6 +6,7 @@ import re
 import uuid
 
 import pytest
+from asgiref.sync import async_to_sync
 from django.db import connection, transaction
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
@@ -142,9 +143,18 @@ def test_page_query_count_does_not_grow_with_rows(org):
 # --- CSV export ---------------------------------------------------------------------------------
 
 
+def _collect(response):
+    """All the bytes of a streamed response. The export is an async stream (see views._csv_stream)."""
+    assert response.streaming and response.is_async
+
+    async def gather():
+        return [part async for part in response.streaming_content]
+
+    return b"".join(async_to_sync(gather)())
+
+
 def _csv(response):
-    assert response.streaming
-    return list(csv.reader(io.StringIO(b"".join(response.streaming_content).decode())))
+    return list(csv.reader(io.StringIO(_collect(response).decode())))
 
 
 def test_export_streams_the_filtered_result_and_is_audited(org):
@@ -176,14 +186,20 @@ def test_export_neutralises_spreadsheet_formulas(org):
         assert not row[4].startswith(("=", "+", "@"))
 
 
-def test_export_does_not_load_everything_into_memory(org):
+def test_export_reads_the_database_in_chunks_not_all_at_once(org):
     with transaction.atomic():
         for i in range(1200):
             audit.record("settings.changed", org["sa"], ("setting", f"m{i}"))
-    r = login("boss").get("/audit/export?action=settings.")
-    first = next(iter(r.streaming_content))  # the first chunk arrives before the rest is read
-    assert first.startswith(b"id,time_ist")
-    assert len(_csv(login("boss").get("/audit/export?action=settings."))) == 1201
+    c = login("boss")
+    with CaptureQueriesContext(connection) as ctx:
+        rows = _csv(c.get("/audit/export?action=settings."))
+    assert len(rows) == 1201  # header + every row, none lost between chunks
+    ids = [row[0] for row in rows[1:]]
+    assert len(ids) == len(set(ids))
+    audit_reads = [
+        q["sql"] for q in ctx.captured_queries if 'FROM "audit_log"' in q["sql"] and "LIMIT" in q["sql"]
+    ]
+    assert len(audit_reads) == 3 and all("LIMIT 501" in q for q in audit_reads)  # 500 rows + 1 to see if more
 
 
 # --- profile Activity tab -------------------------------------------------------------------------
@@ -239,3 +255,50 @@ def test_about_column_names_the_person(org):
     body = login("boss").get("/audit").content.decode()
     assert "Asha Employee (emp)" in body and "setting idle" in body
     assert f"user {org['emp'].pk}" not in body
+
+
+# --- hand-edited links and extreme values must never crash --------------------------------------------
+
+BAD_CURSORS = [
+    "x", "|", "||", "2026-11-12T06:00:00+00:00|audit|abc", "2026-11-12T06:00:00+00:00|audit|-5",
+    "2026-11-12T06:00:00+00:00|audit|99999999999999999999999", "2026-11-12T06:00:00+00:00|audit|1.5",
+    "2026-11-12T06:00:00+00:00|audit|\x00", "2026-11-12 06:00:00|audit|1",  # no zone
+    "2026-11-12T06:00:00+00:00|9999999999999999999999", "2026-11-12T06:00:00+00:00|-1", "2026-11-12T06:00:00+00:00|1.5",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("cursor", BAD_CURSORS)
+def test_bad_cursors_are_a_422_on_the_viewer_and_the_activity_tab(org, cursor):
+    c = login("boss")
+    assert c.get("/audit", {"cursor": cursor}).status_code == 422
+    assert c.get(f"/app/people/{org['emp'].pk}/activity", {"cursor": cursor}).status_code == 422
+
+
+@pytest.mark.parametrize("day", ["9999-12-31", "0001-01-01", "2026-02-30", "", "  ", "2026-11-12T00:00"])
+def test_extreme_or_invalid_dates_do_not_crash_any_endpoint(org, day):
+    c = login("boss")
+    for key in ("from", "to"):
+        assert c.get("/audit", {key: day}).status_code == 200
+        assert c.get(f"/app/people/{org['emp'].pk}/activity", {key: day}).status_code == 200
+        r = c.get("/audit/export", {key: day})
+        assert r.status_code == 200 and _csv(r)[0][0] == "id"
+
+
+def test_the_last_day_of_the_calendar_includes_everything_up_to_it(org):
+    put("settings.changed", org["sa"], ("setting", "x"))
+    body = login("boss").get("/audit?to=9999-12-31&action=settings.").content.decode()
+    assert "settings.changed" in body
+
+
+def test_export_is_an_async_stream_so_asgi_does_not_buffer_it(org):
+    r = login("boss").get("/audit/export")
+    assert r.streaming and r.is_async
+
+
+def test_the_unfiltered_viewer_has_an_index_for_newest_first():
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT indexdef FROM pg_indexes WHERE tablename='audit_log' AND indexname='audit_at_id_idx'"
+        )
+        row = cur.fetchone()
+    assert row and "at DESC" in row[0] and "id DESC" in row[0]
