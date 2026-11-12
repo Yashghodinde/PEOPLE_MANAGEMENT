@@ -1,0 +1,10 @@
+{% comment %}The extra fields an action asks for. Needs: inputs, block_reasons, errors.{% endcomment %}
+{% for name in inputs %}
+  {% if name == "block_reason" %}
+  <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Why are you waiting?
+    <select name="block_reason" required class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><option value="">Choose…</option>{% for v, l in block_reasons %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+  {% else %}
+  <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">{% if name == "block_note" %}What do you need?{% elif name == "feedback" %}What should change?{% elif name == "reason" %}Reason{% else %}Note{% endif %}
+    <textarea name="{{ name }}" rows="2" class="px-3 py-2 rounded-sm border border-line bg-canvas text-body"></textarea></label>
+  {% endif %}
+{% endfor %}

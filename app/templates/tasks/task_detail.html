@@ -1,0 +1,66 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-split gap-4">
+  <div class="flex flex-col gap-4">
+    <section class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-2">
+      <div class="flex items-center gap-2 flex-wrap">{% badge task.derived_status %}{% if overdue %}<span class="text-cap font-medium text-bad">Overdue</span>{% endif %}{% if task.has_blocked %}<span class="text-cap text-ink-600">Someone is waiting</span>{% endif %}</div>
+      <h2 class="text-sec font-semibold text-ink-900">{{ task.title }}</h2>
+      <p class="text-cap text-ink-600">{{ task.task_code }} · {{ task.get_priority_display }} priority{% if task.category %} · {{ task.category }}{% endif %} · due {{ task.due_at|date:"d M Y, H:i" }} · from {{ task.created_by.full_name }}</p>
+      {% if task.description %}<p class="text-body text-ink-900 whitespace-pre-line">{{ task.description }}</p>{% endif %}
+    </section>
+    {% if message %}<p role="alert" class="text-body text-bad">{{ message }}</p>{% endif %}
+    <section class="flex flex-col gap-3" aria-label="People">
+      <h3 class="text-sec font-semibold">People</h3>
+      {% for a in lines %}
+      <div class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2{% if a.removed_at %} opacity-60{% endif %}">
+        <div class="flex items-center justify-between gap-2 flex-wrap"><strong>{{ a.user.full_name }}</strong><span class="text-body">{{ a.status_text }}</span></div>
+        {% if a.status == "BLOCKED" %}<p class="text-cap text-ink-600">{{ a.get_block_reason_display }}: {{ a.block_note }}{% if a.waiting_hours %} · waiting {{ a.waiting_hours }} h{% endif %}</p>{% endif %}
+        {% for act in a.actions %}
+        <details class="border-t border-line pt-2"{% if open_action and open_action.0 == a.pk|stringformat:"s" and open_action.1 == act.action %} open{% endif %}>
+          <summary class="cursor-pointer text-body font-medium {% if act.danger %}text-bad{% else %}text-accent{% endif %}">{{ act.label }}</summary>
+          <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}" class="flex flex-col gap-2 pt-2">
+            {% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}">
+            {% include "tasks/_inputs.html" with inputs=act.inputs %}
+            {% if open_action and open_action.0 == a.pk|stringformat:"s" and open_action.1 == act.action %}{% for k, errs in errors.items %}<p class="text-cap text-bad" role="alert">{{ errs.0 }}</p>{% endfor %}{% endif %}
+            <div>{% include "components/button.html" with label=act.label type="submit" variant=act.danger|yesno:"danger,primary" %}</div>
+          </form>
+        </details>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      {% if can_add and addable %}
+      <details class="bg-canvas border border-line rounded-md p-4"><summary class="cursor-pointer text-body font-medium text-accent">Add people</summary>
+        <form method="post" action="/app/tasks/{{ task.pk }}/people" class="flex flex-col gap-2 pt-2">{% csrf_token %}<input type="hidden" name="version" value="{{ task.version }}">
+          {% for u in addable %}<label class="flex items-center gap-2 text-body"><input type="checkbox" name="assignees" value="{{ u.pk }}"> {{ u.full_name }}</label>{% endfor %}
+          <div>{% include "components/button.html" with label="Add" type="submit" %}</div></form></details>
+      {% endif %}
+    </section>
+  </div>
+  <div class="flex flex-col gap-4">
+    <section class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Discussion">
+      <h3 class="text-sec font-semibold">Discussion</h3>
+      {% for c in comments %}<div class="border-b border-line pb-2 last:border-0"><p class="text-cap text-ink-600">{{ c.author.full_name }} · {{ c.created_at|date:"d M, H:i" }}</p><p class="text-body whitespace-pre-line">{{ c.body }}</p></div>
+      {% empty %}<p class="text-body text-ink-600">No messages yet.</p>{% endfor %}
+      {% if can_comment %}<form method="post" action="/app/tasks/{{ task.pk }}/comment" class="flex flex-col gap-2">{% csrf_token %}
+        <textarea name="body" rows="3" required class="px-3 py-2 rounded-sm border border-line bg-canvas text-body" aria-label="Write a message"></textarea>
+        <div>{% include "components/button.html" with label="Send" type="submit" variant="secondary" %}</div></form>{% endif %}
+    </section>
+    {% if can_manage %}
+    <section class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Manage">
+      <details><summary class="cursor-pointer text-body font-medium text-accent">Edit task</summary>
+        <form method="post" action="/app/tasks/{{ task.pk }}/update" class="flex flex-col gap-2 pt-2">{% csrf_token %}<input type="hidden" name="version" value="{{ task.version }}">
+          {% include "components/form_field.html" with name="title" label="Title" value=task.title required=True %}
+          {% include "components/form_field.html" with name="description" label="Description" type="textarea" value=task.description %}
+          {% include "components/form_field.html" with name="priority" label="Priority" type="select" options=priorities value=task.priority %}
+          {% include "components/form_field.html" with name="category" label="Category" value=task.category %}
+          {% include "components/form_field.html" with name="due_at" label="Due" type="datetime-local" value=due_local required=True %}
+          <div>{% include "components/button.html" with label="Save" type="submit" %}</div></form></details>
+      <details><summary class="cursor-pointer text-body font-medium text-bad">Cancel task</summary>
+        <form method="post" action="/app/tasks/{{ task.pk }}/cancel" class="flex flex-col gap-2 pt-2">{% csrf_token %}<input type="hidden" name="version" value="{{ task.version }}">
+          <label class="flex flex-col gap-1 text-cap font-medium">Reason<textarea name="reason" rows="2" required class="px-3 py-2 rounded-sm border border-line bg-canvas text-body"></textarea></label>
+          <div>{% include "components/button.html" with label="Cancel task" type="submit" variant="danger" %}</div></form></details>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

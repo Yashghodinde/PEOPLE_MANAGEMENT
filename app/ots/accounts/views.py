@@ -83,9 +83,7 @@ def change_password_view(request: HttpRequest) -> HttpResponse:
 
 @require_http_methods(["GET"])
 def home(request: HttpRequest) -> HttpResponse:
-    """Landing page after login: admins start at the people list, everyone else at their own profile."""
+    """Landing page after login: the dashboard."""
     if not request.user.is_authenticated:
         return redirect("/login")
-    if request.user.role == "EMPLOYEE":
-        return redirect(f"/app/people/{request.user.pk}")
-    return redirect("/app/people")
+    return redirect("/app/dashboard")

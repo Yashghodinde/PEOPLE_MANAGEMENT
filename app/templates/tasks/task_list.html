@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <form method="get" action="/app/tasks" class="flex items-end gap-2 flex-wrap" aria-label="Filters">
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Search
+        <input name="q" value="{{ f.q }}" maxlength="100" placeholder="Title or code" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Status
+        <select name="status" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">All</option>{% for v, l in statuses %}<option value="{{ v }}"{% if f.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select></label>
+      <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Priority
+        <select name="priority" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <option value="">All</option>{% for v, l in priorities %}<option value="{{ v }}"{% if f.priority == v %} selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select></label>
+      <label class="flex items-center gap-1 text-body h-5"><input type="checkbox" name="overdue" value="1"{% if f.overdue == "1" %} checked{% endif %}> Overdue</label>
+      <label class="flex items-center gap-1 text-body h-5"><input type="checkbox" name="mine" value="1"{% if f.mine == "1" %} checked{% endif %}> Mine</label>
+      {% include "components/button.html" with label="Filter" type="submit" variant="secondary" %}
+    </form>
+    {% if can_create %}{% include "components/button.html" with label="Add task" href="/app/tasks/new" icon="plus" %}{% endif %}
+  </div>
+  {% include "components/table.html" with id="tasks" columns=columns rows=rows empty="No tasks match these filters." %}
+  {% if prev_url or next_url %}<nav class="flex items-center justify-between text-cap text-ink-600" aria-label="Pages">
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} tasks</span>
+    <span class="flex gap-3">{% if prev_url %}<a class="text-accent hover:text-ink-900" href="{{ prev_url }}">Previous</a>{% endif %}{% if next_url %}<a class="text-accent hover:text-ink-900" href="{{ next_url }}">Next</a>{% endif %}</span>
+  </nav>{% endif %}
+</div>
+{% endblock %}

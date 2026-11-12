@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4">
+  {% if can_create %}<div>{% include "components/button.html" with label="Add task" href="/app/tasks/new" icon="plus" %}</div>{% endif %}
+  {% if employee %}
+  {% if paused %}<section class="bg-canvas border border-warn rounded-md p-4 flex flex-col gap-2" aria-label="Resume today">
+    <h3 class="text-sec font-semibold">Pick up where you left off</h3>
+    {% for a in paused %}<a class="text-accent hover:text-ink-900" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }} {{ a.task.title }}</a>{% endfor %}</section>{% endif %}
+  <section class="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="My work">
+    {% for label, n in groups %}<div class="bg-canvas border border-line rounded-md p-4"><p class="text-cap text-ink-600">{{ label }}</p><p class="text-title font-semibold tabular-nums">{{ n }}</p></div>{% endfor %}
+  </section>
+  <section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="Due soon"><h3 class="text-sec font-semibold">Due in the next 2 days</h3>
+    {% for a in due_soon %}<div class="flex justify-between gap-2"><a class="text-accent hover:text-ink-900" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }} {{ a.task.title }}</a><span class="text-cap text-ink-600">{{ a.task.due_at|date:"d M, H:i" }}</span></div>
+    {% empty %}<p class="text-body text-ink-600">Nothing due soon.</p>{% endfor %}</section>
+  {% else %}
+  <section class="grid grid-cols-2 sm:grid-cols-5 gap-3" aria-label="Task counts">
+    {% for label, n, v in status_counts %}<a href="/app/tasks?status={{ v }}" class="bg-canvas border border-line rounded-md p-4"><p class="text-cap text-ink-600">{{ label }}</p><p class="text-title font-semibold tabular-nums">{{ n }}</p></a>{% endfor %}
+    <a href="/app/tasks?overdue=1" class="bg-canvas border border-line rounded-md p-4"><p class="text-cap text-ink-600">Overdue</p><p class="text-title font-semibold tabular-nums {% if overdue %}text-bad{% endif %}">{{ overdue }}</p></a>
+  </section>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="Waiting"><h3 class="text-sec font-semibold">Waiting for something</h3>
+      {% for a in waiting %}<p class="text-body"><a class="text-accent" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }}</a> {{ a.user.full_name }} · {{ a.get_block_reason_display }} · {{ a.hours_waiting }} h</p>{% empty %}<p class="text-body text-ink-600">Nobody is waiting.</p>{% endfor %}</section>
+    <section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="To review"><h3 class="text-sec font-semibold">Waiting for review</h3>
+      {% for a in recent_submissions %}<p class="text-body"><a class="text-accent" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }}</a> {{ a.user.full_name }} · {{ a.task.title }}</p>{% empty %}<p class="text-body text-ink-600">Nothing to review.</p>{% endfor %}</section>
+    <section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="Today"><h3 class="text-sec font-semibold">Given today</h3>
+      {% for a in today %}<p class="text-body"><a class="text-accent" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }}</a> {{ a.user.full_name }} · {{ a.task.title }}</p>{% empty %}<p class="text-body text-ink-600">No tasks given today.</p>{% endfor %}</section>
+    <section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="Workload"><h3 class="text-sec font-semibold">Workload</h3>
+      {% for w in workload %}<p class="text-body flex justify-between"><span>{{ w.user__full_name }}</span><span class="tabular-nums">{{ w.open }} open{% if w.overdue %} · <span class="text-bad">{{ w.overdue }} overdue</span>{% endif %}</span></p>{% empty %}<p class="text-body text-ink-600">No open work.</p>{% endfor %}</section>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
