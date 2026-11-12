@@ -41,7 +41,9 @@ def login_view(request: HttpRequest) -> HttpResponse:
             ctx["error"] = exc.message
             return render(request, "accounts/login.html", ctx, status=400)
         if settings.OTS_SELFIE_STAGE_ENABLED:  # M06 turns this on: selfie comes before the session starts
-            request.session["pending_user_id"] = str(user.pk)
+            from ots.attendance import services as attendance
+
+            attendance.make_pending(request, user)
             return redirect("/login/selfie")
         login(request, user, backend=BACKEND)
         return redirect("/password/change" if user.must_change_password else _next_url(request))

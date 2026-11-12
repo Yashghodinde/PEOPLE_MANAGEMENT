@@ -6,3 +6,6 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
+
+# Most tests log in with a password only. The attendance tests switch the selfie step on.
+OTS_SELFIE_STAGE_ENABLED = False

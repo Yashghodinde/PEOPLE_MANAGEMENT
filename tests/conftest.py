@@ -21,6 +21,7 @@ def _field_key(settings):
 def _photo_dir(settings, tmp_path):
     """Reference photos go to a temporary folder in tests, never to /srv/data."""
     settings.OTS_REFERENCE_PHOTO_DIR = tmp_path / "reference-photos"
+    settings.OTS_SELFIE_DIR = tmp_path / "selfies"
 
 
 # ---- the small company used by the task tests (tests/tasks and tests/failure) ----------------------------
