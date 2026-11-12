@@ -45,7 +45,9 @@ def manager_dashboard(viewer: Any) -> dict[str, Any]:
     open_assignments = mine.filter(status__in=OPEN_STATUSES)
     day_start = datetime.datetime.combine(at.astimezone(IST).date(), datetime.time.min, IST)
     waiting = list(
-        mine.filter(status=AssignmentStatus.BLOCKED).select_related("task", "user").order_by("blocked_since")[:LIST_LIMIT]
+        mine.filter(status=AssignmentStatus.BLOCKED)
+        .select_related("task", "user")
+        .order_by("blocked_since")[:LIST_LIMIT]
     )
     for a in waiting:
         a.hours_waiting = blocked_hours(a, at)  # type: ignore[attr-defined]
@@ -59,10 +61,14 @@ def manager_dashboard(viewer: Any) -> dict[str, Any]:
         "overdue": tasks.overdue(at).count(),
         "waiting": waiting,
         "recent_submissions": list(
-            mine.filter(status=AssignmentStatus.SUBMITTED).select_related("task", "user").order_by("-submitted_at")[:LIST_LIMIT]
+            mine.filter(status=AssignmentStatus.SUBMITTED)
+            .select_related("task", "user")
+            .order_by("-submitted_at")[:LIST_LIMIT]
         ),
         "today": list(
-            mine.filter(assigned_at__gte=day_start).select_related("task", "user").order_by("-assigned_at")[:LIST_LIMIT]
+            mine.filter(assigned_at__gte=day_start)
+            .select_related("task", "user")
+            .order_by("-assigned_at")[:LIST_LIMIT]
         ),
         "workload": list(workload),
     }
@@ -74,8 +80,11 @@ def employee_dashboard(viewer: User) -> dict[str, Any]:
     counts = dict(mine.values_list("status").annotate(n=Count("pk")).order_by())
     paused = list(mine.filter(status=AssignmentStatus.PAUSED).order_by("task__due_at"))
     soon = list(
-        mine.filter(status__in=OPEN_STATUSES, task__due_at__lte=at + datetime.timedelta(hours=48), task__is_cancelled=False)
-        .order_by("task__due_at")[: LIST_LIMIT + 4]
+        mine.filter(
+            status__in=OPEN_STATUSES,
+            task__due_at__lte=at + datetime.timedelta(hours=48),
+            task__is_cancelled=False,
+        ).order_by("task__due_at")[: LIST_LIMIT + 4]
     )
     groups = [
         (label, counts.get(status, 0))

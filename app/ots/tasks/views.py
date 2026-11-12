@@ -8,7 +8,6 @@ from __future__ import annotations
 import datetime
 import uuid
 from typing import Any
-
 from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
@@ -85,7 +84,11 @@ def _version(raw: Any) -> int | None:
 
 def _task_or_404(request: HttpRequest, raw: Any) -> Task:
     pk = _uuid(raw)
-    task = Task.objects.visible_to(request.user).select_related("created_by").filter(pk=pk).first() if pk else None
+    task = (
+        Task.objects.visible_to(request.user).select_related("created_by").filter(pk=pk).first()
+        if pk
+        else None
+    )
     if task is None:
         raise NotFound("Task not found.")
     return task
@@ -119,7 +122,11 @@ def _page_url(params: Any, number: int) -> str:
 def task_list(request: HttpRequest) -> HttpResponse:
     permissions.require(request.user, "task.view")
     g = request.GET
-    qs = Task.objects.visible_to(request.user).select_related("created_by").prefetch_related(_live_assignments())
+    qs = (
+        Task.objects.visible_to(request.user)
+        .select_related("created_by")
+        .prefetch_related(_live_assignments())
+    )
     if g.get("status") in DerivedStatus.values:
         qs = qs.filter(derived_status=g["status"])
     if g.get("priority") in Priority.values:
@@ -138,12 +145,13 @@ def task_list(request: HttpRequest) -> HttpResponse:
         names = [a.user.full_name for a in t.live]
         who = ", ".join(names[:3]) + (f" +{len(names) - 3}" if len(names) > 3 else "")
         late = t.due_at < at and t.derived_status not in (DerivedStatus.COMPLETED, DerivedStatus.CANCELLED)
+        due_text = t.due_at.astimezone(IST).strftime("%d %b, %H:%M")
         rows.append([
-            format_html('<a class="text-accent hover:text-ink-900" href="/app/tasks/{}">{}</a>', t.pk, t.task_code),
+            format_html('<a class="text-accent" href="/app/tasks/{}">{}</a>', t.pk, t.task_code),
             t.title,
             t.get_priority_display(),
             who,
-            format_html('<span class="{}">{}</span>', "text-bad" if late else "", t.due_at.astimezone(IST).strftime("%d %b, %H:%M")),
+            format_html('<span class="{}">{}</span>', "text-bad" if late else "", due_text),
             t.get_derived_status_display() + (" · waiting" if t.has_blocked else ""),
         ])  # fmt: skip
     ctx = {
@@ -164,7 +172,9 @@ def task_list(request: HttpRequest) -> HttpResponse:
 # ---------------------------------------------------------------- create
 
 
-def _create_ctx(request: HttpRequest, values: dict[str, Any], errors: dict[str, Any], message: str = "") -> dict[str, Any]:
+def _create_ctx(
+    request: HttpRequest, values: dict[str, Any], errors: dict[str, Any], message: str = ""
+) -> dict[str, Any]:
     return {
         "page_title": "New task",
         "v": values,
@@ -202,7 +212,10 @@ def task_create(request: HttpRequest) -> HttpResponse:
             hide_from_display=bool(p.get("hide_from_display")),
         )
     except ValidationFailed as exc:
-        values = {k: p.get(k, "") for k in ("title", "description", "priority", "category", "due_at", "scheduled_start_at")}
+        values = {
+            k: p.get(k, "")
+            for k in ("title", "description", "priority", "category", "due_at", "scheduled_start_at")
+        }
         values["assignees"] = p.getlist("assignees")
         values["hide_from_display"] = bool(p.get("hide_from_display"))
         ctx = _create_ctx(request, values, exc.extra.get("fields", {}), exc.message)
@@ -233,7 +246,9 @@ def _actions_for(viewer: Any, a: TaskAssignment) -> list[dict[str, Any]]:
         if action in HIDDEN_ACTIONS or not permissions.can(viewer, f"assignment.{action}", a):
             continue
         label, inputs = ACTION_UI.get(action, (action.replace("_", " ").capitalize(), ()))
-        out.append({"action": action, "label": label, "inputs": inputs, "danger": action in ("remove", "cancel")})
+        out.append(
+            {"action": action, "label": label, "inputs": inputs, "danger": action in ("remove", "cancel")}
+        )
     return out
 
 
@@ -250,6 +265,8 @@ def _detail_ctx(
         a.actions = _actions_for(viewer, a) if a.removed_at is None else []
         a.waiting_hours = dashboard.blocked_hours(a, at) if a.status == AssignmentStatus.BLOCKED else 0
     comments = list(task.comments.select_related("author").order_by("created_at"))
+    overdue = task.due_at < at and not task.is_cancelled and any(a.status in OPEN_STATUSES for a in lines)
+    can_add = permissions.can(viewer, "assignment.add", task) and not task.is_cancelled
     return {
         "page_title": task.task_code,
         "task": task,
@@ -261,9 +278,9 @@ def _detail_ctx(
         "can_manage": permissions.can(viewer, "task.update", task) and not task.is_cancelled,
         "can_comment": permissions.can(viewer, "task.comment", task),
         "block_reasons": [(v, state.BLOCKED_LABELS[BlockReason(v)]) for v in BlockReason.values],
-        "overdue": task.due_at < at and not task.is_cancelled and any(a.status in OPEN_STATUSES for a in lines),
-        "can_add": permissions.can(viewer, "assignment.add", task) and not task.is_cancelled,
-        "addable": selectors.assignable_users(viewer) if permissions.can(viewer, "assignment.add", task) and not task.is_cancelled else [],
+        "overdue": overdue,
+        "can_add": can_add,
+        "addable": selectors.assignable_users(viewer) if can_add else [],
         "priorities": Priority.choices,
         "due_local": task.due_at.astimezone(IST).strftime("%Y-%m-%dT%H:%M"),
     }  # fmt: skip
@@ -276,9 +293,13 @@ def task_detail(request: HttpRequest, task_id: str) -> HttpResponse:
     return render(request, "tasks/task_detail.html", _detail_ctx(request, task))
 
 
-def _rerender(request: HttpRequest, task_id: Any, exc: OtsError, open_action: tuple[str, str] | None = None) -> HttpResponse:
+def _rerender(
+    request: HttpRequest, task_id: Any, exc: OtsError, open_action: tuple[str, str] | None = None
+) -> HttpResponse:
     task = _task_or_404(request, task_id)
-    ctx = _detail_ctx(request, task, message=exc.message, errors=exc.extra.get("fields", {}), open_action=open_action)
+    ctx = _detail_ctx(
+        request, task, message=exc.message, errors=exc.extra.get("fields", {}), open_action=open_action
+    )
     return render(request, "tasks/task_detail.html", ctx, status=422)
 
 
@@ -331,9 +352,12 @@ def task_update(request: HttpRequest, task_id: str) -> HttpResponse:
 @require_http_methods(["POST"])
 def task_cancel(request: HttpRequest, task_id: str) -> HttpResponse:
     return _task_post(
-        request, task_id,
-        lambda t, p: services.cancel_task(request.user, t.pk, p.get("reason", ""), _version(p.get("version"))),
-    )  # fmt: skip
+        request,
+        task_id,
+        lambda t, p: services.cancel_task(
+            request.user, t.pk, p.get("reason", ""), _version(p.get("version"))
+        ),
+    )
 
 
 @login_required
@@ -352,7 +376,9 @@ def task_add_people(request: HttpRequest, task_id: str) -> HttpResponse:
 @idempotency_optional
 @require_http_methods(["POST"])
 def task_comment(request: HttpRequest, task_id: str) -> HttpResponse:
-    return _task_post(request, task_id, lambda t, p: services.add_comment(request.user, t.pk, p.get("body", "")))
+    return _task_post(
+        request, task_id, lambda t, p: services.add_comment(request.user, t.pk, p.get("body", ""))
+    )
 
 
 # ---------------------------------------------------------------- dashboards

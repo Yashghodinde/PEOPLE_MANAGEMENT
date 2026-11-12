@@ -39,8 +39,8 @@ def test_anonymous_is_sent_to_login():
 
 
 def test_home_redirects_by_role(org):
-    assert login("boss").get("/")["Location"] == "/app/people"
-    assert login("emp").get("/")["Location"] == f"/app/people/{org['emp'].pk}"
+    assert login("boss").get("/")["Location"] == "/app/dashboard"
+    assert login("emp").get("/")["Location"] == "/app/dashboard"
 
 
 def link(body, user):

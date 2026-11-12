@@ -41,12 +41,14 @@ def test_the_same_request_three_times_makes_one_task(org):
     assert task.assignments.count() == 2  # not 4 and not 6
 
 
-def test_a_different_key_is_a_new_request_and_a_missing_key_is_refused(org):
+def test_a_different_key_is_a_new_request_and_a_plain_form_post_needs_no_key(org):
     c = login("mgr")
     c.post("/app/tasks/new", form(org), HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
     c.post("/app/tasks/new", form(org), HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
     assert Task.objects.count() == 2
-    assert c.post("/app/tasks/new", form(org)).status_code == 428  # no key at all
+    # a plain HTML form (no JavaScript) sends no key; the page's own button is guarded by the version
+    assert c.post("/app/tasks/new", form(org)).status_code == 302
+    assert c.post("/app/tasks/new", form(org), HTTP_IDEMPOTENCY_KEY="not-a-uuid").status_code == 400
 
 
 def test_a_failed_attempt_can_be_retried_with_the_same_key(org):
