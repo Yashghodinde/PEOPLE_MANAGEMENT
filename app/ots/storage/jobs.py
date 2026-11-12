@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ots.core.jobs import CONTINUOUS, job
 
-from . import queue, reconcile, sweep
+from . import capacity, queue, reconcile, sweep
 
 
 @job("storage.process_queue", schedule=CONTINUOUS)
@@ -20,6 +20,16 @@ def delta_reconcile() -> None:
 @job("storage.orphan_sweep", schedule="30 2 * * *")
 def orphan_sweep() -> None:
     sweep.run()
+
+
+@job("storage.capacity", schedule="0 * * * *")
+def capacity_check() -> None:
+    capacity.check_capacity()
+
+
+@job("storage.cert_check", schedule="15 3 * * *")
+def cert_check() -> None:
+    capacity.check_certificate()
 
 
 def on_worker_start() -> int:

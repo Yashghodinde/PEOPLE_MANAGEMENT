@@ -198,6 +198,12 @@ class QueueGate:
         """Capacity >= 95%: only ARCHIVE_FILE operations wait (M05.7)."""
         self._set_block(BLOCKED_QUOTA, SCOPE_ARCHIVE, reason)
 
+    def clear_archive_block(self) -> None:
+        """Space is back below the limit: lift ONLY the archive-only block (never an auth or quota block)."""
+        block = self.block()
+        if block is not None and block.scope == SCOPE_ARCHIVE:
+            alerts.resolve_alert(BLOCK_KEY)
+
     def clear_block(self) -> None:
         alerts.resolve_alert(BLOCK_KEY)
         alerts.resolve_alert(c.ALERT_AUTH)

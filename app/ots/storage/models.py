@@ -115,3 +115,19 @@ class StorageCursor(models.Model):
 
     def __str__(self) -> str:
         return f"{self.library} delta cursor"
+
+
+class StorageCapacity(models.Model):
+    """One reading of the SharePoint quota per hour, so the growth can be charted and forecast."""
+
+    id = models.BigAutoField(primary_key=True)
+    at = models.DateTimeField()
+    used_bytes = models.BigIntegerField()
+    total_bytes = models.BigIntegerField()
+
+    class Meta:
+        db_table = "storage_capacity"
+        indexes = [models.Index(fields=["-at"], name="storage_capacity_at_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.at:%Y-%m-%d %H:%M} {self.used_bytes}/{self.total_bytes}"
