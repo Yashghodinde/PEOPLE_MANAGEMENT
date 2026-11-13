@@ -83,7 +83,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         original_filename=str(data.get("original_filename") or ""),
         size=size,
         sha256=str(data.get("sha256") or ""),
-        allow_blocked=bool(data.get("allow_blocked")),
+        allow_blocked=data.get("allow_blocked") is True,
         request=request,
     )
     progress = services.get_session(request.user, session.pk)  # type: ignore[arg-type]

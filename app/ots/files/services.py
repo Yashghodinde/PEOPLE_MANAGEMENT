@@ -120,6 +120,8 @@ def start_upload(
     if existing is not None:
         if existing.user_id != user.pk:
             raise PermissionDenied("Not your upload.", action="file.upload")
+        if existing.expected_sha256 != (sha256 or "").lower() or existing.expected_size != size:
+            raise Conflict("This upload key was already used for a different file. Use a new key.")
         return existing, False
     name = _clean_name(original_filename)
     sha = (sha256 or "").lower()
@@ -197,8 +199,18 @@ def receive_piece(
 ) -> Progress:
     """Append bytes `start..end` (inclusive) to the staged copy, only if `start` is exactly where it ends.
 
-    The last piece verifies the SHA-256 and commits. A wrong hash (F-FL-2) keeps nothing.
+    The last piece verifies the SHA-256 and commits. A wrong hash (F-FL-2) keeps nothing. If the disk lost
+    bytes the database had counted, the offset is corrected and committed, and the client resumes from it.
     """
+    result = _receive(user, upload_id, start, end, total, stream, request)
+    if isinstance(result, int):
+        raise OffsetMismatch(result)
+    return result
+
+
+def _receive(
+    user: User, upload_id: uuid.UUID, start: int, end: int, total: int, stream: IO[bytes], request: Any
+) -> Progress | int:
     rejected = False
     with transaction.atomic():
         s = UploadSession.objects.select_for_update().filter(pk=upload_id, user=user).first()
@@ -217,6 +229,11 @@ def receive_piece(
             raise OffsetMismatch(s.received_bytes)
         path = layout.staging_path(s.pk)
         path.parent.mkdir(parents=True, exist_ok=True)
+        on_disk = path.stat().st_size if path.exists() else 0
+        if on_disk < s.received_bytes:  # the disk lost bytes the database counted: never pad with zeros
+            s.received_bytes = on_disk
+            s.save(update_fields=["received_bytes"])
+            return on_disk  # the caller raises, after this block committed the corrected offset
         with path.open("r+b" if path.exists() else "w+b") as fh:
             fh.truncate(start)  # drop the tail of a piece that was cut off earlier
             fh.seek(start)
@@ -288,8 +305,12 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
 
     blob = Blob.objects.select_for_update().filter(pk=sha).first()
     if blob is None:
-        blob = Blob.objects.create(sha256=sha, size_bytes=size, local_path=str(dest), cached=True)
-    else:
+        try:
+            with transaction.atomic():
+                blob = Blob.objects.create(sha256=sha, size_bytes=size, local_path=str(dest), cached=True)
+        except IntegrityError:  # someone else stored the same content a moment ago: use their row
+            blob = Blob.objects.select_for_update().get(pk=sha)
+    if blob.last_accessed_at != at:  # a re-upload counts as use, for the cache's LRU order
         blob.cached, blob.local_path, blob.last_accessed_at = True, str(dest), at
         blob.save(update_fields=["cached", "local_path", "last_accessed_at"])
     archived = blob.state == FileState.ARCHIVED

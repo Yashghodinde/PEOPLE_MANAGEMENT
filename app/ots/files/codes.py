@@ -18,6 +18,8 @@ from ots.core.clock import IST
 
 SLUG_MAX = 40
 EXT_MAX = 10
+EMP_MAX = 20
+PERSON_MAX = 24
 _SAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 
@@ -38,11 +40,12 @@ def person_part(full_name: str) -> str:
     if not words:
         return "User"
     first = words[0][0].upper() + words[0][1:]
-    return first + words[-1][0].upper() if len(words) > 1 else first
+    out = first[: PERSON_MAX - 1] + words[-1][0].upper() if len(words) > 1 else first[:PERSON_MAX]
+    return out
 
 
 def clean_extension(filename: str) -> str:
-    name = filename.strip().rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1].rstrip(". ").strip()
     if "." not in name.strip("."):
         return "bin"
     ext = re.sub(r"[^a-z0-9]", "", ascii_fold(name.rsplit(".", 1)[-1]).lower())
@@ -60,8 +63,8 @@ def make_code(
     original_filename: str,
 ) -> str:
     local = committed_at.astimezone(IST)
-    emp = _SAFE.sub("", ascii_fold(employee_id)) or "EMP"
-    where = _SAFE.sub("", ascii_fold(task_code)) if task_code else "LIB"
+    emp = _SAFE.sub("", ascii_fold(employee_id))[:EMP_MAX] or "EMP"
+    where = _SAFE.sub("", ascii_fold(task_code))[:24] if task_code else "LIB"
     slug = slugify(title) or "untitled"
     code = (
         f"{local:%Y%m%d-%H%M%S}_{emp}-{person_part(full_name)}_{where}-{slug}"

@@ -11,8 +11,9 @@ BLOCKED_EXTENSIONS = frozenset({"exe", "msi", "bat", "cmd", "ps1", "vbs", "js", 
 
 def extension_of(filename: str) -> str:
     """The lower-case extension without the dot, or '' when there is none. 'a.tar.GZ' gives 'gz'."""
-    name = filename.strip().rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
-    if "." not in name.strip("."):
+    # Windows ignores trailing dots and spaces ("tool.exe." still runs), so they must not hide the type.
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1].rstrip(". ").lstrip()
+    if "." not in name.lstrip("."):
         return ""
     return name.rsplit(".", 1)[-1].strip().lower()
 
