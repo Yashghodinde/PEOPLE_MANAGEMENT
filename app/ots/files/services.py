@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import logging
 import mimetypes
 import os
 import re
@@ -33,7 +34,7 @@ from ots.storage.models import StorageOperation as Op
 from ots.storage.provider import Library
 from ots.tasks.models import OPEN_STATUSES, Task, TaskAssignment, TaskEvent
 
-from . import layout
+from . import cache, layout
 from .blocklist import is_blocked
 from .codes import make_code, unique_code
 from .errors import HashMismatch, OffsetMismatch
@@ -400,7 +401,16 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
     s.state = FileState.STAGED
     s.save(update_fields=["state"])
     transaction.on_commit(lambda: _drop(part))
+    transaction.on_commit(_trim_cache)
     return version
+
+
+def _trim_cache() -> None:
+    """After an upload: if the cache is above 90% of its cap, evict down to 80%. Never fails the upload."""
+    try:
+        cache.run()
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("cache trim failed")
 
 
 # --- status, cancel, sweep ------------------------------------------------------------------------

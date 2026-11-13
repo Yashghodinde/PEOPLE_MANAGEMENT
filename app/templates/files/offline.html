@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="File not available yet">
+  <div class="flex items-center gap-2">{% icon "clock" "5" %}<h2 class="text-sec font-semibold">Archived: available when the internet returns</h2></div>
+  <p class="text-body text-ink-900"><strong class="break-all">{{ version.original_filename }}</strong> is stored safely in SharePoint, and this office cannot reach it right now.</p>
+  <p class="text-body text-ink-600">We will fetch it as soon as the connection is back and tell you with a notification in the bell. You do not need to ask again.</p>
+  <div>{% if task %}{% include "components/button.html" with href="/app/tasks/"|add:task.pk|stringformat:"s" label="Back to the task" variant="secondary" %}{% else %}{% include "components/button.html" with href="/app/tasks" label="Back to tasks" variant="secondary" %}{% endif %}</div>
+</section>
+{% endblock %}

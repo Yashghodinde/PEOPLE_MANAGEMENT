@@ -6,4 +6,6 @@ class FilesConfig(AppConfig):
     label = "files"
 
     def ready(self) -> None:
-        from . import permissions  # noqa: F401  (policies)
+        from . import handlers, permissions  # noqa: F401  (policies)
+
+        handlers.register()  # the storage queue reports archived files here

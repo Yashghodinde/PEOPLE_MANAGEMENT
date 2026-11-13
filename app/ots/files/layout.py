@@ -34,14 +34,17 @@ def admit(size: int, *, evict: object = None) -> None:
     """Refuse an upload that would leave less than the minimum free space (default 10% of the disk).
 
     It reserves `size * 1.1`. Before refusing it asks the cache to evict ARCHIVED copies and looks again.
-    `evict` is the hook for that; it defaults to `cache.evict_on_demand` (built in M08.4, a no-op until then).
+    `evict` is that hook (told how many bytes are missing); it defaults to `cache.evict_on_demand`.
     """
     need = int(size * 1.1)
     floor_pct = float(settings.OTS_DISK_FREE_MIN_PERCENT)
 
-    def enough() -> bool:
+    def shortfall() -> int:
         free, total = _usage()
-        return free - need >= total * floor_pct / 100
+        return max(0, int(total * floor_pct / 100) + need - free)
+
+    def enough() -> bool:
+        return shortfall() == 0
 
     if enough():
         return
@@ -49,6 +52,6 @@ def admit(size: int, *, evict: object = None) -> None:
         from . import cache
 
         evict = cache.evict_on_demand
-    evict()  # type: ignore[operator]
+    evict(shortfall())  # type: ignore[operator]
     if not enough():
         raise QuotaBlocked("Server storage full. Ask the Super Admin to free some space.")

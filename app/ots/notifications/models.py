@@ -25,6 +25,7 @@ class Kind(models.TextChoices):
     CHANGED = "CHANGED", "Task changed"
     CANCELLED = "CANCELLED", "Task cancelled"
     REMOVED = "REMOVED", "Removed from task"
+    FILE_READY = "FILE_READY", "File ready"
 
 
 # What the little dot beside a task means (red = a message, green = finished, grey = anything else new).

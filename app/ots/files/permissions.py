@@ -31,3 +31,13 @@ def can_upload(user: Any, task: Task | None) -> bool:
     if user.role == Role.SUB_ADMIN:
         return Task.objects.visible_to(user).filter(pk=task.pk).exists()
     return TaskAssignment.objects.filter(task=task, user=user, status__in=OPEN_STATUSES).exists()
+
+
+@policy("file.download")
+def can_download(user: Any, version: Any) -> bool:
+    """Download and preview share one rule: see `selectors.versions_visible_to`."""
+    from . import selectors
+
+    if not _active(user) or version is None:
+        return False
+    return selectors.versions_visible_to(user).filter(pk=version.pk).exists()

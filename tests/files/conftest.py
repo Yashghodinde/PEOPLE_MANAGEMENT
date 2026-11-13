@@ -55,5 +55,28 @@ def upload_all(c: Client, data: bytes, key, task=None, piece=1024, **kw):
 
 
 @pytest.fixture(autouse=True)
-def _scratch_dirs(dirs):
-    """Every test in tests/files writes under its own temporary directories."""
+def _scratch_dirs(dirs, file_handlers):
+    """Every test in tests/files writes under its own temporary directories, with the real file handlers."""
+
+
+def drain(remote) -> int:
+    """Run the storage queue until nothing is due. Returns how many operations ran."""
+    from ots.storage import queue
+    from ots.storage.gate import QueueGate
+
+    gate, ran = QueueGate(rng=lambda: 1.0), 0
+    while queue.process_one(provider=remote, gate=gate) not in ("idle", "waited"):
+        ran += 1
+    return ran
+
+
+def body(response) -> bytes:
+    """The whole body of a (streaming) response."""
+    if getattr(response, "streaming", False):
+        from asgiref.sync import async_to_sync
+
+        async def collect() -> bytes:
+            return b"".join([part async for part in response.streaming_content])
+
+        return async_to_sync(collect)()
+    return response.content

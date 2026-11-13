@@ -21,6 +21,7 @@ from ots.core import permissions
 from ots.core.errors import NotFound, ValidationFailed
 from ots.tasks.models import Task
 
+from . import download as download_mod
 from . import selectors, services
 from .models import FileState
 
@@ -135,3 +136,15 @@ def task_files_panel(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
             "max_mb": settings.OTS_UPLOAD_MAX_MB,
         },
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def download(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
+    return download_mod.serve(request, version_id, "DOWNLOAD")
+
+
+@login_required
+@require_http_methods(["GET"])
+def preview(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
+    return download_mod.serve(request, version_id, "PREVIEW")

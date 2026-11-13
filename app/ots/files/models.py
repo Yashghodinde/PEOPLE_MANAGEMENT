@@ -142,6 +142,24 @@ class FileVersion(models.Model):
     def __str__(self) -> str:
         return self.file_code
 
+    PREVIEW_TYPES = {
+        "pdf": "application/pdf",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+        "txt": "text/plain; charset=utf-8",
+    }
+
+    @property
+    def extension(self) -> str:
+        return self.file_code.rsplit(".", 1)[-1].lower() if "." in self.file_code else ""
+
+    @property
+    def preview_type(self) -> str | None:
+        """The one content type a preview is served as (never what the file claims), or None."""
+        return self.PREVIEW_TYPES.get(self.extension)
+
 
 class UploadSession(models.Model):
     """One resumable browser upload. The same idempotency key always returns the same session (F-FL-1)."""
@@ -257,3 +275,30 @@ class FileAccessLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action} {self.version_id} by {self.user_id}"
+
+
+class FileFetchRequest(models.Model):
+    """Someone asked for an archived file while SharePoint was out of reach (F-FL-6). The worker
+    fetches it into the cache when it can, and tells them. One row per person per version."""
+
+    class State(models.TextChoices):
+        PENDING = "PENDING"
+        DONE = "DONE"
+        EXPIRED = "EXPIRED"
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    version = models.ForeignKey(FileVersion, on_delete=models.PROTECT, related_name="fetch_requests")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    created_at = models.DateTimeField(default=now)
+    done_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "file_fetch_requests"
+        constraints = [
+            models.UniqueConstraint(fields=["version", "user"], name="fetch_request_uq"),
+        ]
+        indexes = [models.Index(fields=["state", "created_at"], name="fetch_pending_idx")]
+
+    def __str__(self) -> str:
+        return f"fetch {self.version_id} for {self.user_id} ({self.state})"

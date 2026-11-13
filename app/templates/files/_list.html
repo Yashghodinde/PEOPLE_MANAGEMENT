@@ -15,6 +15,10 @@
         {{ r.version.size_bytes|filesizeformat }} · {{ r.linked_at|date:"d M Y, H:i" }}
       </p>
       <p class="text-cap text-ink-600 break-all">{{ r.version.file_code }}</p>
+      <div class="flex items-center gap-3 flex-wrap">
+        <a class="text-cap text-accent" href="/files/v/{{ r.version_id }}/download" download>Download</a>
+        {% if r.version.preview_type %}<a class="text-cap text-accent" href="/files/v/{{ r.version_id }}/preview" target="_blank" rel="noopener">Preview</a>{% endif %}
+      </div>
       {% if can_upload and r.file.current_version_id == r.version_id %}
       <div><button type="button" class="text-cap text-accent" data-file-id="{{ r.file_id }}" @click="newVersion">Upload a new version</button></div>
       {% endif %}

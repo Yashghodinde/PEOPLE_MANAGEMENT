@@ -25,10 +25,10 @@ def test_a_nearly_full_disk_refuses_the_upload_after_trying_to_evict(office, set
     settings.OTS_DISK_FREE_MIN_PERCENT = 10
     disk(monkeypatch, free_mb=100)  # 10% of 1000 MB is exactly the floor: nothing to spare
     asked = []
-    monkeypatch.setattr(cache, "evict_on_demand", lambda: asked.append(1) or 0)
+    monkeypatch.setattr(cache, "evict_on_demand", lambda need=0: asked.append(need) or 0)
     r = start(login("emp"), DATA, uuid.uuid4(), office["task"])
     assert r.status_code == 507 and "storage full" in r.json()["message"].lower()
-    assert asked == [1]  # eviction was tried before refusing
+    assert len(asked) == 1 and asked[0] > 0  # eviction was tried first, told how much is missing
     assert UploadSession.objects.count() == 0
 
 
@@ -36,7 +36,7 @@ def test_eviction_that_frees_enough_lets_the_upload_through(office, settings, mo
     settings.OTS_DISK_FREE_MIN_PERCENT = 10
     state = disk(monkeypatch, free_mb=100)
 
-    def evict():
+    def evict(need=0):
         state["free"] += int(300e6)
         return int(300e6)
 
@@ -47,7 +47,7 @@ def test_eviction_that_frees_enough_lets_the_upload_through(office, settings, mo
 def test_the_reservation_is_size_times_one_point_one(office, settings, monkeypatch):
     settings.OTS_DISK_FREE_MIN_PERCENT = 10
     disk(monkeypatch, free_mb=205)  # floor 100 MB; a 100 MB file reserves 110 MB: 205-110 = 95 < 100
-    monkeypatch.setattr(cache, "evict_on_demand", lambda: 0)
+    monkeypatch.setattr(cache, "evict_on_demand", lambda need=0: 0)
     big = {"size": 100 * 1000 * 1000, "sha256": "a" * 64}
     c = login("emp")
     body = {
