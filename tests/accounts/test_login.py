@@ -75,7 +75,8 @@ def test_selfie_stage_flag_defers_the_session(sa, settings):
     c = Client()
     r = c.post("/login", {"login_id": "boss", "password": GOOD})
     assert r["Location"] == "/login/selfie"
-    assert "_auth_user_id" not in c.session and c.session["pending_user_id"] == str(sa.pk)
+    assert "_auth_user_id" not in c.session and c.session["pending_login"]  # a signed note, not a session
+    assert sa.pk
 
 
 def test_break_glass_login_raises_critical_alert(sa):

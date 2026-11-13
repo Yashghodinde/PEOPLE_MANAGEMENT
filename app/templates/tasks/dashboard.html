@@ -21,6 +21,12 @@
     {% for label, n, v in status_counts %}<a href="/app/tasks?status={{ v }}" class="bg-canvas border border-line rounded-md p-4"><p class="text-cap text-ink-600">{{ label }}</p><p class="text-title font-semibold tabular-nums">{{ n }}</p></a>{% endfor %}
     <a href="/app/tasks?overdue=1" class="bg-canvas border border-line rounded-md p-4"><p class="text-cap text-ink-600">Overdue</p><p class="text-title font-semibold tabular-nums {% if overdue %}text-bad{% endif %}">{{ overdue }}</p></a>
   </section>
+  {% if team_today.rows %}<section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="Team today">
+    <div class="flex items-center justify-between"><h3 class="text-sec font-semibold">Team today</h3>
+      <span class="text-cap text-ink-600">{{ team_today.present }} present · {{ team_today.late }} late · {{ team_today.absent }} absent · {{ team_today.live }} online · {{ team_today.idle }} idle</span></div>
+    {% for r in team_today.rows %}<p class="text-body flex items-center justify-between"><a class="text-accent" href="/app/attendance/{{ r.user.pk }}">{{ r.user.full_name }}</a>
+      <span class="text-cap text-ink-600">{% if r.status == "WO" or r.status == "H" %}off{% elif r.status == "A" %}absent{% else %}{% if r.live %}online{% else %}offline{% endif %}{% if r.idle %} · idle{% endif %}{% if r.status == "L" %} · late{% endif %}{% if r.tab_only and r.session %} · tab only{% endif %}{% endif %}</span></p>{% endfor %}
+  </section>{% endif %}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <section class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2" aria-label="Waiting"><h3 class="text-sec font-semibold">Waiting for something</h3>
       {% for a in waiting %}<p class="text-body">{% dot dots a.task_id %}<a class="text-accent" href="/app/tasks/{{ a.task_id }}">{{ a.task.task_code }}</a> {{ a.user.full_name }} · {{ a.get_block_reason_display }} · {{ a.hours_waiting }} h</p>{% empty %}<p class="text-body text-ink-600">Nobody is waiting.</p>{% endfor %}</section>

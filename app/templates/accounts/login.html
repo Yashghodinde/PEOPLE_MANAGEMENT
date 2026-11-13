@@ -4,6 +4,7 @@
 <main class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-[377px] bg-canvas border border-line rounded-lg shadow-card p-5 flex flex-col gap-4">
     <header class="text-center"><h1 class="text-title font-semibold">Office Task System</h1><p class="text-body text-ink-600">Sign in to continue</p></header>
+    {% if notice %}<p role="status" class="text-body text-ink-600">{{ notice }}</p>{% endif %}
     {% if error %}<p role="alert" class="text-body text-bad">{{ error }}</p>{% endif %}
     <form class="flex flex-col gap-3" method="post" action="/login">
       {% csrf_token %}

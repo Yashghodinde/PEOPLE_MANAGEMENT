@@ -1,0 +1,21 @@
+{% extends "base_plain.html" %}{% load static %}
+{% block title %}Take your picture · OTS{% endblock %}
+{% block body %}
+<main class="min-h-screen flex items-center justify-center p-5">
+  <div id="selfie-root" data-url="/login/selfie" data-csrf="{{ csrf_token }}" class="w-full max-w-[520px] bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3">
+    <h1 class="text-title font-semibold">Hello, {{ person.full_name }}</h1>
+    <p class="text-body text-ink-600">Take a quick picture to start your day. Look at the camera.</p>
+    <p id="selfie-msg" role="alert" class="text-body text-bad"></p>
+    <div class="relative">
+      <video id="selfie-video" autoplay playsinline muted class="w-full rounded-sm bg-ink-900 aspect-[4/3]"></video>
+      <canvas id="selfie-canvas" width="480" height="360" class="hidden"></canvas>
+    </div>
+    <div class="flex gap-3">
+      <button id="selfie-capture" type="button" disabled class="inline-flex items-center justify-center h-5 px-4 rounded-full text-body font-medium bg-accent text-canvas disabled:opacity-50">Capture and continue</button>
+      <a href="/login" class="inline-flex items-center justify-center h-5 px-4 rounded-full text-body text-ink-600 hover:bg-line">Cancel</a>
+    </div>
+    <noscript><p class="text-body text-bad">This step needs JavaScript and a camera.</p></noscript>
+  </div>
+</main>
+<script src="{% static 'js/selfie.js' %}"></script>
+{% endblock %}

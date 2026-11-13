@@ -8,9 +8,11 @@ from types import FrameType
 
 from django.core.management.base import BaseCommand
 
+from ots.attendance import jobs as attendance_jobs  # registers the attendance jobs
 from ots.core import builtin_jobs  # noqa: F401  (registers core jobs)
 from ots.core.dispatcher import Listener
 from ots.core.jobs import Scheduler
+from ots.live import jobs as live_jobs  # noqa: F401  (registers the live jobs)
 from ots.storage import jobs as storage_jobs  # registers the storage jobs
 
 HEARTBEAT = Path("/tmp/worker-heartbeat")  # noqa: S108
@@ -35,6 +37,7 @@ class Command(BaseCommand):
         sched.sync_registry()
         aborted = sched.startup_sweep()
         storage_jobs.on_worker_start()
+        attendance_jobs.on_worker_start()
         log.info("worker started", extra={"event": "worker.started", "aborted_runs": aborted})
         listener = Listener()  # wakes the loop immediately on outbox NOTIFY
         try:

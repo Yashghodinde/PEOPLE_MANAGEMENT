@@ -18,6 +18,8 @@ INSTALLED_APPS = [
     "ots.storage",
     "ots.tasks",
     "ots.notifications",
+    "ots.attendance",
+    "ots.live",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -61,7 +63,10 @@ DATABASES["default"]["ATOMIC_REQUESTS"] = False
 AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "/login"
 OTS_HOME_URL = "/"
-OTS_SELFIE_STAGE_ENABLED = False  # M06 enables the selfie step after the password
+OTS_LATE_GRACE_MINUTES = env.int("OTS_LATE_GRACE_MINUTES", default=10)
+OTS_SELFIE_STAGE_ENABLED = env.bool(
+    "OTS_SELFIE_STAGE_ENABLED", default=True
+)  # the selfie step after the password
 SESSION_COOKIE_AGE = 12 * 3600  # absolute ceiling
 SESSION_COOKIE_HTTPONLY = True
 # "Secure" cookies need HTTPS. Production keeps the default (True); a developer looking at the app over plain
@@ -114,6 +119,7 @@ OTS_DATA_DIR = Path(env("OTS_DATA_DIR", default="/srv/data"))
 OTS_STORAGE_BACKEND = env("OTS_STORAGE_BACKEND", default="fake")  # "graph" in production
 OTS_STORAGE_FAKE_DIR = Path(env("OTS_STORAGE_FAKE_DIR", default=str(OTS_DATA_DIR / "fake-remote")))
 OTS_MANIFEST_DIR = Path(env("OTS_MANIFEST_DIR", default=str(OTS_DATA_DIR / "manifests")))  # monthly manifests
+OTS_SELFIE_DIR = Path(env("OTS_SELFIE_DIR", default=str(OTS_DATA_DIR / "selfies")))
 OTS_REFERENCE_PHOTO_DIR = Path(
     env("OTS_REFERENCE_PHOTO_DIR", default=str(OTS_DATA_DIR / "selfies" / "reference"))
 )  # one small JPEG per person

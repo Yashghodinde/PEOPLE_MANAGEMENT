@@ -15,7 +15,7 @@ ITEMS = [
     NavItem("Dashboard", "layout-dashboard", "/app/dashboard"),
     NavItem("Tasks", "list-checks", "/app/tasks"),
     NavItem("Files", "folder", "#"),
-    NavItem("Attendance", "calendar", "#"),
+    NavItem("Attendance", "calendar", "/app/attendance"),
     NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "SUB_ADMIN")),
     NavItem("Org chart", "user", "/app/org", ("SUPER_ADMIN", "SUB_ADMIN")),
     NavItem("Audit", "shield", "/audit"),

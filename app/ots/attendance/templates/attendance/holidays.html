@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-[610px]">
+  <form method="post" action="/app/attendance/holidays" class="flex items-end gap-2 flex-wrap">{% csrf_token %}
+    {% include "components/form_field.html" with name="date" label="Date" type="date" required=True %}
+    {% include "components/form_field.html" with name="name" label="Name" required=True %}
+    {% include "components/button.html" with label="Add holiday" type="submit" %}
+  </form>
+  {% if message %}<p role="alert" class="text-body text-bad">{{ message }}</p>{% endif %}
+  <div class="bg-canvas border border-line rounded-md divide-y divide-line">
+    {% for h in items %}<form method="post" action="/app/attendance/holidays" class="flex items-center justify-between px-4 h-6">{% csrf_token %}
+      <span class="text-body">{{ h.date|date:"D d M Y" }} · {{ h.name }}</span>
+      <button name="remove" value="{{ h.pk }}" class="text-cap text-bad">Remove</button></form>
+    {% empty %}<p class="p-4 text-body text-ink-600">No holidays yet.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

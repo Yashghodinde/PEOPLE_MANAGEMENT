@@ -28,7 +28,17 @@ def _next_url(request: HttpRequest) -> str:
 def login_view(request: HttpRequest) -> HttpResponse:
     if request.user.is_authenticated:
         return redirect(settings.OTS_HOME_URL)
-    ctx = {"next": request.GET.get("next", ""), "login_id": ""}
+    reasons = {
+        "IDLE_45": "You were logged out after 45 minutes of no activity.",
+        "BROWSER_CLOSED": "You were logged out because the browser was closed.",
+        "FORCED": "An administrator ended your session.",
+        "ended": "Your session has ended.",
+    }
+    ctx = {
+        "next": request.GET.get("next", ""),
+        "login_id": "",
+        "notice": reasons.get(request.GET.get("reason", ""), ""),
+    }
     if request.method == "POST":
         login_id, password = request.POST.get("login_id", ""), request.POST.get("password", "")
         ctx["login_id"] = login_id
@@ -41,7 +51,9 @@ def login_view(request: HttpRequest) -> HttpResponse:
             ctx["error"] = exc.message
             return render(request, "accounts/login.html", ctx, status=400)
         if settings.OTS_SELFIE_STAGE_ENABLED:  # M06 turns this on: selfie comes before the session starts
-            request.session["pending_user_id"] = str(user.pk)
+            from ots.attendance import services as attendance
+
+            attendance.make_pending(request, user)
             return redirect("/login/selfie")
         login(request, user, backend=BACKEND)
         return redirect("/password/change" if user.must_change_password else _next_url(request))
@@ -51,6 +63,9 @@ def login_view(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["POST"])
 @idempotency_exempt
 def logout_view(request: HttpRequest) -> HttpResponse:
+    from ots.attendance import sessions
+
+    sessions.end_current(request.session.session_key or "", "MANUAL")
     logout(request)
     return redirect("/login")
 
