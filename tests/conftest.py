@@ -1,5 +1,7 @@
 import pytest
 
+pytest_plugins = ["tests.files.fixtures"]
+
 
 # ---- storage fixtures shared by tests/storage and tests/failure ---------------------------------------------
 @pytest.fixture

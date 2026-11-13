@@ -12,6 +12,7 @@ from ots.attendance import jobs as attendance_jobs  # registers the attendance j
 from ots.core import builtin_jobs  # noqa: F401  (registers core jobs)
 from ots.core.dispatcher import Listener
 from ots.core.jobs import Scheduler
+from ots.files import jobs as file_jobs  # noqa: F401 (registers file jobs)
 from ots.live import jobs as live_jobs  # noqa: F401  (registers the live jobs)
 from ots.storage import jobs as storage_jobs  # registers the storage jobs
 

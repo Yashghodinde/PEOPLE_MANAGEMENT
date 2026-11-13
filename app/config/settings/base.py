@@ -124,6 +124,13 @@ OTS_SELFIE_DIR = Path(env("OTS_SELFIE_DIR", default=str(OTS_DATA_DIR / "selfies"
 OTS_REFERENCE_PHOTO_DIR = Path(
     env("OTS_REFERENCE_PHOTO_DIR", default=str(OTS_DATA_DIR / "selfies" / "reference"))
 )  # one small JPEG per person
+# --- Files (M08) ---------------------------------------------------------------------------------
+OTS_STAGING_DIR = Path(env("OTS_STAGING_DIR", default=str(OTS_DATA_DIR / "staging")))  # uploads in progress
+OTS_BLOB_DIR = Path(env("OTS_BLOB_DIR", default=str(OTS_DATA_DIR / "blobs")))  # the cache, by SHA-256
+OTS_UPLOAD_MAX_MB = env.int("OTS_UPLOAD_MAX_MB", default=500)
+OTS_UPLOAD_PIECE_BYTES = 8 * 1024 * 1024
+OTS_CACHE_CAP_GB = env.float("OTS_CACHE_CAP_GB", default=25.0)
+OTS_DISK_FREE_MIN_PERCENT = env.float("OTS_DISK_FREE_MIN_PERCENT", default=10.0)  # F-FL-3
 OTS_VERSION = env("OTS_VERSION", default="dev")
 OTS_UPLINK_MBPS = env.int("OTS_UPLINK_MBPS", default=50)
 OTS_FIELD_ENCRYPTION_KEY = env("OTS_FIELD_ENCRYPTION_KEY", default="")  # encrypts uploadUrl at rest
