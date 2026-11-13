@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import Exists, F, OuterRef, Q, QuerySet
 
 from ots.files.models import FileVersion, TaskFile
 from ots.tasks.models import Task
@@ -153,3 +153,90 @@ def trail(viewer: Any, file_id: Any) -> list[dict[str, Any]] | None:
         add(p.at, "problem", words[p.action], by_id[uuid.UUID(p.target_id)])
     out.sort(key=lambda e: e["at"], reverse=True)
     return out
+
+
+# --- library and search ---
+
+SEARCH_PAGE = 50
+SEARCH_MAX = 200
+MAX_TERMS = 6
+
+
+def _like(term: str) -> str:
+    return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def search(
+    viewer: Any,
+    q: str = "",
+    *,
+    uploader: Any = None,
+    task: Any = None,
+    extension: str = "",
+    relation: str = "",
+    state: str = "",
+    date_from: Any = None,
+    date_to: Any = None,
+    limit: int = SEARCH_PAGE,
+    offset: int = 0,
+) -> list[FileVersion]:
+    """Versions matching every word of `q` (in the file name, file code, task title or uploader name),
+    narrowed by the filters, newest first, only those `viewer` may open. At most `limit` (never over 200)."""
+    qs = versions_visible_to(viewer)
+    for term in q.split()[:MAX_TERMS]:
+        like = _like(term)
+        # one indexed branch per place a word can be, joined by UNION: an OR across tables cannot use an index
+        from ots.accounts.models import User
+
+        by_name = FileVersion.objects.filter(original_filename__ilike=like).values("pk")
+        by_code = FileVersion.objects.filter(file_code__ilike=like).values("pk")
+        by_person = FileVersion.objects.filter(
+            uploaded_by_id__in=User.objects.filter(full_name__ilike=like).values("pk")
+        ).values("pk")
+        by_task = TaskFile.objects.filter(task__title__ilike=like).values(pk=F("version_id"))
+        qs = qs.filter(pk__in=by_name.union(by_code, by_person, by_task))
+    if uploader:
+        qs = qs.filter(uploaded_by_id=uploader)
+    if task:
+        qs = qs.filter(Exists(TaskFile.objects.filter(version=OuterRef("pk"), task_id=task)))
+    if relation:
+        qs = qs.filter(Exists(TaskFile.objects.filter(version=OuterRef("pk"), relation=relation)))
+    if extension:
+        qs = qs.filter(file_code__iendswith="." + extension.lstrip(".").lower())
+    if state:
+        qs = qs.filter(state=state)
+    if date_from:
+        qs = qs.filter(uploaded_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(uploaded_at__date__lte=date_to)
+    limit = max(1, min(int(limit), SEARCH_MAX))
+    return list(
+        qs.select_related("file", "uploaded_by").order_by("-uploaded_at", "-id")[
+            max(0, offset) : offset + limit
+        ]
+    )
+
+
+def library_view(folder_id: Any = None) -> dict[str, Any]:
+    """One level of the library: subfolders, files in it, and the path above it. Everyone may read it."""
+    from ots.files.models import File, LibraryFolder
+
+    folder = LibraryFolder.objects.filter(pk=folder_id).first() if folder_id else None
+    if folder_id and folder is None:
+        return {}
+    path: list[Any] = []
+    cur = folder
+    while cur is not None and len(path) < 20:
+        path.append(cur)
+        cur = cur.parent
+    files = (
+        File.objects.filter(visibility="LIBRARY", library_folder=folder)
+        .select_related("current_version", "current_version__uploaded_by")
+        .order_by("display_name")[:PANEL_LIMIT]
+    )
+    return {
+        "folder": folder,
+        "path": list(reversed(path)),
+        "folders": list(LibraryFolder.objects.filter(parent=folder).order_by("name")[:PANEL_LIMIT]),
+        "files": list(files),
+    }

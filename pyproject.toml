@@ -55,6 +55,8 @@ DJANGO_SETTINGS_MODULE = "config.settings.test"
 pythonpath = ["app", "."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = ["slow: qualification-suite tests (large seeds); run with `pytest -m slow`, skipped by `make test`"]
+addopts = "-m 'not slow'"
 
 [tool.mypy]
 python_version = "3.12"

@@ -129,6 +129,8 @@ def task_files_panel(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
             "rows": rows,
             "pending": selectors.anything_pending(rows),
             "can_upload": can_upload,
+            "can_attach": permissions.can(request.user, "file.attach_reference", task)
+            and not task.is_cancelled,
             "default_relation": "SUBMISSION" if employee_only else "DELIVERABLE",
             "relations": []
             if employee_only
@@ -190,3 +192,106 @@ def file_trail(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
     link = f.task_links.order_by("-linked_at").first()
     back = f"/app/tasks/{link.task_id}" if link else "/app/tasks"
     return render(request, "files/trail.html", {"file": f, "rows": rows, "back": back})
+
+
+def _date(raw: str | None) -> Any:
+    import datetime
+
+    try:
+        return datetime.date.fromisoformat(raw) if raw else None
+    except ValueError:
+        raise ValidationFailed("That date is not valid.", fields={"date": ["Invalid."]}) from None
+
+
+@login_required
+@require_http_methods(["GET"])
+def search(request: HttpRequest) -> HttpResponse:
+    g = request.GET
+    attach = g.get("attach", "")
+    task = Task.objects.visible_to(request.user).filter(pk=attach).first() if _is_uuid(attach) else None
+    try:
+        page = max(0, int(g.get("page", "0")))
+    except ValueError:
+        page = 0
+    rows = selectors.search(
+        request.user,
+        g.get("q", ""),
+        uploader=g.get("uploader") if _is_uuid(g.get("uploader", "")) else None,
+        task=g.get("task") if _is_uuid(g.get("task", "")) else None,
+        extension=g.get("ext", "")[:10],
+        relation=g.get("relation", "")
+        if g.get("relation") in ("REFERENCE", "SUBMISSION", "DELIVERABLE")
+        else "",
+        state=g.get("state", "")[:20],
+        date_from=_date(g.get("from")),
+        date_to=_date(g.get("to")),
+        limit=selectors.SEARCH_PAGE + 1,
+        offset=page * selectors.SEARCH_PAGE,
+    )
+    more = len(rows) > selectors.SEARCH_PAGE
+    can_attach = task is not None and permissions.can(request.user, "file.attach_reference", task)
+    return render(
+        request,
+        "files/search.html",
+        {
+            "rows": rows[: selectors.SEARCH_PAGE], "q": g.get("q", ""), "page": page, "more": more,
+            "attach": task if can_attach else None, "get": g,
+        },
+    )  # fmt: skip
+
+
+def _is_uuid(raw: str) -> bool:
+    try:
+        uuid.UUID(raw)
+    except ValueError:
+        return False
+    return True
+
+
+@login_required
+@require_http_methods(["POST"])
+def attach(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
+    from django.shortcuts import redirect
+
+    from . import library
+
+    version_id = request.POST.get("version", "")
+    if not _is_uuid(version_id):
+        raise ValidationFailed("Choose a file.", fields={"version": ["Required."]})
+    library.attach_existing(request.user, task_id, version_id, request)
+    return redirect(f"/app/tasks/{task_id}")
+
+
+@login_required
+@require_http_methods(["GET"])
+def library_page(request: HttpRequest) -> HttpResponse:
+    raw = request.GET.get("folder", "")
+    view = selectors.library_view(raw if _is_uuid(raw) else None)
+    if not view:
+        raise NotFound("No such folder.")
+    view["can_manage"] = permissions.can(request.user, "library.manage", None)
+    return render(request, "files/library.html", view)
+
+
+@login_required
+@require_http_methods(["POST"])
+def library_folder(request: HttpRequest) -> HttpResponse:
+    from django.shortcuts import redirect
+
+    from . import library
+
+    parent = request.POST.get("parent") or None
+    library.create_folder(request.user, request.POST.get("name", ""), parent, request)
+    return redirect(f"/files/library?folder={parent}" if parent else "/files/library")
+
+
+@login_required
+@require_http_methods(["POST"])
+def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    from django.shortcuts import redirect
+
+    from . import library
+
+    folder = request.POST.get("folder") or None
+    library.move_file(request.user, file_id, folder, request)
+    return redirect(f"/files/library?folder={folder}" if folder else "/files/library")

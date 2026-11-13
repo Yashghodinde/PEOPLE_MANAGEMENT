@@ -1,7 +1,13 @@
 {% load ots_ui %}
 <section id="files-panel" class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Files"
   {% if can_upload %}x-data="uploader" data-task-id="{{ task.pk }}" data-default-relation="{{ default_relation }}"{% endif %}>
-  <h3 class="text-sec font-semibold">Files</h3>
+  <div class="flex items-center justify-between gap-2 flex-wrap">
+    <h3 class="text-sec font-semibold">Files</h3>
+    <span class="flex items-center gap-3">
+      {% if can_attach %}<a class="text-cap text-accent" href="/files/search?attach={{ task.pk }}">Attach an existing file</a>{% endif %}
+      <a class="text-cap text-accent" href="/files/library">Library</a>
+    </span>
+  </div>
 
   {% if can_upload %}
   <div class="border border-dashed rounded-md p-4 flex flex-col items-center gap-2 text-center"

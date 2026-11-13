@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="Library">
+  <h2 class="text-sec font-semibold">Library</h2>
+  <nav class="text-cap text-ink-600"><a class="text-accent" href="/files/library">Library</a>{% for f in path %} / <a class="text-accent" href="/files/library?folder={{ f.pk }}">{{ f.name }}</a>{% endfor %}</nav>
+  {% if folders %}<ul class="flex flex-col gap-1">{% for f in folders %}<li><a class="text-body text-accent" href="/files/library?folder={{ f.pk }}">{{ f.name }}</a></li>{% endfor %}</ul>{% endif %}
+  {% if files %}
+  <ul class="flex flex-col divide-y divide-line">
+    {% for f in files %}
+    <li class="py-2 flex flex-col gap-1">
+      <strong class="text-body break-all">{{ f.display_name }}</strong>
+      {% if f.current_version %}<p class="text-cap text-ink-600">Version {{ f.current_version.version_number }} · {{ f.current_version.size_bytes|filesizeformat }}</p>
+      <div class="flex gap-3"><a class="text-cap text-accent" href="/files/v/{{ f.current_version_id }}/download" download>Download</a><a class="text-cap text-accent" href="/files/{{ f.pk }}/trail">Trail</a></div>{% endif %}
+      {% if can_manage %}<form method="post" action="/files/library/files/{{ f.pk }}/move" class="flex gap-2 items-center">{% csrf_token %}<select name="folder" class="border border-line rounded-md p-1 text-cap"><option value="">(top level)</option>{% for fo in folders %}<option value="{{ fo.pk }}">{{ fo.name }}</option>{% endfor %}</select><button class="text-cap text-accent">Move</button></form>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif not folders %}{% include "components/empty_state.html" with icon="inbox" text="Nothing here yet." %}{% endif %}
+  {% if can_manage %}
+  <form method="post" action="/files/library/folders" class="flex gap-2 items-end">{% csrf_token %}
+    <input type="hidden" name="parent" value="{{ folder.pk|default:'' }}">
+    <label class="flex flex-col gap-1 text-cap text-ink-600">New folder<input name="name" maxlength="120" required class="border border-line rounded-md p-2 text-body text-ink-900"></label>
+    <button class="bg-accent text-white rounded-md px-4 py-2 text-body">Create</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

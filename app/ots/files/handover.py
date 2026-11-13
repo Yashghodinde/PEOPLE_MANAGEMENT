@@ -89,6 +89,11 @@ def send(
 
 def record_open(user: Any, version: FileVersion, request: HttpRequest | None = None) -> bool:
     """First download or preview by a recipient sets `first_opened_at` once. Returns True when it did."""
+    waiting = FileHandoverRecipient.objects.filter(
+        to_user=user, handover__version=version, first_opened_at__isnull=True
+    )
+    if not waiting.exists():  # nearly every download: one cheap read, no lock, no savepoint
+        return False
     opened = False
     with transaction.atomic():
         rows = list(
