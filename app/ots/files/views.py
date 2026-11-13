@@ -13,13 +13,15 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
+from ots.core import permissions
 from ots.core.errors import NotFound, ValidationFailed
 from ots.tasks.models import Task
 
-from . import services
+from . import selectors, services
 from .models import FileState
 
 _RANGE = re.compile(r"^bytes (\d+)-(\d+)/(\d+)$")
@@ -105,3 +107,31 @@ def upload_detail(request: HttpRequest, upload_id: uuid.UUID) -> JsonResponse:
     start, end, total = (int(g) for g in match.groups())
     progress = services.receive_piece(user, upload_id, start, end, total, request, request=request)  # type: ignore[arg-type]
     return JsonResponse(_body(progress), status=201 if progress.version else 200)
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_files_panel(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
+    """The files section of a task page. It is loaded after the page, and reloads itself while any file is
+    not yet archived (so "Not yet off-site" clears without the person doing anything)."""
+    task = Task.objects.visible_to(request.user).filter(pk=task_id).first()
+    if task is None:
+        raise NotFound("Task not found.")
+    rows = selectors.task_file_rows(request.user, task)
+    can_upload = permissions.can(request.user, "file.upload", task) and not task.is_cancelled
+    employee_only = can_upload and request.user.role == "EMPLOYEE"  # type: ignore[union-attr]
+    return render(
+        request,
+        "files/_list.html" if request.GET.get("list") else "files/_panel.html",
+        {
+            "task": task,
+            "rows": rows,
+            "pending": selectors.anything_pending(rows),
+            "can_upload": can_upload,
+            "default_relation": "SUBMISSION" if employee_only else "DELIVERABLE",
+            "relations": []
+            if employee_only
+            else [("DELIVERABLE", "Deliverable"), ("REFERENCE", "Reference"), ("SUBMISSION", "Submission")],
+            "max_mb": settings.OTS_UPLOAD_MAX_MB,
+        },
+    )

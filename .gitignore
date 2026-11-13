@@ -11,3 +11,4 @@ static/dist/
 .dev/
 app/static/css/app.css
 app/static_src/node_modules/
+app/staticfiles/

@@ -1,0 +1,43 @@
+{% load ots_ui %}
+<section id="files-panel" class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Files"
+  {% if can_upload %}x-data="uploader" data-task-id="{{ task.pk }}" data-default-relation="{{ default_relation }}"{% endif %}>
+  <h3 class="text-sec font-semibold">Files</h3>
+
+  {% if can_upload %}
+  <div class="border border-dashed rounded-md p-4 flex flex-col items-center gap-2 text-center"
+       :class="dropClass" @dragover.prevent="dragOver" @dragleave="dragLeave" @drop.prevent="dropped">
+    {% icon "upload" "5" %}
+    <p class="text-body text-ink-900">Drop files here, or choose them</p>
+    <p class="text-cap text-ink-600">Up to {{ max_mb }} MB each. Large files upload in pieces and carry on if the connection drops.</p>
+    <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
+    <div class="flex items-center gap-2 flex-wrap justify-center">
+      <button type="button" class="px-4 h-5 rounded-sm bg-accent text-canvas text-body font-medium" @click="choose">Choose files</button>
+      {% if relations %}
+      <label class="text-cap text-ink-600 flex items-center gap-2">This is a
+        <select x-model="relation" class="px-2 h-5 rounded-sm border border-line bg-canvas text-body">
+          {% for value, label in relations %}<option value="{{ value }}"{% if value == default_relation %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+  </div>
+
+  <ul class="flex flex-col gap-2" x-show="hasItems" aria-label="Uploads in progress">
+    <template x-for="item in items" :key="item.id">
+      <li class="border border-line rounded-sm p-3 flex flex-col gap-1">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-body font-medium break-all" x-text="item.name"></span>
+          <button type="button" class="text-cap text-bad" x-show="item.active" :data-id="item.id" @click="cancel">Cancel</button>
+        </div>
+        <div class="h-1 rounded-full bg-line overflow-hidden" x-show="item.showBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="item.percent">
+          <div class="h-1 bg-accent" :style="item.barStyle"></div>
+        </div>
+        <p class="text-cap" :class="item.labelClass" x-text="item.label" role="status"></p>
+      </li>
+    </template>
+    <li x-show="anyFinished"><button type="button" class="text-cap text-accent" @click="clearFinished">Clear finished</button></li>
+  </ul>
+  {% endif %}
+
+  {% include "files/_list.html" %}
+</section>

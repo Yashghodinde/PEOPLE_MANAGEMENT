@@ -10,5 +10,8 @@
     es.close();
     window.location.href = "/login?reason=" + encodeURIComponent(reason || "ended");
   });
+  // M08: the server tells the page a file reached SharePoint, so "Not yet off-site" clears at once. (The files list
+  // also refreshes itself every 15 s while anything is pending, so nothing depends on this arriving.)
+  es.addEventListener("files-changed", function () { document.body.dispatchEvent(new CustomEvent("ots:files-changed")); });
   window.addEventListener("beforeunload", function () { es.close(); });
 })();

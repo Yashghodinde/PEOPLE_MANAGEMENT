@@ -35,6 +35,10 @@
           <div>{% include "components/button.html" with label="Add" type="submit" %}</div></form></details>
       {% endif %}
     </section>
+
+    <div hx-get="/app/tasks/{{ task.pk }}/files" hx-trigger="load" hx-swap="outerHTML" aria-live="polite">
+      <p class="text-cap text-ink-600">Loading files…</p>
+    </div>
   </div>
   <div class="flex flex-col gap-4">
     <section class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Discussion">

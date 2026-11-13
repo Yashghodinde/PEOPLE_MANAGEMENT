@@ -1,0 +1,27 @@
+{% load ots_ui %}
+{# The only part that refreshes: every 15 s while a file is not yet off-site, and when an upload finishes or the server says so. #}
+<div id="files-list" hx-get="/app/tasks/{{ task.pk }}/files?list=1" hx-swap="outerHTML"
+  hx-trigger="ots:file-uploaded from:body, ots:files-changed from:body{% if pending %}, every 15s{% endif %}">
+  {% if rows %}
+  <ul class="flex flex-col divide-y divide-line">
+    {% for r in rows %}
+    <li class="py-2 flex flex-col gap-1">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <strong class="text-body break-all">{{ r.file.display_name }}</strong>
+        {% include "components/offsite_badge.html" with state=r.version.state %}
+      </div>
+      <p class="text-cap text-ink-600">
+        Version {{ r.version.version_number }} · {{ r.get_relation_display|lower }} · {{ r.version.uploaded_by.full_name }} ·
+        {{ r.version.size_bytes|filesizeformat }} · {{ r.linked_at|date:"d M Y, H:i" }}
+      </p>
+      <p class="text-cap text-ink-600 break-all">{{ r.version.file_code }}</p>
+      {% if can_upload and r.file.current_version_id == r.version_id %}
+      <div><button type="button" class="text-cap text-accent" data-file-id="{{ r.file_id }}" @click="newVersion">Upload a new version</button></div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  {% include "components/empty_state.html" with icon="inbox" text="No files on this task yet." %}
+  {% endif %}
+</div>
