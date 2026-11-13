@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "ots.notifications",
     "ots.attendance",
     "ots.live",
+    "ots.files",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",

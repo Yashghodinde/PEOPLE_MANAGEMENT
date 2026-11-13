@@ -1,0 +1,259 @@
+"""Files (contract section 6, M08 section 1 to 8).
+
+A *file* is the thing people talk about; a *version* is one upload of it; a *blob* is the bytes, stored once
+by SHA-256 (the same content uploaded twice is kept once). Versions are never retried into existence: a retry
+of the same Idempotency-Key returns the same version, a deliberate new upload is version N+1 (F-FL-7).
+"""
+
+from __future__ import annotations
+
+from django.db import models
+
+from ots.accounts.models import Company, User
+from ots.core.clock import now
+from ots.core.ids import uuid7
+from ots.tasks.models import Task, TaskAssignment
+
+
+class FileState(models.TextChoices):
+    INITIATED = "INITIATED"
+    RECEIVING = "RECEIVING"
+    REJECTED = "REJECTED"
+    ABANDONED = "ABANDONED"
+    STAGED = "STAGED"
+    ARCHIVING = "ARCHIVING"
+    RETRY_WAIT = "RETRY_WAIT"
+    BLOCKED_QUOTA = "BLOCKED_QUOTA"
+    BLOCKED_AUTH = "BLOCKED_AUTH"
+    VERIFYING = "VERIFYING"
+    ARCHIVED = "ARCHIVED"
+    FAILED = "FAILED"
+    MISSING = "MISSING"
+    DRIFTED = "DRIFTED"
+
+
+class FileRelation(models.TextChoices):
+    REFERENCE = "REFERENCE"
+    SUBMISSION = "SUBMISSION"
+    DELIVERABLE = "DELIVERABLE"
+
+
+class FileVisibility(models.TextChoices):
+    PRIVATE = "PRIVATE"
+    TASK = "TASK"
+    LIBRARY = "LIBRARY"
+
+
+class LibraryFolder(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
+    )
+    name = models.CharField(max_length=120)
+
+    class Meta:
+        db_table = "library_folders"
+        constraints = [
+            models.UniqueConstraint(fields=["parent", "name"], name="library_folder_name_uq"),
+            models.UniqueConstraint(
+                fields=["name"], condition=models.Q(parent__isnull=True), name="library_root_name_uq"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Blob(models.Model):
+    """The bytes, keyed by SHA-256. `local_path` is empty once the cache evicted an ARCHIVED copy."""
+
+    sha256 = models.CharField(max_length=64, primary_key=True)
+    size_bytes = models.BigIntegerField()
+    local_path = models.CharField(max_length=300, null=True, blank=True)  # noqa: DJ001 (null after eviction)
+    cached = models.BooleanField(default=True)
+    last_accessed_at = models.DateTimeField(default=now)
+    drive_id = models.CharField(max_length=200, blank=True, default="")
+    item_id = models.CharField(max_length=200, blank=True, default="")
+    etag = models.CharField(max_length=200, blank=True, default="")
+    ms_quick_xor_hash = models.CharField(max_length=60, blank=True, default="")
+    archived_at = models.DateTimeField(null=True, blank=True)
+    state = models.CharField(max_length=20, choices=FileState.choices, default=FileState.STAGED)
+
+    class Meta:
+        db_table = "blobs"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(size_bytes__gte=0), name="blob_size_ck"),
+            models.CheckConstraint(condition=models.Q(sha256__regex=r"^[0-9a-f]{64}$"), name="blob_sha_ck"),
+        ]
+        indexes = [models.Index(fields=["state", "last_accessed_at"], name="blob_evict_idx")]
+
+    def __str__(self) -> str:
+        return f"blob {self.sha256[:12]}"
+
+
+class File(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="files")
+    display_name = models.CharField(max_length=255)
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="files_owned")
+    visibility = models.CharField(max_length=10, choices=FileVisibility.choices, default=FileVisibility.TASK)
+    library_folder = models.ForeignKey(
+        LibraryFolder, null=True, blank=True, on_delete=models.PROTECT, related_name="files"
+    )
+    current_version = models.ForeignKey(
+        "FileVersion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=now)
+
+    class Meta:
+        db_table = "files"
+        indexes = [models.Index(fields=["owner", "created_at"], name="files_owner_idx")]
+
+    def __str__(self) -> str:
+        return self.display_name
+
+
+class FileVersion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    file = models.ForeignKey(File, on_delete=models.PROTECT, related_name="versions")
+    version_number = models.PositiveIntegerField()
+    file_code = models.CharField(max_length=255, unique=True)
+    original_filename = models.CharField(max_length=255)
+    blob = models.ForeignKey(Blob, db_column="blob_sha256", on_delete=models.PROTECT, related_name="versions")
+    mime_type = models.CharField(max_length=120, blank=True, default="")
+    size_bytes = models.BigIntegerField()
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="file_versions")
+    uploaded_at = models.DateTimeField(default=now)
+    note = models.TextField(blank=True, default="")
+    state = models.CharField(max_length=20, choices=FileState.choices, default=FileState.STAGED)
+    idempotency_key = models.UUIDField(unique=True)
+
+    class Meta:
+        db_table = "file_versions"
+        constraints = [
+            models.UniqueConstraint(fields=["file", "version_number"], name="file_version_number_uq"),
+            models.CheckConstraint(condition=models.Q(version_number__gte=1), name="file_version_ck"),
+        ]
+        indexes = [
+            models.Index(fields=["uploaded_by", "uploaded_at"], name="fv_uploader_idx"),
+            models.Index(fields=["state"], name="fv_state_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.file_code
+
+
+class UploadSession(models.Model):
+    """One resumable browser upload. The same idempotency key always returns the same session (F-FL-1)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    idempotency_key = models.UUIDField(unique=True)
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="upload_sessions")
+    task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    assignment = models.ForeignKey(
+        TaskAssignment, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    file = models.ForeignKey(File, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    relation = models.CharField(max_length=12, choices=FileRelation.choices, default=FileRelation.SUBMISSION)
+    expected_size = models.BigIntegerField()
+    expected_sha256 = models.CharField(max_length=64)
+    original_filename = models.CharField(max_length=255)
+    received_bytes = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(default=now)
+    last_piece_at = models.DateTimeField(default=now)
+    state = models.CharField(max_length=20, choices=FileState.choices, default=FileState.RECEIVING)
+    override_block = models.BooleanField(default=False)  # a Super Admin allowed a blocked type, audited
+
+    class Meta:
+        db_table = "upload_sessions"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(received_bytes__gte=0, received_bytes__lte=models.F("expected_size")),
+                name="upload_received_ck",
+            ),
+        ]
+        indexes = [models.Index(fields=["state", "last_piece_at"], name="upload_sweep_idx")]
+
+    def __str__(self) -> str:
+        return f"upload {self.original_filename} {self.received_bytes}/{self.expected_size}"
+
+
+class TaskFile(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    task = models.ForeignKey(Task, on_delete=models.PROTECT, related_name="task_files")
+    file = models.ForeignKey(File, on_delete=models.PROTECT, related_name="task_links")
+    version = models.ForeignKey(FileVersion, on_delete=models.PROTECT, related_name="task_links")
+    assignment = models.ForeignKey(
+        TaskAssignment, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    relation = models.CharField(max_length=12, choices=FileRelation.choices)
+    linked_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    linked_at = models.DateTimeField(default=now)
+
+    class Meta:
+        db_table = "task_files"
+        constraints = [models.UniqueConstraint(fields=["task", "version", "relation"], name="task_file_uq")]
+        indexes = [models.Index(fields=["task", "linked_at"], name="task_files_task_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.task_id} -> {self.version_id}"
+
+
+class FileHandover(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    version = models.ForeignKey(FileVersion, on_delete=models.PROTECT, related_name="handovers")
+    from_user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="handovers_sent")
+    task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    note = models.TextField(blank=True, default="")
+    sent_at = models.DateTimeField(default=now)
+
+    class Meta:
+        db_table = "file_handovers"
+        indexes = [models.Index(fields=["version", "sent_at"], name="handover_version_idx")]
+
+    def __str__(self) -> str:
+        return f"handover of {self.version_id} by {self.from_user_id}"
+
+
+class FileHandoverRecipient(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    handover = models.ForeignKey(FileHandover, on_delete=models.PROTECT, related_name="recipients")
+    to_user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="handovers_received")
+    first_opened_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "file_handover_recipients"
+        constraints = [models.UniqueConstraint(fields=["handover", "to_user"], name="handover_recipient_uq")]
+        indexes = [models.Index(fields=["to_user", "first_opened_at"], name="handover_inbox_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.handover_id} to {self.to_user_id}"
+
+
+class FileAccessLog(models.Model):
+    """Who downloaded or previewed which version, and from where. Append-only."""
+
+    class Action(models.TextChoices):
+        DOWNLOAD = "DOWNLOAD"
+        PREVIEW = "PREVIEW"
+
+    class Source(models.TextChoices):
+        CACHE = "CACHE"
+        ONEDRIVE = "ONEDRIVE"
+
+    id = models.BigAutoField(primary_key=True)
+    version = models.ForeignKey(FileVersion, on_delete=models.PROTECT, related_name="access_log")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    action = models.CharField(max_length=10, choices=Action.choices)
+    source = models.CharField(max_length=10, choices=Source.choices)
+    at = models.DateTimeField(default=now)
+
+    class Meta:
+        db_table = "file_access_log"
+        indexes = [
+            models.Index(fields=["version", "id"], name="access_version_idx"),
+            models.Index(fields=["user", "at"], name="access_user_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.action} {self.version_id} by {self.user_id}"
