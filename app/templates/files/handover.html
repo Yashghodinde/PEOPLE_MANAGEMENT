@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="Send file">
+  <h2 class="text-sec font-semibold">Send file to…</h2>
+  <p class="text-body text-ink-900"><strong class="break-all">{{ version.original_filename }}</strong> <span class="text-cap text-ink-600">version {{ version.version_number }}</span></p>
+  {% if sent %}<p class="text-body text-ink-900" role="status">Sent. They will see it in the bell, and you can see when they open it.</p>{% endif %}
+  {% if error %}<p class="text-body text-danger" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="flex flex-col gap-3">
+    {% csrf_token %}
+    <fieldset class="flex flex-col gap-1">
+      <legend class="text-cap text-ink-600">People</legend>
+      {% for p in people %}
+      <label class="flex items-center gap-2 text-body"><input type="checkbox" name="recipients" value="{{ p.pk }}"{% if p.pk|stringformat:"s" in chosen %} checked{% endif %}> {{ p.full_name }} <span class="text-cap text-ink-600">{{ p.employee_id }}</span></label>
+      {% empty %}<p class="text-body text-ink-600">There is nobody you can send this to.</p>{% endfor %}
+    </fieldset>
+    <label class="flex flex-col gap-1 text-cap text-ink-600">Note (optional)
+      <textarea name="note" rows="3" maxlength="1000" class="border border-line rounded-md p-2 text-body text-ink-900">{{ note|default:"" }}</textarea>
+    </label>
+    <div class="flex items-center gap-3">
+      <button type="submit" class="bg-accent text-white rounded-md px-4 py-2 text-body">Send</button>
+      <a class="text-body text-accent" href="{{ back }}">Back</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

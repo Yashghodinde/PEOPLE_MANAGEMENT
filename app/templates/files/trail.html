@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="File trail">
+  <h2 class="text-sec font-semibold">Trail: <span class="break-all">{{ file.display_name }}</span></h2>
+  <ol class="flex flex-col divide-y divide-line">
+    {% for e in rows %}
+    <li class="py-2 flex flex-col gap-0.5">
+      <span class="text-body text-ink-900">{{ e.text }}</span>
+      <span class="text-cap text-ink-600">{{ e.at|date:"d M Y, H:i:s" }} · version {{ e.version }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  <div><a class="text-body text-accent" href="{{ back }}">Back</a></div>
+</section>
+{% endblock %}

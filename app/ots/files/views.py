@@ -148,3 +148,45 @@ def download(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
 @require_http_methods(["GET"])
 def preview(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
     return download_mod.serve(request, version_id, "PREVIEW")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def handover(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
+    """ "Send file to…": a plain form page that works without JavaScript."""
+    from django.shortcuts import redirect
+
+    from . import handover as handover_mod
+
+    version = selectors.versions_visible_to(request.user).select_related("file").filter(pk=version_id).first()
+    if version is None:
+        raise NotFound("File not found.")
+    permissions.require(request.user, "file.handover", version)
+    link = version.task_links.select_related("task").order_by("-linked_at").first()
+    back = f"/app/tasks/{link.task_id}" if link else "/app/tasks"
+    people = list(selectors.handover_targets(request.user).order_by("full_name")[:200])
+    ctx: dict[str, Any] = {"version": version, "people": people, "back": back, "sent": False, "chosen": set()}
+    if request.method == "POST":
+        chosen = request.POST.getlist("recipients")
+        try:
+            handover_mod.send(request.user, version_id, chosen, request.POST.get("note", ""), request)
+        except ValidationFailed as exc:
+            ctx.update(error=str(exc), chosen=set(chosen), note=request.POST.get("note", ""))
+            return render(request, "files/handover.html", ctx, status=422)
+        return redirect(f"{request.path}?sent=1")
+    ctx["sent"] = request.GET.get("sent") == "1"
+    return render(request, "files/handover.html", ctx)
+
+
+@login_required
+@require_http_methods(["GET"])
+def file_trail(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    rows = selectors.trail(request.user, file_id)
+    if rows is None:
+        raise NotFound("File not found.")
+    from .models import File
+
+    f = File.objects.get(pk=file_id)
+    link = f.task_links.order_by("-linked_at").first()
+    back = f"/app/tasks/{link.task_id}" if link else "/app/tasks"
+    return render(request, "files/trail.html", {"file": f, "rows": rows, "back": back})

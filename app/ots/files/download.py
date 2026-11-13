@@ -28,7 +28,7 @@ from ots.storage.factory import get_provider
 from ots.storage.gate import SCOPE_ALL, QueueGate
 from ots.storage.provider import Library, RemoteRef
 
-from . import cache
+from . import cache, handover
 from .models import Blob, FileAccessLog, FileFetchRequest, FileState, FileVersion, TaskFile
 
 CHUNK = 1024 * 1024
@@ -146,6 +146,7 @@ def _log(request: HttpRequest, version: FileVersion, action: str, source: str) -
             {"file_code": version.file_code, "source": source},
             request,
         )
+        handover.record_open(request.user, version, request)  # a recipient's first open, once
 
 
 def _offline(request: HttpRequest, version: FileVersion) -> HttpResponse:

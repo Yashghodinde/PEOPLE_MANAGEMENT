@@ -41,3 +41,31 @@ def can_download(user: Any, version: Any) -> bool:
     if not _active(user) or version is None:
         return False
     return selectors.versions_visible_to(user).filter(pk=version.pk).exists()
+
+
+@policy("file.handover")
+def can_handover(user: Any, version: Any) -> bool:
+    """Anyone who may open the file may send it on; whom it may go to is `selectors.handover_targets`."""
+    return can_download(user, version)
+
+
+@policy("file.attach_reference")
+def can_attach(user: Any, task: Task | None) -> bool:
+    """Super Admin: any task. Sub-Admin: visible tasks. Employees cannot attach existing files."""
+    if not _active(user) or task is None:
+        return False
+    if user.role == Role.SUPER_ADMIN:
+        return True
+    if user.role == Role.SUB_ADMIN:
+        return Task.objects.visible_to(user).filter(pk=task.pk).exists()
+    return False
+
+
+@policy("library.manage")
+def can_manage_library(user: Any, obj: Any = None) -> bool:
+    return _active(user) and bool(user.role == Role.SUPER_ADMIN)
+
+
+@policy("storage.retry_failed")
+def can_retry_failed(user: Any, obj: Any = None) -> bool:
+    return _active(user) and bool(user.role == Role.SUPER_ADMIN)
