@@ -132,14 +132,18 @@ def finish_fill(blob: Blob, part: Path, digest: str) -> bool:
         part.unlink(missing_ok=True)
 
 
-def fill(blob: Blob, provider: object) -> bool:
+OK, UNREACHABLE, CORRUPT, BUSY = "ok", "unreachable", "corrupt", "busy"
+
+
+def fill(blob: Blob, provider: object) -> str:
     """Fetch an archived blob into the cache (the worker's way; downloads tee the same bytes while serving).
 
-    False if SharePoint cannot be reached or the bytes do not verify; the caller tries again later.
+    Returns OK, UNREACHABLE (SharePoint could not be read: try again soon), CORRUPT (the bytes arrived but
+    do not match: do not hammer SharePoint) or BUSY (a download is filling the cache right now).
     """
     part = claim_part(blob.sha256)
     if part is None:
-        return False  # a download is filling it right now
+        return BUSY
     h = hashlib.sha256()
     try:
         ref = RemoteRef(Library.BUSINESS, blob.drive_id, blob.item_id)
@@ -153,5 +157,5 @@ def fill(blob: Blob, provider: object) -> bool:
     except StorageProviderError as exc:
         part.unlink(missing_ok=True)
         log.warning("could not fetch %s: %s", blob.sha256[:12], exc, extra={"event": "files.fetch_failed"})
-        return False
-    return finish_fill(blob, part, h.hexdigest())
+        return UNREACHABLE
+    return OK if finish_fill(blob, part, h.hexdigest()) else CORRUPT

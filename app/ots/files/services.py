@@ -29,7 +29,7 @@ from ots.core import events
 from ots.core.clock import IST, now
 from ots.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
 from ots.core.permissions import require
-from ots.storage import queue
+from ots.storage import manifest, queue
 from ots.storage.models import StorageOperation as Op
 from ots.storage.provider import Library
 from ots.tasks.models import OPEN_STATUSES, Task, TaskAssignment, TaskEvent
@@ -302,9 +302,11 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
     task = s.task
     at = now()
     local = at.astimezone(IST)
+    blob = (
+        Blob.objects.select_for_update().filter(pk=sha).first()
+    )  # first: cache eviction needs this lock too
     dest = _publish_bytes(part, sha)
 
-    blob = Blob.objects.select_for_update().filter(pk=sha).first()
     if blob is None:
         try:
             with transaction.atomic():
@@ -314,6 +316,8 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
     if blob.last_accessed_at != at:  # a re-upload counts as use, for the cache's LRU order
         blob.cached, blob.local_path, blob.last_accessed_at = True, str(dest), at
         blob.save(update_fields=["cached", "local_path", "last_accessed_at"])
+    if not dest.exists():  # eviction removed the copy between publishing and here: put it back
+        dest = _publish_bytes(part, sha)
     archived = blob.state == FileState.ARCHIVED
 
     if s.file_id:
@@ -394,6 +398,11 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             ref_type="file_version",
             ref_id=str(version.pk),
         )
+    if (
+        archived
+    ):  # content SharePoint already holds: this version is off-site now, and the manifest must say so
+        events.publish("file.archived", ("file_version", str(version.pk)), body)
+        transaction.on_commit(lambda: _list_in_manifest(version, blob, at))
     audit.record(
         "file.uploaded", user, version, {k: body[k] for k in ("file_code", "version", "size")}, request
     )
@@ -403,6 +412,15 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
     transaction.on_commit(lambda: _drop(part))
     transaction.on_commit(_trim_cache)
     return version
+
+
+def _list_in_manifest(version: FileVersion, blob: Blob, at: datetime.datetime) -> None:
+    """The disaster-recovery list of what is in SharePoint. After the commit, so it never names a version the
+    database rolled back; a failure is logged and the nightly inventory still finds the file."""
+    try:
+        manifest.append(version.file_code, blob.sha256, blob.size_bytes, blob.drive_id, blob.item_id, at)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("could not append to the manifest")
 
 
 def _trim_cache() -> None:

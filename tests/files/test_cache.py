@@ -137,7 +137,7 @@ def archived_remote(office, remote, data=b"\x07" * 4096):
 
 def test_fill_brings_the_file_back_verified(office, remote):
     blob = archived_remote(office, remote)
-    assert cache.fill(blob, remote) is True
+    assert cache.fill(blob, remote) == cache.OK
     blob.refresh_from_db()
     assert blob.cached and layout.blob_path(blob.sha256).read_bytes() == b"\x07" * 4096
     assert not cache.fetch_part_path(blob.sha256).exists()
@@ -147,7 +147,7 @@ def test_fill_refuses_bytes_that_do_not_match_and_leaves_nothing(office, remote)
     blob = archived_remote(office, remote)
     item = remote._items[blob.item_id]  # corrupt the remote copy, keeping its size
     item.file.write_bytes(b"\x08" * 4096)
-    assert cache.fill(blob, remote) is False
+    assert cache.fill(blob, remote) == cache.CORRUPT
     blob.refresh_from_db()
     assert not blob.cached and not layout.blob_path(blob.sha256).exists()
     assert not cache.fetch_part_path(blob.sha256).exists()
@@ -156,7 +156,7 @@ def test_fill_refuses_bytes_that_do_not_match_and_leaves_nothing(office, remote)
 def test_fill_gives_up_quietly_when_sharepoint_is_unreachable(office, remote):
     blob = archived_remote(office, remote)
     remote.inject([503])
-    assert cache.fill(blob, remote) is False
+    assert cache.fill(blob, remote) == cache.UNREACHABLE
     assert not Blob.objects.get().cached and not cache.fetch_part_path(blob.sha256).exists()
 
 

@@ -83,7 +83,9 @@ def _tee(blob: Blob, first: bytes, rest: Iterator[bytes]) -> Iterator[bytes]:
                 cache.finish_fill(blob, part, h.hexdigest())
             else:
                 part.unlink(missing_ok=True)  # the client left early: a partial copy is never cached
-        rest.close()  # type: ignore[attr-defined]
+        close = getattr(rest, "close", None)
+        if close is not None:
+            close()
 
 
 # --- where the bytes come from --------------------------------------------------------------------

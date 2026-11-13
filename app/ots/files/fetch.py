@@ -21,13 +21,24 @@ GIVE_UP_AFTER = datetime.timedelta(days=3)
 PER_RUN = 3  # a fetch can be large; the job runs every minute, so a few at a time is plenty
 
 
+def backoff(attempts: int) -> datetime.timedelta:
+    """2, 4, 8 ... minutes, at most an hour: a copy that does not verify is not re-downloaded every minute."""
+    return datetime.timedelta(minutes=min(2**attempts, 60))
+
+
 def run() -> dict[str, int]:
+    at = now()
     expired = FileFetchRequest.objects.filter(
-        state=FileFetchRequest.State.PENDING, created_at__lt=now() - GIVE_UP_AFTER
+        state=FileFetchRequest.State.PENDING, created_at__lt=at - GIVE_UP_AFTER
     ).update(state=FileFetchRequest.State.EXPIRED)
-    pending = FileFetchRequest.objects.filter(state=FileFetchRequest.State.PENDING)
-    shas = list(pending.values_list("version__blob_id", flat=True).distinct()[:PER_RUN])
     stats = {"expired": expired, "fetched": 0, "waiting": 0}
+    due = FileFetchRequest.objects.filter(state=FileFetchRequest.State.PENDING, next_attempt_at__lte=at)
+    shas: list[str] = []
+    for sha in due.order_by("created_at").values_list("version__blob_id", flat=True)[:50]:
+        if sha not in shas:
+            shas.append(sha)
+        if len(shas) == PER_RUN:
+            break
     if not shas:
         return stats
     block = QueueGate().block()
@@ -38,13 +49,25 @@ def run() -> dict[str, int]:
     for sha in shas:
         blob = Blob.objects.get(pk=sha)
         if not _in_cache(blob):
-            fetchable = blob.state in (FileState.ARCHIVED, FileState.DRIFTED)
-            if not (fetchable and cache.fill(blob, provider)):
-                stats["waiting"] += 1  # unreachable or not verified: stay pending, try again next minute
+            if blob.state not in (FileState.ARCHIVED, FileState.DRIFTED):
+                stats["waiting"] += 1
+                continue
+            outcome = cache.fill(blob, provider)
+            if outcome == cache.CORRUPT:
+                _back_off(sha)
+            if outcome != cache.OK:
+                stats["waiting"] += 1  # unreachable or busy: try again next minute; corrupt: after a back-off
                 continue
         _complete(sha)
         stats["fetched"] += 1
     return stats
+
+
+def _back_off(sha: str) -> None:
+    for r in FileFetchRequest.objects.filter(version__blob_id=sha, state=FileFetchRequest.State.PENDING):
+        r.attempts += 1
+        r.next_attempt_at = now() + backoff(r.attempts)
+        r.save(update_fields=["attempts", "next_attempt_at"])
 
 
 def _in_cache(blob: Blob) -> bool:

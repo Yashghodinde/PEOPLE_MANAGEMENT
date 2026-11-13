@@ -65,10 +65,14 @@ document.addEventListener("alpine:init", function () {
         this.fileId = ""; this.relation = this.$el.dataset.defaultRelation || "SUBMISSION";
       },
       picked: function (e) { this.take(e.target.files); e.target.value = ""; },
-      dropped: function (e) { this.dragging = false; if (e.dataTransfer) this.take(e.dataTransfer.files); },
+      dropped: function (e) {
+        this.dragging = false;
+        this.fileId = ""; // dropped files are new files, even if "Upload a new version" was clicked and then cancelled
+        if (e.dataTransfer) this.take(e.dataTransfer.files);
+      },
       dragOver: function () { this.dragging = true; },
       dragLeave: function () { this.dragging = false; },
-      choose: function () { this.$refs.input.click(); },
+      choose: function () { this.fileId = ""; this.$refs.input.click(); }, // a cancelled "new version" must not stick
       newVersion: function (e) { this.fileId = e.currentTarget.dataset.fileId; this.$refs.input.click(); },
       cancel: function (e) { this.queue.cancel(Number(e.currentTarget.dataset.id)); },
       clearFinished: function () { this.queue.clearFinished(); },

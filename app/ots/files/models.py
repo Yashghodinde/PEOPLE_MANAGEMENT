@@ -292,6 +292,10 @@ class FileFetchRequest(models.Model):
     state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
     created_at = models.DateTimeField(default=now)
     done_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(
+        default=0
+    )  # failed fetches where the bytes arrived but did not verify
+    next_attempt_at = models.DateTimeField(default=now)
 
     class Meta:
         db_table = "file_fetch_requests"
