@@ -125,7 +125,9 @@ def trail(viewer: Any, file_id: Any) -> list[dict[str, Any]] | None:
         for r in h.recipients.all():
             if r.first_opened_at is not None:
                 add(r.first_opened_at, "opened", f"{r.to_user.full_name} opened it for the first time", v)
-    links = TaskFile.objects.filter(version_id__in=ids).select_related("task", "linked_by")
+    links = TaskFile.objects.filter(
+        version_id__in=ids, task__in=Task.objects.visible_to(viewer).values("pk")
+    ).select_related("task", "linked_by")
     for t in links.order_by("-linked_at")[:TRAIL_LIMIT]:
         add(
             t.linked_at,
@@ -193,7 +195,9 @@ def search(
         by_person = FileVersion.objects.filter(
             uploaded_by_id__in=User.objects.filter(full_name__ilike=like).values("pk")
         ).values("pk")
-        by_task = TaskFile.objects.filter(task__title__ilike=like).values(pk=F("version_id"))
+        by_task = TaskFile.objects.filter(
+            task__in=Task.objects.visible_to(viewer).values("pk"), task__title__ilike=like
+        ).values(pk=F("version_id"))
         qs = qs.filter(pk__in=by_name.union(by_code, by_person, by_task))
     if uploader:
         qs = qs.filter(uploaded_by_id=uploader)

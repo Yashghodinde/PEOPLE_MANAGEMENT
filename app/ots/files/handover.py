@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import uuid
 from collections.abc import Iterable
 from typing import Any
 
@@ -38,7 +39,10 @@ def send(
     if version is None:
         raise NotFound("File not found.")
     require(sender, "file.handover", version)
-    wanted = {str(r) for r in recipient_ids}
+    try:  # one spelling per person: capitals, braces or missing hyphens must not matter
+        wanted = {str(uuid.UUID(str(r))) for r in recipient_ids}
+    except ValueError:
+        raise ValidationFailed("That person is not valid.", fields={"recipients": ["Invalid."]}) from None
     if not wanted:
         raise ValidationFailed("Choose at least one person.", fields={"recipients": ["Required."]})
     if len(wanted) > MAX_RECIPIENTS:
