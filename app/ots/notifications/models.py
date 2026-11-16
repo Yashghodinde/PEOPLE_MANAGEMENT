@@ -27,6 +27,8 @@ class Kind(models.TextChoices):
     REMOVED = "REMOVED", "Removed from task"
     FILE_READY = "FILE_READY", "File ready"
     FILE_HANDED = "FILE_HANDED", "File sent to you"
+    REMINDER = "REMINDER", "Reminder"
+    ALERT = "ALERT", "System alert"
 
 
 # What the little dot beside a task means (red = a message, green = finished, grey = anything else new).
@@ -38,17 +40,26 @@ class Notification(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     kind = models.CharField(max_length=20, choices=Kind.choices)
-    task = models.ForeignKey(Task, on_delete=models.PROTECT, related_name="+")
+    task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     comment = models.ForeignKey(
         TaskComment, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     title = models.CharField(max_length=200)
     body = models.CharField(max_length=200, blank=True, default="")
+    # what caused it (an event id or a reminder window): one cause never notifies a person twice (F-NT-1)
+    source = models.CharField(max_length=100, blank=True, default="")
     created_at = models.DateTimeField(default=now)
     read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "notifications"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "kind", "source"],
+                condition=~models.Q(source=""),
+                name="notif_source_uq",
+            )
+        ]
         indexes = [
             models.Index(fields=["user", "read_at", "-created_at"], name="notif_user_unread_idx"),
             models.Index(fields=["task", "user"], name="notif_task_user_idx"),

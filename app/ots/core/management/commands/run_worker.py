@@ -14,6 +14,7 @@ from ots.core.dispatcher import Listener
 from ots.core.jobs import Scheduler
 from ots.files import jobs as file_jobs  # noqa: F401 (registers file jobs)
 from ots.live import jobs as live_jobs  # noqa: F401  (registers the live jobs)
+from ots.notifications import jobs as notification_jobs  # noqa: F401  (registers the reminder job)
 from ots.storage import jobs as storage_jobs  # registers the storage jobs
 
 HEARTBEAT = Path("/tmp/worker-heartbeat")  # noqa: S108

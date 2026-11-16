@@ -25,7 +25,7 @@ def bell_items(user: Any) -> list[Notification]:
 
 def dots_for(user: Any, task_ids: Iterable[Any] | None = None) -> dict[str, str]:
     """{task id: 'chat' | 'done' | 'update'} for tasks with something unread. Chat wins, then done."""
-    qs = Notification.objects.filter(user=user, read_at__isnull=True)
+    qs = Notification.objects.filter(user=user, read_at__isnull=True, task__isnull=False)
     if task_ids is not None:
         qs = qs.filter(task_id__in=list(task_ids))
     kinds: dict[str, set[str]] = defaultdict(set)
@@ -40,7 +40,7 @@ def dots_for(user: Any, task_ids: Iterable[Any] | None = None) -> dict[str, str]
 def unread_tasks(user: Any, limit: int = 8) -> list[Any]:
     """Tasks with something new for this person, newest first (the dashboard's 'New for you')."""
     rows = (
-        Notification.objects.filter(user=user, read_at__isnull=True)
+        Notification.objects.filter(user=user, read_at__isnull=True, task__isnull=False)
         .select_related("task")
         .order_by("-created_at")[:50]
     )

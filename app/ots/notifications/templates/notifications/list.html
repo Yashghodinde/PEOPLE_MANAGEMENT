@@ -8,7 +8,7 @@
       <span class="ots-dot {% if n.read_at %}ots-dot-off{% elif n.kind == 'COMMENT' %}ots-dot-chat{% elif n.kind == 'APPROVED' or n.kind == 'COMPLETED' %}ots-dot-done{% else %}ots-dot-update{% endif %} mt-2"></span>
       <span class="flex flex-col"><span class="text-body {% if not n.read_at %}font-semibold{% endif %}">{{ n.title }}</span>
       {% if n.body %}<span class="text-cap text-ink-600">{{ n.body }}</span>{% endif %}
-      <span class="text-cap text-ink-600">{{ n.task.task_code }} · {{ n.created_at|date:"d M, H:i" }}</span></span>
+      <span class="text-cap text-ink-600">{% if n.task %}{{ n.task.task_code }} · {% endif %}{{ n.created_at|date:"d M, H:i" }}</span></span>
     </button>
   </form>
   {% empty %}<p class="text-body text-ink-600">Nothing new.</p>{% endfor %}
