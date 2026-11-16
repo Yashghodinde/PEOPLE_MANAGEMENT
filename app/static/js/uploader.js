@@ -52,7 +52,12 @@ document.addEventListener("alpine:init", function () {
         this.queue = OtsUploadCore.create({
           fetch: window.fetch.bind(window), hashFile: hashFile, uuid: uuid, storage: storage(), csrf: csrf,
           concurrency: 2,
-          onChange: function (list) { self.items = list; },
+          onChange: function (list) {
+            self.items = list;
+            // the page must not swap itself under a running upload (live.js looks at this)
+            if (list.some(function (i) { return i.active; })) document.body.setAttribute("data-live-hold", "uploading");
+            else document.body.removeAttribute("data-live-hold");
+          },
           onDone: function () { document.body.dispatchEvent(new CustomEvent("ots:file-uploaded")); },
         });
       },

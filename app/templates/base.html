@@ -10,7 +10,7 @@
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/app.js' %}" defer></script>
   <script src="{% static 'js/ui.js' %}"></script>
-  {% if request.user.is_authenticated %}<script src="{% static 'js/attendance-idle.js' %}" defer></script><script src="{% static 'js/live.js' %}" defer></script><script src="{% static 'js/sha256.js' %}" defer></script><script src="{% static 'js/upload-core.js' %}" defer></script><script src="{% static 'js/uploader.js' %}" defer></script>{% endif %}
+  {% if request.user.is_authenticated %}<script src="{% static 'js/attendance-idle.js' %}" defer></script><script src="{% static 'js/live-core.js' %}" defer></script><script src="{% static 'js/live.js' %}" defer></script><script src="{% static 'js/sha256.js' %}" defer></script><script src="{% static 'js/upload-core.js' %}" defer></script><script src="{% static 'js/uploader.js' %}" defer></script>{% endif %}
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
 </head>
 {# hx-headers carries the CSRF token on every HTMX request #}
@@ -36,7 +36,7 @@
         <h1 class="text-title font-semibold text-ink-900">{% block heading %}{{ page_title }}{% endblock %}</h1>
         <div class="flex items-center gap-3">
           {% include "components/pending_chip.html" with count=pending_count %}
-          <a href="/app/notifications" class="relative rounded-full p-2 text-ink-600 hover:bg-line" aria-label="Notifications{% if unread_count %}, {{ unread_count }} unread{% endif %}">{% icon "bell" "5" %}{% if unread_count %}<span class="ots-count">{% if unread_count > 99 %}99+{% else %}{{ unread_count }}{% endif %}</span>{% endif %}</a>
+          {% include "components/bell.html" %}
           <div x-data="dropdown" class="relative" @keydown.escape.window="close" @click.outside="close">
             <button type="button" @click="toggle" class="flex items-center gap-2 rounded-full hover:bg-line p-1" aria-haspopup="menu" aria-label="User menu">
               {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" %}{% icon "chevron-down" "3" %}

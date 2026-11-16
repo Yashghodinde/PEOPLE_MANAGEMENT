@@ -96,7 +96,7 @@ def _file_state(event: Event) -> None:
     version = FileVersion.objects.filter(pk=event.aggregate_id).values("pk", "uploaded_by_id").first()
     if version is None:
         return
-    people = {version["uploaded_by_id"]}
+    people: set[Any] = {version["uploaded_by_id"]}
     for task_id in TaskFile.objects.filter(version_id=version["pk"]).values_list("task_id", flat=True):
         people |= task_audience(task_id)
     send(users=_chain(people), roles=["SUPER_ADMIN"], type_="file-archived", version_id=version["pk"])
@@ -106,7 +106,8 @@ def _file_state(event: Event) -> None:
 def _handover_opened(event: Event) -> None:
     from ots.files.models import FileHandover
 
-    h = FileHandover.objects.filter(pk=event.payload.get("handover_id")).values("from_user_id").first()
+    handover_id = event.payload.get("handover_id")
+    h = FileHandover.objects.filter(pk=handover_id).values("from_user_id").first() if handover_id else None
     if h:
         send(users=[h["from_user_id"]], type_="file-archived", version_id=event.aggregate_id)
 

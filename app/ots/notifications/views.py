@@ -36,3 +36,10 @@ def open_notification(request: HttpRequest, notification_id: str) -> HttpRespons
 def read_all(request: HttpRequest) -> HttpResponse:
     services.mark_all_read(request.user)
     return redirect("/app/notifications")
+
+
+@login_required
+@require_http_methods(["GET"])
+def badge(request: HttpRequest) -> HttpResponse:
+    """The bell on its own, so a page can refresh the unread count without reloading."""
+    return render(request, "components/bell.html")

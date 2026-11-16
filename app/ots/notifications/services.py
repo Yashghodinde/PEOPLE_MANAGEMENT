@@ -31,6 +31,10 @@ def notify(
         for u in wanted
     ]
     Notification.objects.bulk_create(made)
+    if made:  # the bell of each person updates by itself (delivered when the transaction commits)
+        from ots.live.publisher import send
+
+        send(users=[n.user_id for n in made], type_="notification")
     return made
 
 
