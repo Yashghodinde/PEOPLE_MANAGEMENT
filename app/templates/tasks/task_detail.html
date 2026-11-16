@@ -14,6 +14,7 @@
       {% for a in lines %}
       <div class="bg-canvas border border-line rounded-md p-4 flex flex-col gap-2{% if a.removed_at %} opacity-60{% endif %}">
         <div class="flex items-center justify-between gap-2 flex-wrap"><strong>{{ a.user.full_name }}</strong><span class="text-body">{{ a.status_text }}</span></div>
+        {% if a.mark %}<p class="text-cap {% if a.mark.state == 'late' %}text-bad font-medium{% elif a.mark.state == 'seen' %}text-ok{% else %}text-ink-600{% endif %}" data-receipt="{{ a.mark.state }}"><span aria-hidden="true">{% if a.mark.state == 'saved' %}✓{% elif a.mark.state == 'late' %}!{% else %}✓✓{% endif %}</span> {{ a.mark.text }}</p>{% endif %}
         {% if a.status == "BLOCKED" %}<p class="text-cap text-ink-600">{{ a.get_block_reason_display }}: {{ a.block_note }}{% if a.waiting_hours %} · waiting {{ a.waiting_hours }} h{% endif %}</p>{% endif %}
         {% for act in a.actions %}
         <details class="border-t border-line pt-2"{% if open_action and open_action.0 == a.pk|stringformat:"s" and open_action.1 == act.action %} open{% endif %}>

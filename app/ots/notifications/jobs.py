@@ -67,3 +67,11 @@ def run(at: datetime.datetime | None = None) -> int:
 @job("notifications.deadline_reminders", schedule="*/15 8-20 * * *")
 def deadline_reminders() -> None:
     run()
+
+
+@job("notifications.undelivered", schedule="* * * * *")
+def undelivered() -> None:
+    """URGENT changes the person has not received after 15 minutes: tell the sender, once per receipt."""
+    from ots.tasks import receipts
+
+    receipts.remind_senders()

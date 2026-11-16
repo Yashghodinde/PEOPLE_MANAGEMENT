@@ -17,7 +17,7 @@ from ots.core import events, permissions
 from ots.core.clock import now
 from ots.core.errors import Conflict, InvalidTransition, NotFound, PermissionDenied, ValidationFailed
 
-from . import hooks, notify, selectors, state
+from . import hooks, notify, receipts, selectors, state
 from .codes import next_task_code
 from .models import (
     AssignmentStatus,
@@ -127,9 +127,10 @@ def _record(
     **extra: Any,
 ) -> None:
     """One history row plus the outbox event that drives notifications, receipts and the TV."""
-    TaskEvent.objects.create(
+    row = TaskEvent.objects.create(
         task=task, assignment=a, actor=actor, event_type=event_type, payload=payload, created_at=at
     )
+    receipts.create_for(row, task, actor, event_type, a)  # D-052: a receipt for each person it is for
     body: dict[str, Any] = {
         **payload,
         "task_id": str(task.pk),

@@ -6,6 +6,7 @@ POST views accept a missing Idempotency-Key; a key that is sent is still enforce
 from __future__ import annotations
 
 import datetime
+import json
 import uuid
 from typing import Any
 from urllib.parse import urlencode
@@ -14,7 +15,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Prefetch, Q
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.html import format_html
 from django.views.decorators.http import require_http_methods
@@ -30,7 +31,7 @@ from ots.notifications import selectors as notes
 from ots.notifications import services as note_services
 from ots.ui.templatetags.ots_ui import dot
 
-from . import dashboard, selectors, services, state
+from . import dashboard, receipts, selectors, services, state
 from .models import (
     OPEN_STATUSES,
     AssignmentStatus,
@@ -268,8 +269,10 @@ def _detail_ctx(
     viewer = request.user
     lines = list(task.assignments.select_related("user").order_by("assigned_at"))
     at = now()
+    marks = receipts.marks_for(viewer, task)  # the sender's ticks: sent, delivered, seen, not delivered yet
     for a in lines:
         a.task = task
+        a.mark = marks.get(a.user_id)
         a.status_text = _status_text(viewer, a)
         a.actions = _actions_for(viewer, a) if a.removed_at is None else []
         a.waiting_hours = dashboard.blocked_hours(a, at) if a.status == AssignmentStatus.BLOCKED else 0
@@ -300,6 +303,7 @@ def _detail_ctx(
 def task_detail(request: HttpRequest, task_id: str) -> HttpResponse:
     task = _task_or_404(request, task_id)
     note_services.mark_task_read(request.user, task.pk)  # opening the task clears its dot and bell entries
+    receipts.mark_seen(request.user, task)  # and tells whoever sent it that it was seen
     return render(request, "tasks/task_detail.html", _detail_ctx(request, task))
 
 
@@ -404,6 +408,7 @@ def dashboard_view(request: HttpRequest) -> HttpResponse:
         ctx["status_counts"] = [(label, ctx["counts"][v], v) for v, label in DerivedStatus.choices]
     if request.user.role != Role.EMPLOYEE:
         ctx["team_today"] = attendance_selectors.team_today(request.user)
+        ctx["undelivered"] = receipts.undelivered(request.user)
     fresh = notes.unread_tasks(request.user)
     shown = {a.task_id for key in ("waiting", "recent_submissions", "today", "paused", "due_soon")
              for a in ctx.get(key, [])} | {t.pk for t in fresh}  # fmt: skip
@@ -462,3 +467,25 @@ def day_close(request: HttpRequest) -> HttpResponse:
 def resume_all(request: HttpRequest) -> HttpResponse:
     services.resume_paused(request.user)
     return _done(request, "/app/dashboard")
+
+
+@login_required
+@idempotency_optional
+@require_http_methods(["POST"])
+def receipts_ack(request: HttpRequest) -> JsonResponse:
+    """The page of the person a change was sent to says it arrived (D-052). Time is the server's."""
+    try:
+        data = (
+            json.loads(request.body or b"{}") if request.content_type == "application/json" else request.POST
+        )
+    except ValueError:
+        raise ValidationFailed("The request is not valid JSON.") from None
+    raw = data.get("ids") if request.content_type == "application/json" else request.POST.getlist("ids")
+    return JsonResponse({"acked": receipts.ack(request.user, raw, request)})
+
+
+@login_required
+@require_http_methods(["GET"])
+def receipts_pending(request: HttpRequest) -> JsonResponse:
+    """What this person has not acknowledged yet. After a reconnect the page asks, then acks."""
+    return JsonResponse({"ids": receipts.pending_ids(request.user)})

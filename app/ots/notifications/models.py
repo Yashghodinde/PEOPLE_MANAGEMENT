@@ -29,6 +29,7 @@ class Kind(models.TextChoices):
     FILE_HANDED = "FILE_HANDED", "File sent to you"
     REMINDER = "REMINDER", "Reminder"
     ALERT = "ALERT", "System alert"
+    UNDELIVERED = "UNDELIVERED", "Not received yet"
 
 
 # What the little dot beside a task means (red = a message, green = finished, grey = anything else new).

@@ -214,3 +214,38 @@ class TaskEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.event_type}#{self.pk}"
+
+
+class EventReceipt(models.Model):
+    """Delivery receipt for a key task event (D-052): was the change saved, did it reach the person's screen,
+    did they open the task. One row per recipient. It informs and never blocks or changes the task itself.
+    Unlike task_events this row is updated (delivered_at, seen_at), which is why it is a separate table."""
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    event = models.ForeignKey(TaskEvent, on_delete=models.PROTECT, related_name="receipts")
+    task = models.ForeignKey(Task, on_delete=models.PROTECT, related_name="receipts")
+    assignment = models.ForeignKey(
+        TaskAssignment, null=True, blank=True, on_delete=models.PROTECT, related_name="receipts"
+    )
+    sender = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    recipient = models.ForeignKey(User, on_delete=models.PROTECT, related_name="receipts")
+    urgent = models.BooleanField(default=False)
+    what = models.CharField(max_length=60)  # the event type, for the "not delivered yet" list
+    created_at = models.DateTimeField(default=now)  # server time: when the change was saved
+    delivered_at = models.DateTimeField(null=True, blank=True)  # server time of the recipient's ack
+    seen_at = models.DateTimeField(null=True, blank=True)  # server time the recipient opened the task
+    undelivered_notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "event_receipts"
+        constraints = [
+            models.UniqueConstraint(fields=["event", "recipient"], name="receipt_event_recipient_uq")
+        ]
+        indexes = [
+            models.Index(fields=["recipient", "delivered_at"], name="receipt_inbox_idx"),
+            models.Index(fields=["task", "recipient", "-created_at"], name="receipt_task_idx"),
+            models.Index(fields=["delivered_at", "created_at"], name="receipt_pending_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.what} -> {self.recipient_id}"

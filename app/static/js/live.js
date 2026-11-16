@@ -109,6 +109,36 @@
       act(Core.wants(msg, window.location.pathname));
     });
   });
+
+  // ---- delivery receipts (D-052): say "got it" at once, no timer and no batching ----
+  function csrf() {
+    try { return JSON.parse(document.body.getAttribute("hx-headers") || "{}")["X-CSRFToken"] || ""; } catch (e) { return ""; }
+  }
+  function uuid() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+  function ack(ids, attempt) {
+    attempt = attempt || 0;
+    if (!ids.length) return;
+    fetch("/app/receipts/ack", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf(), "Idempotency-Key": uuid() },
+      body: JSON.stringify({ ids: ids.slice(0, 100) }),
+    }).then(function (r) { if (r.status >= 500) throw new Error("retry"); })
+      .catch(function () { if (attempt < 3) window.setTimeout(function () { ack(ids, attempt + 1); }, 1000 * Math.pow(2, attempt)); });
+  }
+  // After a (re)connect: fetch what was missed first, then answer for all of it.
+  function ackPending() {
+    get("/app/receipts/pending").then(function (t) { ack(JSON.parse(t).ids || []); }).catch(function () {});
+  }
+  es.addEventListener("receipt", function (e) {
+    var msg = {};
+    try { msg = JSON.parse(e.data); } catch (x) {}
+    if (msg.receipt_id) ack([msg.receipt_id]);
+  });
   es.addEventListener("alert", function (e) {
     var msg = {};
     try { msg = JSON.parse(e.data); } catch (x) {}
@@ -122,6 +152,7 @@
   });
   // First connection: nothing to catch up on. Every later one: fetch what was missed while the line was down.
   es.addEventListener("hello", function () {
+    ackPending();
     if (opened) act({ page: Core.pageKind(window.location.pathname).kind !== "other", bell: true, files: true });
     opened = true;
   });

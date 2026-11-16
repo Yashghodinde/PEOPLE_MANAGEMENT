@@ -141,3 +141,8 @@ GRAPH_KEY_PATH = env("GRAPH_KEY_PATH", default="/etc/ots/graph.key")
 GRAPH_SITE_ID = env("GRAPH_SITE_ID", default="")
 GRAPH_DRIVE_BUSINESS = env("GRAPH_DRIVE_BUSINESS", default="")
 GRAPH_DRIVE_DR = env("GRAPH_DRIVE_DR", default="")
+
+# Delivery receipts (D-052): after the first time a change not yet received shows "Not delivered yet";
+# an URGENT one still not received after the second time tells the sender once.
+OTS_RECEIPT_LATE_SECONDS = env.int("OTS_RECEIPT_LATE_SECONDS", default=120)
+OTS_RECEIPT_URGENT_SECONDS = env.int("OTS_RECEIPT_URGENT_SECONDS", default=900)
