@@ -33,7 +33,7 @@
     <div class="flex-1 min-w-0 flex flex-col">
       <header class="flex items-center justify-between h-6 px-5 border-b border-line bg-canvas">
         <button type="button" @click="toggleMobile" class="md:hidden rounded-full p-2 text-ink-600 hover:bg-line" aria-label="Open menu">{% icon "menu" "5" %}</button>
-        <h1 class="text-title font-semibold text-ink-900">{% block heading %}{{ page_title }}{% endblock %}</h1>
+        <h1 class="min-w-0 flex-1 truncate px-2 md:px-0 text-sec md:text-title font-semibold text-ink-900">{% block heading %}{{ page_title }}{% endblock %}</h1>
         <div class="flex items-center gap-3">
           {% include "components/pending_chip.html" with count=pending_count %}
           {% include "components/bell.html" %}

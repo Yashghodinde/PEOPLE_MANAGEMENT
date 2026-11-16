@@ -104,7 +104,7 @@ def test_the_send_page_works_without_javascript(office):
     v = uploaded(office)
     c = login("sub")
     page = c.get(f"/files/v/{v.pk}/handover")
-    assert page.status_code == 200 and b"Send file to" in page.content
+    assert page.status_code == 200 and b"Send to" in page.content and b"<title>Send file" in page.content
     r = c.post(f"/files/v/{v.pk}/handover", {"recipients": [str(office["other"].pk)], "note": "hi"})
     assert r.status_code == 302 and FileHandover.objects.count() == 1
     r = c.post(f"/files/v/{v.pk}/handover", {"note": "hi"})

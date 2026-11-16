@@ -44,6 +44,15 @@ def get_item(mapping: Any, key: str) -> Any:
 
 
 @register.filter
+def nth(items: Any, index: int) -> Any:
+    """items[index], or an empty dict when there is no such entry (a table cell's column, for its label)."""
+    try:
+        return items[index]
+    except (IndexError, TypeError, KeyError):
+        return {}
+
+
+@register.filter
 def tone(value: Any) -> str:
     return status.tone(value)
 

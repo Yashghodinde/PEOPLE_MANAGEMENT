@@ -10,7 +10,7 @@ def ui(request: HttpRequest) -> dict[str, object]:
     role = getattr(user, "role", None) if user is not None and user.is_authenticated else None
     return {
         "nav_items": [
-            {"item": i, "active": i.path != "#" and request.path.startswith(i.path)} for i in items_for(role)
+            {"item": i, "active": request.path.startswith(i.match or i.path)} for i in items_for(role)
         ],
         "unread_count": unread_count(user),
     }

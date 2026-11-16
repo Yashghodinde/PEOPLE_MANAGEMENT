@@ -1,46 +1,42 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
-<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="Search files">
-  <h2 class="text-sec font-semibold">{% if attach %}Attach an existing file to “{{ attach.title }}”{% else %}Search files{% endif %}</h2>
-  <form method="get" class="flex flex-wrap items-end gap-2">
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-page" aria-label="Search files">
+  {% if attach %}<p class="text-body text-ink-900">Choose a file to attach to <strong>{{ attach.title }}</strong>. It is linked as a reference, nothing is copied.</p>{% endif %}
+  <form method="get" class="grid grid-cols-2 md:grid-cols-6 gap-x-3 items-start">
     {% if attach %}<input type="hidden" name="attach" value="{{ attach.pk }}">{% endif %}
-    <label class="flex flex-col gap-1 text-cap text-ink-600 grow">Words
-      <input type="search" name="q" value="{{ q }}" class="border border-line rounded-md p-2 text-body text-ink-900" placeholder="file name, task, or who uploaded">
-    </label>
-    <label class="flex flex-col gap-1 text-cap text-ink-600">Type
-      <input type="text" name="ext" value="{{ get.ext }}" size="6" class="border border-line rounded-md p-2 text-body text-ink-900" placeholder="pdf">
-    </label>
-    <label class="flex flex-col gap-1 text-cap text-ink-600">From
-      <input type="date" name="from" value="{{ get.from }}" class="border border-line rounded-md p-2 text-body text-ink-900">
-    </label>
-    <label class="flex flex-col gap-1 text-cap text-ink-600">To
-      <input type="date" name="to" value="{{ get.to }}" class="border border-line rounded-md p-2 text-body text-ink-900">
-    </label>
-    <button type="submit" class="bg-accent text-white rounded-md px-4 py-2 text-body">Search</button>
+    <div class="col-span-2 md:col-span-2">{% include "components/form_field.html" with name="q" label="Words" type="search" value=q placeholder="File name, task or person" %}</div>
+    <div>{% include "components/form_field.html" with name="ext" label="Type" value=get.ext placeholder="pdf" %}</div>
+    <div>{% include "components/form_field.html" with name="from" label="From" type="date" value=get.from %}</div>
+    <div>{% include "components/form_field.html" with name="to" label="To" type="date" value=get.to %}</div>
+    <div class="col-span-2 md:col-span-1 pt-[22px]">{% include "components/button.html" with label="Search" type="submit" icon="search" %}</div>
   </form>
+  <div class="flex items-center justify-between gap-2 flex-wrap">
+    <p class="text-cap text-ink-600">{% if rows %}Newest first. {{ rows|length }} shown{% if more %}, more on the next page{% endif %}.{% endif %}</p>
+    <a class="text-body text-accent" href="/files/library">Open the library</a>
+  </div>
   {% if rows %}
-  <ul class="flex flex-col divide-y divide-line">
+  <ul class="flex flex-col divide-y divide-line border-t border-line">
     {% for v in rows %}
-    <li class="py-2 flex flex-col gap-1">
-      <strong class="text-body break-all">{{ v.file.display_name }}</strong>
+    <li class="py-3 flex flex-col gap-1">
+      <strong class="text-body text-ink-900 break-all">{{ v.file.display_name }}</strong>
       <p class="text-cap text-ink-600">Version {{ v.version_number }} · {{ v.uploaded_by.full_name }} · {{ v.size_bytes|filesizeformat }} · {{ v.uploaded_at|date:"d M Y, H:i" }}</p>
       <p class="text-cap text-ink-600 break-all">{{ v.file_code }}</p>
-      <div class="flex items-center gap-3">
-        <a class="text-cap text-accent" href="/files/v/{{ v.pk }}/download" download>Download</a>
-        <a class="text-cap text-accent" href="/files/{{ v.file_id }}/trail">Trail</a>
+      <div class="flex items-center gap-2 flex-wrap pt-1">
         {% if attach %}
-        <form method="post" action="/files/attach/{{ attach.pk }}">{% csrf_token %}<input type="hidden" name="version" value="{{ v.pk }}"><button type="submit" class="text-cap text-accent">Attach to this task</button></form>
+        <form method="post" action="/files/attach/{{ attach.pk }}">{% csrf_token %}<input type="hidden" name="version" value="{{ v.pk }}">{% include "components/button.html" with label="Attach to this task" type="submit" %}</form>
         {% endif %}
+        {% include "components/button.html" with label="Download" href="/files/v/"|add:v.pk|stringformat:"s"|add:"/download" variant="secondary" %}
+        {% include "components/button.html" with label="History" href="/files/"|add:v.file_id|stringformat:"s"|add:"/trail" variant="ghost" %}
       </div>
     </li>
     {% endfor %}
   </ul>
-  <div class="flex gap-3 text-body">
+  <div class="flex gap-4 text-body">
     {% if page %}<a class="text-accent" href="?{% for k, val in get.items %}{% if k != 'page' %}{{ k }}={{ val|urlencode }}&{% endif %}{% endfor %}page={{ page|add:'-1' }}">Newer</a>{% endif %}
     {% if more %}<a class="text-accent" href="?{% for k, val in get.items %}{% if k != 'page' %}{{ k }}={{ val|urlencode }}&{% endif %}{% endfor %}page={{ page|add:'1' }}">Older</a>{% endif %}
   </div>
   {% else %}
-  {% include "components/empty_state.html" with icon="inbox" text="No files match." %}
+  {% include "components/empty_state.html" with icon="search" text="No files match. Try fewer words." %}
   {% endif %}
 </section>
 {% endblock %}

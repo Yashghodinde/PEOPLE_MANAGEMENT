@@ -1,24 +1,26 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
-<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="Send file">
-  <h2 class="text-sec font-semibold">Send file to…</h2>
-  <p class="text-body text-ink-900"><strong class="break-all">{{ version.original_filename }}</strong> <span class="text-cap text-ink-600">version {{ version.version_number }}</span></p>
-  {% if sent %}<p class="text-body text-ink-900" role="status">Sent. They will see it in the bell, and you can see when they open it.</p>{% endif %}
-  {% if error %}<p class="text-body text-danger" role="alert">{{ error }}</p>{% endif %}
-  <form method="post" class="flex flex-col gap-3">
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-[610px]" aria-label="Send file">
+  <div>
+    <strong class="text-body text-ink-900 break-all">{{ version.original_filename }}</strong>
+    <p class="text-cap text-ink-600">Version {{ version.version_number }} · {{ version.size_bytes|filesizeformat }}</p>
+  </div>
+  {% if sent %}<p class="text-body text-ok border border-ok rounded-sm p-3" role="status">Sent. They will see it in their bell, and you can follow it in the file's history.</p>{% endif %}
+  {% if error %}<p class="text-body text-bad border border-bad rounded-sm p-3" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="flex flex-col gap-4">
     {% csrf_token %}
     <fieldset class="flex flex-col gap-1">
-      <legend class="text-cap text-ink-600">People</legend>
+      <legend class="text-cap font-medium text-ink-900 pb-1">Send to</legend>
+      <div class="max-h-[377px] overflow-y-auto border border-line rounded-sm divide-y divide-line">
       {% for p in people %}
-      <label class="flex items-center gap-2 text-body"><input type="checkbox" name="recipients" value="{{ p.pk }}"{% if p.pk|stringformat:"s" in chosen %} checked{% endif %}> {{ p.full_name }} <span class="text-cap text-ink-600">{{ p.employee_id }}</span></label>
-      {% empty %}<p class="text-body text-ink-600">There is nobody you can send this to.</p>{% endfor %}
+      <label class="flex items-center gap-3 p-3 text-body text-ink-900 hover:bg-line cursor-pointer"><input type="checkbox" name="recipients" value="{{ p.pk }}"{% if p.pk|stringformat:"s" in chosen %} checked{% endif %}> <span>{{ p.full_name }}</span> <span class="text-cap text-ink-600">{{ p.employee_id }}</span></label>
+      {% empty %}<p class="p-3 text-body text-ink-600">There is nobody you can send this to.</p>{% endfor %}
+      </div>
     </fieldset>
-    <label class="flex flex-col gap-1 text-cap text-ink-600">Note (optional)
-      <textarea name="note" rows="3" maxlength="1000" class="border border-line rounded-md p-2 text-body text-ink-900">{{ note|default:"" }}</textarea>
-    </label>
-    <div class="flex items-center gap-3">
-      <button type="submit" class="bg-accent text-white rounded-md px-4 py-2 text-body">Send</button>
-      <a class="text-body text-accent" href="{{ back }}">Back</a>
+    {% include "components/form_field.html" with name="note" label="Note (optional)" type="textarea" value=note placeholder="What should they do with it?" %}
+    <div class="flex items-center gap-3 flex-wrap">
+      {% include "components/button.html" with label="Send" type="submit" icon="send" %}
+      {% include "components/button.html" with label="Back" href=back variant="ghost" %}
     </div>
   </form>
 </section>

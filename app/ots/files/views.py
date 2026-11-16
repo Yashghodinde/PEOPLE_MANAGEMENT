@@ -167,7 +167,14 @@ def handover(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
     link = version.task_links.select_related("task").order_by("-linked_at").first()
     back = f"/app/tasks/{link.task_id}" if link else "/app/tasks"
     people = list(selectors.handover_targets(request.user).order_by("full_name")[:200])
-    ctx: dict[str, Any] = {"version": version, "people": people, "back": back, "sent": False, "chosen": set()}
+    ctx: dict[str, Any] = {
+        "page_title": "Send file",
+        "version": version,
+        "people": people,
+        "back": back,
+        "sent": False,
+        "chosen": set(),
+    }
     if request.method == "POST":
         chosen = request.POST.getlist("recipients")
         try:
@@ -191,7 +198,9 @@ def file_trail(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
     f = File.objects.get(pk=file_id)
     link = f.task_links.order_by("-linked_at").first()
     back = f"/app/tasks/{link.task_id}" if link else "/app/tasks"
-    return render(request, "files/trail.html", {"file": f, "rows": rows, "back": back})
+    return render(
+        request, "files/trail.html", {"page_title": "File history", "file": f, "rows": rows, "back": back}
+    )
 
 
 def _date(raw: str | None) -> Any:
@@ -234,6 +243,7 @@ def search(request: HttpRequest) -> HttpResponse:
         request,
         "files/search.html",
         {
+            "page_title": "Attach a file" if can_attach else "Files",
             "rows": rows[: selectors.SEARCH_PAGE], "q": g.get("q", ""), "page": page, "more": more,
             "attach": task if can_attach else None, "get": g,
         },
@@ -270,6 +280,7 @@ def library_page(request: HttpRequest) -> HttpResponse:
     if not view:
         raise NotFound("No such folder.")
     view["can_manage"] = permissions.can(request.user, "library.manage", None)
+    view["page_title"] = "Library"
     return render(request, "files/library.html", view)
 
 

@@ -47,7 +47,7 @@ def run(at: datetime.datetime | None = None) -> int:
         made += len(
             services.notify(
                 [a.user_id], Kind.REMINDER, a.task, f"Due {when}: {a.task.title}",
-                body=f"{a.task.task_code}, due {due:%d %b %H:%M}", source=f"reminder:{a.pk}:{window}",
+                body=f"Due {due:%d %b, %H:%M}", source=f"reminder:{a.pk}:{window}",
             )
         )  # fmt: skip
     # Overdue: one a day, from 10:00.
@@ -57,7 +57,7 @@ def run(at: datetime.datetime | None = None) -> int:
             made += len(
                 services.notify(
                     [a.user_id], Kind.REMINDER, a.task, f"Overdue: {a.task.title}",
-                    body=f"{a.task.task_code} was due {due:%d %b %H:%M}",
+                    body=f"Was due {due:%d %b, %H:%M}",
                     source=f"reminder:{a.pk}:overdue:{local.date().isoformat()}",
                 )
             )  # fmt: skip

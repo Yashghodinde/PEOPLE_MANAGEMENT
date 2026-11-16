@@ -15,15 +15,13 @@
         {{ r.version.size_bytes|filesizeformat }} · {{ r.linked_at|date:"d M Y, H:i" }}
       </p>
       <p class="text-cap text-ink-600 break-all">{{ r.version.file_code }}</p>
-      <div class="flex items-center gap-3 flex-wrap">
-        <a class="text-cap text-accent" href="/files/v/{{ r.version_id }}/download" download>Download</a>
-        {% if r.version.preview_type %}<a class="text-cap text-accent" href="/files/v/{{ r.version_id }}/preview" target="_blank" rel="noopener">Preview</a>{% endif %}
-        <a class="text-cap text-accent" href="/files/v/{{ r.version_id }}/handover">Send to…</a>
-        <a class="text-cap text-accent" href="/files/{{ r.file_id }}/trail">Trail</a>
+      <div class="flex items-center gap-2 flex-wrap pt-1">
+        <a class="inline-flex items-center h-5 px-3 rounded-full border border-accent text-cap font-medium text-accent hover:bg-line" href="/files/v/{{ r.version_id }}/download" download>Download</a>
+        {% if r.version.preview_type %}<a class="inline-flex items-center h-5 px-3 rounded-full text-cap font-medium text-ink-600 hover:bg-line" href="/files/v/{{ r.version_id }}/preview" target="_blank" rel="noopener">Preview</a>{% endif %}
+        <a class="inline-flex items-center h-5 px-3 rounded-full text-cap font-medium text-ink-600 hover:bg-line" href="/files/v/{{ r.version_id }}/handover">Send to…</a>
+        <a class="inline-flex items-center h-5 px-3 rounded-full text-cap font-medium text-ink-600 hover:bg-line" href="/files/{{ r.file_id }}/trail">History</a>
+        {% if can_upload and r.file.current_version_id == r.version_id %}<button type="button" class="inline-flex items-center h-5 px-3 rounded-full text-cap font-medium text-ink-600 hover:bg-line" data-file-id="{{ r.file_id }}" @click="newVersion">Upload a new version</button>{% endif %}
       </div>
-      {% if can_upload and r.file.current_version_id == r.version_id %}
-      <div><button type="button" class="text-cap text-accent" data-file-id="{{ r.file_id }}" @click="newVersion">Upload a new version</button></div>
-      {% endif %}
     </li>
     {% endfor %}
   </ul>

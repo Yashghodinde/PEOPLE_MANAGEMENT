@@ -164,7 +164,10 @@ def _offline(request: HttpRequest, version: FileVersion) -> HttpResponse:
             )
     link = TaskFile.objects.filter(version=version).select_related("task").order_by("-linked_at").first()
     response = render(
-        request, "files/offline.html", {"version": version, "task": link.task if link else None}, status=503
+        request,
+        "files/offline.html",
+        {"page_title": "File not available yet", "version": version, "task": link.task if link else None},
+        status=503,
     )
     response["Retry-After"] = "300"
     return response

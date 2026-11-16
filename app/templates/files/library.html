@@ -1,26 +1,39 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
-<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="Library">
-  <h2 class="text-sec font-semibold">Library</h2>
-  <nav class="text-cap text-ink-600"><a class="text-accent" href="/files/library">Library</a>{% for f in path %} / <a class="text-accent" href="/files/library?folder={{ f.pk }}">{{ f.name }}</a>{% endfor %}</nav>
-  {% if folders %}<ul class="flex flex-col gap-1">{% for f in folders %}<li><a class="text-body text-accent" href="/files/library?folder={{ f.pk }}">{{ f.name }}</a></li>{% endfor %}</ul>{% endif %}
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-page" aria-label="Library">
+  <nav class="text-body text-ink-600 flex items-center gap-1 flex-wrap" aria-label="Folder path"><a class="text-accent" href="/files/library">Library</a>{% for f in path %}<span aria-hidden="true">/</span>{% if forloop.last %}<span class="text-ink-900">{{ f.name }}</span>{% else %}<a class="text-accent" href="/files/library?folder={{ f.pk }}">{{ f.name }}</a>{% endif %}{% endfor %}</nav>
+  {% if folders %}
+  <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+    {% for f in folders %}<li><a class="flex items-center gap-2 border border-line rounded-sm p-3 text-body text-ink-900 hover:bg-line" href="/files/library?folder={{ f.pk }}">{% icon "folder" %}<span class="break-all">{{ f.name }}</span></a></li>{% endfor %}
+  </ul>
+  {% endif %}
   {% if files %}
-  <ul class="flex flex-col divide-y divide-line">
+  <ul class="flex flex-col divide-y divide-line border-t border-line">
     {% for f in files %}
-    <li class="py-2 flex flex-col gap-1">
-      <strong class="text-body break-all">{{ f.display_name }}</strong>
-      {% if f.current_version %}<p class="text-cap text-ink-600">Version {{ f.current_version.version_number }} · {{ f.current_version.size_bytes|filesizeformat }}</p>
-      <div class="flex gap-3"><a class="text-cap text-accent" href="/files/v/{{ f.current_version_id }}/download" download>Download</a><a class="text-cap text-accent" href="/files/{{ f.pk }}/trail">Trail</a></div>{% endif %}
-      {% if can_manage %}<form method="post" action="/files/library/files/{{ f.pk }}/move" class="flex gap-2 items-center">{% csrf_token %}<select name="folder" class="border border-line rounded-md p-1 text-cap"><option value="">(top level)</option>{% for fo in folders %}<option value="{{ fo.pk }}">{{ fo.name }}</option>{% endfor %}</select><button class="text-cap text-accent">Move</button></form>{% endif %}
+    <li class="py-3 flex flex-col gap-1">
+      <strong class="text-body text-ink-900 break-all">{{ f.display_name }}</strong>
+      {% if f.current_version %}
+      <p class="text-cap text-ink-600">Version {{ f.current_version.version_number }} · {{ f.current_version.size_bytes|filesizeformat }} · {{ f.current_version.uploaded_by.full_name }}</p>
+      <div class="flex items-center gap-2 flex-wrap pt-1">
+        {% include "components/button.html" with label="Download" href="/files/v/"|add:f.current_version_id|stringformat:"s"|add:"/download" variant="secondary" %}
+        {% include "components/button.html" with label="History" href="/files/"|add:f.pk|stringformat:"s"|add:"/trail" variant="ghost" %}
+        {% if can_manage and folders or can_manage and folder %}
+        <form method="post" action="/files/library/files/{{ f.pk }}/move" class="flex items-center gap-2">{% csrf_token %}
+          <select name="folder" aria-label="Move to" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><option value="">Top level</option>{% for fo in folders %}<option value="{{ fo.pk }}">{{ fo.name }}</option>{% endfor %}</select>
+          {% include "components/button.html" with label="Move" type="submit" variant="ghost" %}
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>
-  {% elif not folders %}{% include "components/empty_state.html" with icon="inbox" text="Nothing here yet." %}{% endif %}
+  {% elif not folders %}{% include "components/empty_state.html" with icon="folder" text="Nothing here yet." %}{% endif %}
   {% if can_manage %}
-  <form method="post" action="/files/library/folders" class="flex gap-2 items-end">{% csrf_token %}
+  <form method="post" action="/files/library/folders" class="flex items-start gap-3 flex-wrap border-t border-line pt-4">{% csrf_token %}
     <input type="hidden" name="parent" value="{{ folder.pk|default:'' }}">
-    <label class="flex flex-col gap-1 text-cap text-ink-600">New folder<input name="name" maxlength="120" required class="border border-line rounded-md p-2 text-body text-ink-900"></label>
-    <button class="bg-accent text-white rounded-md px-4 py-2 text-body">Create</button>
+    <div class="grow max-w-[377px]">{% include "components/form_field.html" with name="name" label="New folder" required=True placeholder="Folder name" %}</div>
+    <div class="pt-[22px]">{% include "components/button.html" with label="Create folder" type="submit" icon="plus" %}</div>
   </form>
   {% endif %}
 </section>

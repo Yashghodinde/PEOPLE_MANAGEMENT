@@ -1,15 +1,16 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
-<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 max-w-page" aria-label="File trail">
-  <h2 class="text-sec font-semibold">Trail: <span class="break-all">{{ file.display_name }}</span></h2>
-  <ol class="flex flex-col divide-y divide-line">
+<section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-[610px]" aria-label="File history">
+  <strong class="text-body text-ink-900 break-all">{{ file.display_name }}</strong>
+  <ol class="flex flex-col border-l-2 border-line ml-1">
     {% for e in rows %}
-    <li class="py-2 flex flex-col gap-0.5">
-      <span class="text-body text-ink-900">{{ e.text }}</span>
-      <span class="text-cap text-ink-600">{{ e.at|date:"d M Y, H:i:s" }} · version {{ e.version }}</span>
+    <li class="pl-4 pb-4 relative">
+      <span class="absolute -left-[7px] top-1 w-3 h-3 rounded-full border-2 border-canvas {% if e.kind == 'problem' %}bg-bad{% elif e.kind == 'archived' %}bg-ok{% else %}bg-accent{% endif %}" aria-hidden="true"></span>
+      <p class="text-body text-ink-900">{{ e.text }}</p>
+      <p class="text-cap text-ink-600">{{ e.at|date:"d M Y, H:i" }} · version {{ e.version }}</p>
     </li>
     {% endfor %}
   </ol>
-  <div><a class="text-body text-accent" href="{{ back }}">Back</a></div>
+  <div>{% include "components/button.html" with label="Back" href=back variant="secondary" %}</div>
 </section>
 {% endblock %}
