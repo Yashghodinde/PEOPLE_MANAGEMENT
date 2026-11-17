@@ -54,3 +54,12 @@ def task(org):
 @pytest.fixture
 def assignment(task, org):
     return task.assignments.get(user=org["emp"])
+
+
+@pytest.fixture
+def real_name_rule(settings):
+    """Switch the production file-name rule back on (the test settings relax it for tiny fixture names)."""
+    from config.settings import base
+
+    settings.OTS_NAME_PLACEHOLDERS = base.OTS_NAME_PLACEHOLDERS
+    settings.OTS_NAME_MIN_WORD = base.OTS_NAME_MIN_WORD

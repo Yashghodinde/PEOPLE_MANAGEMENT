@@ -84,6 +84,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         assignment_id=_uuid(data.get("assignment_id"), "assignment_id"),
         relation=str(data.get("relation") or "SUBMISSION"),
         original_filename=str(data.get("original_filename") or ""),
+        display_name=str(data.get("display_name") or ""),
         size=size,
         sha256=str(data.get("sha256") or ""),
         allow_blocked=data.get("allow_blocked") is True,

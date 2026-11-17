@@ -7,6 +7,8 @@ import pytest
 from ots.files import naming
 from ots.files.naming import MESSAGE, NameContext, judge, suggest
 
+pytestmark = pytest.mark.usefixtures("real_name_rule")
+
 TODAY = datetime.date(2026, 11, 17)
 CTX = NameContext(
     task_code="T-2026-000123", task_title="Income tax working", client="AZ Exports", today=TODAY

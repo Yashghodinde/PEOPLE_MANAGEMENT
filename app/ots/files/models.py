@@ -118,7 +118,10 @@ class FileVersion(models.Model):
     file = models.ForeignKey(File, on_delete=models.PROTECT, related_name="versions")
     version_number = models.PositiveIntegerField()
     file_code = models.CharField(max_length=255, unique=True)
-    original_filename = models.CharField(max_length=255)
+    original_filename = models.CharField(max_length=255)  # exactly what the browser sent; never edited
+    display_name = models.CharField(
+        max_length=255, blank=True, default=""
+    )  # blank on files from before IMP-01
     blob = models.ForeignKey(Blob, db_column="blob_sha256", on_delete=models.PROTECT, related_name="versions")
     mime_type = models.CharField(max_length=120, blank=True, default="")
     size_bytes = models.BigIntegerField()
@@ -152,6 +155,11 @@ class FileVersion(models.Model):
     }
 
     @property
+    def shown_name(self) -> str:
+        """What a person sees: the name confirmed at upload, else the original (files from before IMP-01)."""
+        return self.display_name or self.original_filename
+
+    @property
     def extension(self) -> str:
         return self.file_code.rsplit(".", 1)[-1].lower() if "." in self.file_code else ""
 
@@ -175,7 +183,10 @@ class UploadSession(models.Model):
     relation = models.CharField(max_length=12, choices=FileRelation.choices, default=FileRelation.SUBMISSION)
     expected_size = models.BigIntegerField()
     expected_sha256 = models.CharField(max_length=64)
-    original_filename = models.CharField(max_length=255)
+    original_filename = models.CharField(max_length=255)  # exactly what the browser sent; never edited
+    display_name = models.CharField(
+        max_length=255, blank=True, default=""
+    )  # what the person confirmed (IMP-01)
     received_bytes = models.BigIntegerField(default=0)
     created_at = models.DateTimeField(default=now)
     last_piece_at = models.DateTimeField(default=now)

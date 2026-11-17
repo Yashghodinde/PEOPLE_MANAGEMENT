@@ -23,7 +23,7 @@ def test_a_very_long_name_or_id_still_uploads(office):
     office["emp"].full_name = "y" * 190
     office["emp"].save(update_fields=["full_name"])
     c = login("emp")
-    _, last = upload_all(c, DATA, uuid.uuid4(), office["task"], name="n" * 200 + ".xlsx")
+    _, last = upload_all(c, DATA, uuid.uuid4(), office["task"], name=("budget-" * 34)[:200] + ".xlsx")
     assert last.status_code == 201
     assert len(FileVersion.objects.get().file_code) <= 255
 

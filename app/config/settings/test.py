@@ -9,3 +9,8 @@ STORAGES = {
 
 # Most tests log in with a password only. The attendance tests switch the selfie step on.
 OTS_SELFIE_STAGE_ENABLED = False
+
+# Many tests upload tiny files named a.bin or b.xlsx. The file-name rule (IMP-01) is relaxed here so they keep
+# working; tests of the rule itself use the `real_name_rule` fixture to switch the production values back on.
+OTS_NAME_PLACEHOLDERS = []
+OTS_NAME_MIN_WORD = 1

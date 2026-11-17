@@ -26,7 +26,7 @@ from django.db.models import Max
 from ots.accounts.models import Role, User
 from ots.audit import api as audit
 from ots.core import events
-from ots.core.clock import IST, now
+from ots.core.clock import IST, now, today_local
 from ots.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
 from ots.core.permissions import require
 from ots.storage import manifest, queue
@@ -34,7 +34,7 @@ from ots.storage.models import StorageOperation as Op
 from ots.storage.provider import Library
 from ots.tasks.models import OPEN_STATUSES, Task, TaskAssignment, TaskEvent
 
-from . import cache, layout
+from . import cache, layout, naming
 from .blocklist import is_blocked
 from .codes import make_code, unique_code
 from .errors import HashMismatch, OffsetMismatch
@@ -63,11 +63,25 @@ class Progress:
 # --- start ----------------------------------------------------------------------------------------
 
 
-def _clean_name(raw: str) -> str:
+def _clean_name(raw: str, field: str = "original_filename") -> str:
     name = (raw or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not name or name in {".", ".."} or len(name) > 255 or "\x00" in name:
-        raise ValidationFailed("That file name is not valid.", fields={"original_filename": ["Invalid."]})
+        raise ValidationFailed("That file name is not valid.", fields={field: ["Invalid."]})
     return name
+
+
+VOICE_PURPOSE = "voice"  # set by the server for voice notes (IMP-10); a client cannot ask for it
+
+
+def _require_meaningful_name(name: str, task: Task | None) -> None:
+    ctx = naming.NameContext(
+        task_code=task.task_code if task else "", task_title=task.title if task else "", today=today_local()
+    )
+    verdict = naming.judge(name, ctx)
+    if not verdict.ok:
+        raise ValidationFailed(
+            verdict.message, fields={"display_name": [verdict.message]}, suggestion=verdict.suggestion
+        )
 
 
 def _resolve_target(
@@ -114,6 +128,8 @@ def start_upload(
     size: int,
     sha256: str,
     allow_blocked: bool = False,
+    display_name: str = "",
+    purpose: str = "",
     request: Any = None,
 ) -> tuple[UploadSession, bool]:
     """Open (or find) the upload for this key: (session, created). The same key returns the same session."""
@@ -125,6 +141,11 @@ def start_upload(
             raise Conflict("This upload key was already used for a different file. Use a new key.")
         return existing, False
     name = _clean_name(original_filename)
+    shown = _clean_name(display_name, "display_name") if display_name.strip() else ""
+    if (
+        purpose != VOICE_PURPOSE
+    ):  # a system-made name (a voice note) is exempt; every person-chosen name is judged
+        _require_meaningful_name(shown or name, task)
     sha = (sha256 or "").lower()
     if not SHA_RE.match(sha):
         raise ValidationFailed("The file fingerprint is not valid.", fields={"sha256": ["Invalid."]})
@@ -137,7 +158,7 @@ def start_upload(
     if relation not in FileRelation.values:
         raise ValidationFailed("Choose what this file is.", fields={"relation": ["Invalid."]})
     override = False
-    if is_blocked(name):
+    if is_blocked(name) or (shown and is_blocked(shown)):
         if not (allow_blocked and user.role == Role.SUPER_ADMIN):
             raise ValidationFailed(
                 "This type of file is not allowed (programs and scripts).",
@@ -158,6 +179,7 @@ def start_upload(
                 expected_size=size,
                 expected_sha256=sha,
                 original_filename=name,
+                display_name=shown,
                 override_block=override,
             )
             if override:
@@ -325,7 +347,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
     else:
         file = File.objects.create(
             company=user.company,
-            display_name=s.original_filename,
+            display_name=s.display_name or s.original_filename,
             owner=user,
             visibility=FileVisibility.TASK if task else FileVisibility.LIBRARY,
         )
@@ -347,6 +369,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         version_number=number,
         file_code=code,
         original_filename=s.original_filename,
+        display_name=s.display_name,
         blob=blob,
         mime_type=mimetypes.guess_type(s.original_filename)[0] or "application/octet-stream",
         size_bytes=size,
