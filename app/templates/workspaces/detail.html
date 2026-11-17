@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% load ots_ui %}
+
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="File ID">
+    <p class="text-cap text-ink-600">{{ ws.file_id }} · {{ ws.get_category_display }}{% if archived %} · Archived{% endif %} · You are {{ role|lower }}</p>
+    <h2 class="text-sec font-semibold">{{ ws.name }}</h2>
+    {% if ws.description %}<p class="text-body text-ink-900">{{ ws.description }}</p>{% endif %}
+    {% if ws.tags %}<p class="text-cap text-ink-600">Tags: {{ tags_text }}</p>{% endif %}
+    {% if error %}<p class="text-body text-danger" role="alert">{{ error }}</p>{% endif %}
+    {% if can_archive %}<form method="post" action="/files/ids/{{ ws.pk }}/status">{% csrf_token %}
+      {% if archived %}<input type="hidden" name="status" value="ACTIVE">{% include "components/button.html" with label="Restore" type="submit" variant="secondary" %}
+      {% else %}<input type="hidden" name="status" value="ARCHIVED">{% include "components/button.html" with label="Archive" type="submit" variant="ghost" %}{% endif %}</form>{% endif %}
+  </section>
+
+  {% if can_contribute and not archived %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Upload to this File ID" x-data="uploader" data-scope="workspace" data-workspace-id="{{ ws.pk }}" data-default-relation="REFERENCE">
+    <h3 class="text-sec font-semibold">Upload</h3>
+    <div class="border border-dashed rounded-md p-4 flex flex-col items-center gap-2 text-center" :class="dropClass" @dragover.prevent="dragOver" @dragleave="dragLeave" @drop.prevent="dropped">
+      {% icon "upload" "5" %}
+      <p class="text-body text-ink-900">Drop files here, or choose them</p>
+      <p class="text-cap text-ink-600">Up to {{ max_mb }} MB each. Give each file a meaningful name.</p>
+      <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
+      <button type="button" class="px-4 h-5 rounded-sm bg-accent text-canvas text-body font-medium" @click="choose">Choose files</button>
+    </div>
+    {% include "files/_queue.html" %}
+  </section>
+  {% endif %}
+
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Documents">
+    <h3 class="text-sec font-semibold">Documents</h3>
+    {% if documents %}<ul class="flex flex-col divide-y divide-line border-t border-line">
+      {% for d in documents %}{% with v=d.file.current_version %}
+      <li class="py-3 flex flex-col gap-1" data-file="{{ d.file_id }}">
+        <strong class="text-body text-ink-900 break-all">{{ d.file.display_name }}</strong>
+        <p class="text-cap text-ink-600">Added {{ d.added_at|date:"d M Y, H:i" }} by {{ d.added_by.full_name }}{% if v %} · Version {{ v.version_number }}{% endif %}</p>
+        <div class="flex items-center gap-2 flex-wrap pt-1">
+          {% if v %}{% include "components/button.html" with label="Download" href="/files/v/"|add:v.pk|stringformat:"s"|add:"/download" variant="secondary" %}{% endif %}
+          {% include "components/button.html" with label="History" href="/files/"|add:d.file_id|stringformat:"s"|add:"/trail" variant="ghost" %}
+          {% if can_contribute %}<form method="post" action="/files/ids/{{ ws.pk }}/documents/{{ d.file_id }}/remove">{% csrf_token %}{% include "components/button.html" with label="Remove from File ID" type="submit" variant="ghost" %}</form>{% endif %}
+        </div>
+      </li>{% endwith %}{% endfor %}
+    </ul>{% else %}<p class="text-body text-ink-600">No documents yet.</p>{% endif %}
+  </section>
+
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Members">
+    <h3 class="text-sec font-semibold">Members</h3>
+    <ul class="flex flex-col divide-y divide-line border-t border-line">
+      {% for m in members %}
+      <li class="py-2 flex items-center justify-between gap-2 flex-wrap">
+        <span class="text-body text-ink-900">{{ m.user.full_name }} <span class="text-cap text-ink-600">· {{ m.get_role_display }}</span></span>
+        {% if is_owner %}<span class="flex items-center gap-2 flex-wrap">
+          <form method="post" action="/files/ids/{{ ws.pk }}/members" class="flex items-center gap-2">{% csrf_token %}<input type="hidden" name="op" value="role"><input type="hidden" name="user" value="{{ m.user_id }}">
+            <select name="role" aria-label="Role of {{ m.user.full_name }}" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body">{% for v, l in roles %}<option value="{{ v }}"{% if v == m.role %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+            {% include "components/button.html" with label="Set role" type="submit" variant="ghost" %}</form>
+          <form method="post" action="/files/ids/{{ ws.pk }}/members">{% csrf_token %}<input type="hidden" name="op" value="remove"><input type="hidden" name="user" value="{{ m.user_id }}">{% include "components/button.html" with label="Remove" type="submit" variant="ghost" %}</form>
+        </span>{% endif %}
+      </li>{% endfor %}
+    </ul>
+    {% if is_owner and not archived %}
+    <form method="post" action="/files/ids/{{ ws.pk }}/members" class="flex items-end gap-2 flex-wrap pt-2">{% csrf_token %}<input type="hidden" name="op" value="add">
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Add a person<select name="user" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body min-w-[200px]">{% for u in candidates %}<option value="{{ u.pk }}">{{ u.full_name }}</option>{% endfor %}</select></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Role<select name="role" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body">{% for v, l in roles %}{% if v != "OWNER" %}<option value="{{ v }}">{{ l }}</option>{% endif %}{% endfor %}</select></label>
+      {% include "components/button.html" with label="Add" type="submit" %}
+    </form>
+    {% endif %}
+  </section>
+
+  {% if is_owner and not archived %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Edit details">
+    <h3 class="text-sec font-semibold">Details</h3>
+    <form method="post" action="/files/ids/{{ ws.pk }}/edit" class="grid grid-cols-1 md:grid-cols-2 gap-3">{% csrf_token %}
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Name<input name="name" required maxlength="200" value="{{ ws.name }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Category<select name="category" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">{% for v, l in categories %}<option value="{{ v }}"{% if v == ws.category %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Tags<input name="tags" value="{{ tags_text }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600 md:col-span-2">Description<textarea name="description" rows="2" maxlength="2000" class="px-3 py-2 rounded-sm border border-line bg-canvas text-body text-ink-900">{{ ws.description }}</textarea></label>
+      <div class="md:col-span-2">{% include "components/button.html" with label="Save" type="submit" variant="secondary" %}</div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

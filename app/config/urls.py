@@ -11,6 +11,7 @@ urlpatterns = [
     path("", include("ots.attendance.urls")),
     path("", include("ots.live.urls")),
     path("", include("ots.files.urls")),
+    path("", include("ots.workspaces.urls")),
     path("styleguide", ui_views.styleguide),
     path("shells/<str:name>", ui_views.shell),
 ]

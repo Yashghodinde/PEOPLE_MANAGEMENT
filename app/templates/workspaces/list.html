@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% load ots_ui %}
+
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Your File IDs">
+    <h2 class="text-sec font-semibold">File IDs</h2>
+    <p class="text-cap text-ink-600">A File ID is a shared space for one client, company or project. Only the people added to it can open its files.</p>
+    {% if cards %}
+    <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      {% for w in cards %}
+      <li><a href="/files/ids/{{ w.pk }}" class="flex flex-col gap-1 border border-line rounded-sm p-3 hover:bg-line h-full">
+        <span class="text-cap text-ink-600">{{ w.file_id }}{% if w.status == "ARCHIVED" %} · Archived{% endif %}</span>
+        <strong class="text-body text-ink-900">{{ w.name }}</strong>
+        <span class="text-cap text-ink-600">{{ w.get_category_display }} · {{ w.member_count }} member{{ w.member_count|pluralize }} · {{ w.document_count }} file{{ w.document_count|pluralize }}</span>
+      </a></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="text-body text-ink-600">You are not in any File ID yet.</p>{% endif %}
+  </section>
+
+  {% if can_create %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="New File ID">
+    <h3 class="text-sec font-semibold">New File ID</h3>
+    {% if error %}<p class="text-body text-danger" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" action="/files/ids/new" class="grid grid-cols-1 md:grid-cols-2 gap-3">{% csrf_token %}
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Name<input name="name" required maxlength="200" value="{{ form.name }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">File ID (leave blank to generate)<input name="file_id" maxlength="40" value="{{ form.file_id }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Category<select name="category" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900">{% for v, l in categories %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Tags (comma separated)<input name="tags" value="{{ form.tags }}" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600 md:col-span-2">Description<textarea name="description" rows="2" maxlength="2000" class="px-3 py-2 rounded-sm border border-line bg-canvas text-body text-ink-900">{{ form.description }}</textarea></label>
+      <div class="md:col-span-2">{% include "components/button.html" with label="Create File ID" type="submit" %}</div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

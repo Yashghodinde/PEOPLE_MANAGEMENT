@@ -413,6 +413,7 @@ def _files_nav(request: HttpRequest, active: str) -> list[dict[str, Any]]:
         ("tasks", "Task files", "/files/tasks"),
         ("mine", "My storage", "/files/mine"),
         ("shared", "Shared with me", "/files/shared"),
+        ("ids", "File IDs", "/files/ids"),
         ("library", "Library", "/files/library"),
     ]
     if request.user.role == Role.SUPER_ADMIN:
