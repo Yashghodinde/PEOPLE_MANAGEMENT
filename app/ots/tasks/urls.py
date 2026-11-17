@@ -18,5 +18,6 @@ urlpatterns = [
     path("app/tasks/<str:task_id>/cancel", views.task_cancel),
     path("app/tasks/<str:task_id>/people", views.task_add_people),
     path("app/tasks/<str:task_id>/comment", views.task_comment),
+    path("app/tasks/<str:task_id>/voice", views.task_voice),
     path("app/assignments/<str:assignment_id>/<str:action>", views.assignment_action),
 ]

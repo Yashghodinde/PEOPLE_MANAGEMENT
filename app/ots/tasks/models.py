@@ -176,8 +176,14 @@ class TaskAssignment(models.Model):
         return self.status in FINAL_STATUSES
 
 
+class CommentKind(models.TextChoices):
+    TEXT = "TEXT"
+    VOICE = "VOICE"
+
+
 class TaskComment(models.Model):
-    """Immutable (the table is append-only)."""
+    """Immutable (the table is append-only). A voice message is written once, after its recording has been
+    uploaded and verified; its `body` is the short line shown in the bell ("Voice message (0:23)")."""
 
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     task = models.ForeignKey(Task, on_delete=models.PROTECT, related_name="comments")
@@ -187,10 +193,29 @@ class TaskComment(models.Model):
     author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     body = models.TextField()
     created_at = models.DateTimeField(default=now)
+    kind = models.CharField(max_length=5, choices=CommentKind.choices, default=CommentKind.TEXT)
+    voice_version = models.ForeignKey(
+        "files.FileVersion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    voice_seconds = models.PositiveSmallIntegerField(
+        null=True, blank=True
+    )  # from the recorder's timer; display only
 
     class Meta:
         db_table = "task_comments"
         indexes = [models.Index(fields=["task", "created_at"], name="comments_task_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(kind="TEXT", voice_version__isnull=True)
+                | models.Q(kind="VOICE", voice_version__isnull=False),
+                name="comment_kind_voice_ck",
+            ),
+            models.UniqueConstraint(
+                fields=["voice_version"],
+                condition=models.Q(voice_version__isnull=False),
+                name="comment_voice_version_uq",
+            ),  # one recording, one message
+        ]
 
     def __str__(self) -> str:
         return f"comment on {self.task_id} by {self.author_id}"

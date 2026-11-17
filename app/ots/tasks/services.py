@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 
 from ots.accounts.models import User
@@ -22,6 +23,7 @@ from .codes import next_task_code
 from .models import (
     AssignmentStatus,
     BlockReason,
+    CommentKind,
     DerivedStatus,
     PauseReason,
     Priority,
@@ -517,6 +519,55 @@ def add_comment(actor: Any, task_id: Any, body: str, assignment_id: Any = None) 
     _record(
         task, actor, "comment.added", {"comment_id": str(comment.pk), "length": len(text)}, at, assignment
     )
+    notify.comment_added(task, actor, comment)
+    return comment
+
+
+def _clock(seconds: int) -> str:
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def add_voice_comment(actor: Any, task_id: Any, version_id: Any, seconds: int) -> TaskComment:
+    """A voice message appears only after its recording is uploaded, hash-checked and held by the server.
+
+    The recording must be the actor's own upload as VOICE on this very task, not yet used. Sending the same
+    request again returns the first message, so a retry after a lost answer never writes a second one.
+    """
+    from ots.files.models import FileRelation, FileState, FileVersion, UploadSession
+
+    try:
+        task = Task.objects.get(pk=task_id)
+    except Task.DoesNotExist:
+        raise NotFound("Task not found.") from None
+    permissions.require(actor, "task.comment", task)
+    with transaction.atomic():
+        version = (
+            FileVersion.objects.select_for_update()
+            .filter(pk=version_id, uploaded_by=actor, is_voice=True)
+            .first()
+        )
+        ok = (
+            version is not None
+            and UploadSession.objects.filter(
+                idempotency_key=version.idempotency_key, user=actor, task=task, relation=FileRelation.VOICE
+            ).exists()
+        )
+        if not ok or version is None:
+            raise NotFound("That recording was not found.")  # not yours, not on this task, or not a recording
+        if version.state not in (FileState.STAGED, FileState.ARCHIVED):
+            raise ValidationFailed(
+                "The recording is not stored yet. Try again in a moment.", fields={"version": ["Not stored."]}
+            )
+        first = TaskComment.objects.filter(voice_version=version).first()
+        if first is not None:
+            return first
+        length = max(1, min(int(seconds or 0), int(settings.OTS_VOICE_MAX_SECONDS)))
+        at = now()
+        comment = TaskComment.objects.create(
+            task=task, author=actor, created_at=at, kind=CommentKind.VOICE, voice_version=version,
+            voice_seconds=length, body=f"Voice message ({_clock(length)})",
+        )  # fmt: skip
+        _record(task, actor, "comment.voice_added", {"comment_id": str(comment.pk), "seconds": length}, at)
     notify.comment_added(task, actor, comment)
     return comment
 

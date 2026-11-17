@@ -533,6 +533,25 @@ def task_comment(request: HttpRequest, task_id: str) -> HttpResponse:
     )
 
 
+@login_required
+@idempotency_optional
+@require_http_methods(["POST"])
+def task_voice(request: HttpRequest, task_id: str) -> JsonResponse:
+    """Called by the recorder after its upload finished. A repeat gets the same message."""
+    task = _task_or_404(request, task_id)
+    version = _uuid(request.POST.get("version_id"))
+    if version is None:
+        raise ValidationFailed("Which recording?", fields={"version_id": ["Required."]})
+    try:
+        seconds = int(request.POST.get("seconds", "0"))
+    except ValueError:
+        raise ValidationFailed("Say how long it is.", fields={"seconds": ["Invalid."]}) from None
+    comment = services.add_voice_comment(request.user, task.pk, version, seconds)
+    return JsonResponse(
+        {"comment_id": str(comment.pk), "seconds": comment.voice_seconds, "body": comment.body}
+    )
+
+
 # ---------------------------------------------------------------- dashboards
 
 

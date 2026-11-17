@@ -204,7 +204,13 @@ def handover(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
 
     from . import handover as handover_mod
 
-    version = selectors.versions_visible_to(request.user).select_related("file").filter(pk=version_id).first()
+    version = (
+        selectors.versions_visible_to(request.user)
+        .filter(is_voice=False)
+        .select_related("file")
+        .filter(pk=version_id)
+        .first()
+    )
     if version is None:
         raise NotFound("File not found.")
     permissions.require(request.user, "file.handover", version)

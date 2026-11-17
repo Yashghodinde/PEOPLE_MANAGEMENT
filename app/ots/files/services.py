@@ -63,6 +63,21 @@ class Progress:
 # --- start ----------------------------------------------------------------------------------------
 
 
+AUDIO_EXTENSIONS = {"webm", "m4a", "mp4", "ogg", "opus", "wav", "mp3"}
+
+
+def _voice_name(task: Task | None, original: str) -> str:
+    """`voice-<task code>-<yyyymmdd-HHMMSS>.<ext>` in Indian time. Refuses anything that is not audio."""
+    ext = original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if ext not in AUDIO_EXTENSIONS:
+        raise ValidationFailed(
+            "A voice message must be an audio recording.", fields={"original_filename": ["Not audio."]}
+        )
+    if task is None:
+        raise ValidationFailed("A voice message belongs to a task.", fields={"task_id": ["Required."]})
+    return f"voice-{task.task_code}-{now().astimezone(IST):%Y%m%d-%H%M%S}.{ext}"
+
+
 def _clean_name(raw: str, field: str = "original_filename") -> str:
     name = (raw or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not name or name in {".", ".."} or len(name) > 255 or "\x00" in name:
@@ -88,6 +103,11 @@ def _resolve_target(
     user: User, task: Task | None, file_id: uuid.UUID | None, assignment_id: uuid.UUID | None, relation: str
 ) -> tuple[File | None, TaskAssignment | None]:
     """Check the task, the existing file (for a new version) and the assignment the upload belongs to."""
+    if relation == FileRelation.VOICE:  # a recording is a message: whoever may write on the task may send one
+        if task is None:
+            raise ValidationFailed("A voice message belongs to a task.", fields={"task_id": ["Required."]})
+        require(user, "task.comment", task)
+        return None, None
     require(user, "file.upload", task)
     assignment: TaskAssignment | None = None
     if user.role == Role.EMPLOYEE:
@@ -141,18 +161,21 @@ def start_upload(
             raise Conflict("This upload key was already used for a different file. Use a new key.")
         return existing, False
     name = _clean_name(original_filename)
-    shown = _clean_name(display_name, "display_name") if display_name.strip() else ""
-    if (
-        purpose != VOICE_PURPOSE
-    ):  # a system-made name (a voice note) is exempt; every person-chosen name is judged
+    voice = relation == FileRelation.VOICE or purpose == VOICE_PURPOSE
+    if relation == FileRelation.VOICE:
+        shown = _voice_name(task, name)  # the server names a recording; whatever the browser sent is ignored
+    else:
+        shown = _clean_name(display_name, "display_name") if display_name.strip() else ""
+    if not voice:  # a system-made name (a voice note) is exempt; every person-chosen name is judged
         _require_meaningful_name(shown or name, task)
     sha = (sha256 or "").lower()
     if not SHA_RE.match(sha):
         raise ValidationFailed("The file fingerprint is not valid.", fields={"sha256": ["Invalid."]})
-    max_bytes = int(settings.OTS_UPLOAD_MAX_MB) * 1024 * 1024
+    max_mb = int(settings.OTS_VOICE_MAX_MB if relation == FileRelation.VOICE else settings.OTS_UPLOAD_MAX_MB)
+    max_bytes = max_mb * 1024 * 1024
     if size < 1 or size > max_bytes:
         raise ValidationFailed(
-            f"Files must be between 1 byte and {settings.OTS_UPLOAD_MAX_MB} MB.",
+            f"Files must be between 1 byte and {max_mb} MB.",
             fields={"size": ["Invalid."]},
         )
     if relation not in FileRelation.values:
@@ -370,6 +393,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         file_code=code,
         original_filename=s.original_filename,
         display_name=s.display_name,
+        is_voice=s.relation == FileRelation.VOICE,
         blob=blob,
         mime_type=mimetypes.guess_type(s.original_filename)[0] or "application/octet-stream",
         size_bytes=size,
@@ -390,7 +414,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         "relation": s.relation,
         "size": size,
     }
-    if task is not None:
+    if task is not None and s.relation != FileRelation.VOICE:  # a voice note is a message, not a task file
         TaskFile.objects.create(
             task=task,
             file=file,

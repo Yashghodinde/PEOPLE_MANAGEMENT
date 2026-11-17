@@ -97,7 +97,13 @@ def attach_existing(
     require(user, "file.attach_reference", task)
     if task.is_cancelled:
         raise Conflict("That task is cancelled.")
-    version = selectors.versions_visible_to(user).select_related("file").filter(pk=version_id).first()
+    version = (
+        selectors.versions_visible_to(user)
+        .filter(is_voice=False)
+        .select_related("file")
+        .filter(pk=version_id)
+        .first()
+    )
     if version is None:
         raise NotFound("File not found.")
     with transaction.atomic():

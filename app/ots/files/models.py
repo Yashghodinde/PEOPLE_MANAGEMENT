@@ -36,6 +36,7 @@ class FileRelation(models.TextChoices):
     REFERENCE = "REFERENCE"
     SUBMISSION = "SUBMISSION"
     DELIVERABLE = "DELIVERABLE"
+    VOICE = "VOICE"  # a recording in a task discussion (IMP-10); never listed in the Files panel
 
 
 class FileVisibility(models.TextChoices):
@@ -122,6 +123,9 @@ class FileVersion(models.Model):
     display_name = models.CharField(
         max_length=255, blank=True, default=""
     )  # blank on files from before IMP-01
+    is_voice = models.BooleanField(
+        default=False
+    )  # a discussion voice note: only people who see the task hear it
     blob = models.ForeignKey(Blob, db_column="blob_sha256", on_delete=models.PROTECT, related_name="versions")
     mime_type = models.CharField(max_length=120, blank=True, default="")
     size_bytes = models.BigIntegerField()
@@ -146,6 +150,13 @@ class FileVersion(models.Model):
         return self.file_code
 
     PREVIEW_TYPES = {
+        "webm": "audio/webm",
+        "m4a": "audio/mp4",
+        "mp4": "audio/mp4",
+        "ogg": "audio/ogg",
+        "opus": "audio/ogg",
+        "wav": "audio/wav",
+        "mp3": "audio/mpeg",
         "pdf": "application/pdf",
         "png": "image/png",
         "jpg": "image/jpeg",

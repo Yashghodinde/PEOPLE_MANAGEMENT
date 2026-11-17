@@ -35,7 +35,13 @@ def send(
     request: HttpRequest | None = None,
 ) -> FileHandover:
     """One handover, one row per recipient, one event, one bell each. All or nothing."""
-    version = selectors.versions_visible_to(sender).select_related("file").filter(pk=version_id).first()
+    version = (
+        selectors.versions_visible_to(sender)
+        .filter(is_voice=False)
+        .select_related("file")
+        .filter(pk=version_id)
+        .first()
+    )  # a recording cannot be sent on as a file
     if version is None:
         raise NotFound("File not found.")
     require(sender, "file.handover", version)
