@@ -32,7 +32,7 @@ from ots.notifications import selectors as notes
 from ots.notifications import services as note_services
 from ots.ui.templatetags.ots_ui import dot
 
-from . import dashboard, receipts, selectors, services, state
+from . import cards, dashboard, receipts, selectors, services, state
 from .models import (
     OPEN_STATUSES,
     AssignmentStatus,
@@ -125,9 +125,144 @@ def _page_url(params: Any, number: int) -> str:
     return "?" + urlencode([*keep, ("page", number)])
 
 
+# ---------------------------------------------------------------- the card landing (IMP-09)
+
+ACCENT_LABELS = {
+    "overdue": "Overdue", "soon": "Due soon", "urgent": "Urgent", "high": "High", "normal": "", "low": "Low",
+    "done": "Done",
+}  # fmt: skip
+CHIPS = [
+    ("open", "Open"), ("all", "All"), ("pending", "Pending"), ("progress", "In progress"),
+    ("waiting", "Waiting"), ("changes", "Needs changes"), ("submitted", "Submitted"),
+    ("completed", "Completed"), ("overdue", "Overdue"),
+]  # fmt: skip
+
+
+def safe_back(raw: str) -> str:
+    """A "back to where I was" address from ?from=. Only /app/tasks itself, or a page under it, is accepted;
+    anything that could leave the site or climb out of the task pages (another host, //host, a scheme, a
+    backslash, ".." segments, control characters) is ignored."""
+    raw = (raw or "").strip()
+    path = raw.split("?", 1)[0]
+    if path != "/app/tasks" and not path.startswith("/app/tasks/"):
+        return ""
+    if "\\" in raw or "://" in raw or ".." in path or len(raw) > 300:
+        return ""
+    if any(ord(c) < 32 for c in raw):
+        return ""
+    return raw
+
+
+def _decorate(viewer: Any, rows: list[TaskAssignment], shown_to: str) -> list[TaskAssignment]:
+    """What each task card needs to draw itself, added to the rows (no further queries)."""
+    at = now()
+    unread = cards.unread_by_task(viewer, [a.task_id for a in rows])
+    dots = notes.dots_for(viewer, [a.task_id for a in rows])
+    for a in rows:
+        a.accent = cards.accent(a, at)
+        a.accent_label = ACCENT_LABELS[a.accent]
+        a.status_text = _status_text(viewer, a)
+        a.due_text = a.task.due_at.astimezone(IST).strftime("%d %b, %H:%M")
+        a.dot = dots.get(str(a.task_id), "")
+        u = unread.get(a.task_id, {})
+        a.unread_text, a.unread_voice = u.get("text", 0), u.get("voice", 0)
+        a.who = a.user if shown_to == "assignee" else a.assigned_by
+    return rows
+
+
 @login_required
 @require_http_methods(["GET"])
-def task_list(request: HttpRequest) -> HttpResponse:
+def task_landing(request: HttpRequest) -> HttpResponse:
+    """/app/tasks: cards for the people who gave me work and the people I gave work to."""
+    permissions.require(request.user, "task.view")
+    viewer: Any = request.user
+    wider = viewer.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN)
+    team = wider and request.GET.get("team") == "1"
+    to_me = cards.with_unread(cards.assigned_to_me_groups(viewer), cards.unread_by_assigner(viewer))
+    mine_or_team = cards.team_groups(viewer) if team else cards.assigned_by_me_groups(viewer)
+    by_me = cards.with_unread(mine_or_team, cards.unread_by_assignee(viewer))
+    review = _decorate(viewer, cards.review_queue(viewer), "assignee")
+    for c in to_me:
+        c.href = f"/app/tasks/by/{c.user.pk}"
+    for c in by_me:
+        c.href = f"/app/tasks/to/{c.user.pk}" + ("?team=1" if team else "")
+    return render(
+        request,
+        "tasks/landing.html",
+        {
+            "page_title": "Tasks",
+            "to_me": to_me,
+            "by_me": by_me,
+            "review": review,
+            "can_create": permissions.can(viewer, "task.create"),
+            "wider": wider,
+            "team": team,
+            "team_label": "Everyone" if viewer.role == Role.SUPER_ADMIN else "My team",
+            "show_by_me": wider,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_group_by(request: HttpRequest, user_id: str) -> HttpResponse:
+    return _task_group(request, "by", user_id)
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_group_to(request: HttpRequest, user_id: str) -> HttpResponse:
+    return _task_group(request, "to", user_id)
+
+
+def _task_group(request: HttpRequest, kind: str, user_id: str) -> HttpResponse:
+    """/app/tasks/by/<id> (what that person gave me) and /app/tasks/to/<id> (what I gave them)."""
+    permissions.require(request.user, "task.view")
+    viewer: Any = request.user
+    other = cards.other_user_or_none(user_id)
+    team = request.GET.get("team") == "1" and kind == "to"
+    if other is None or not cards.has_relationship(viewer, kind, other, team):
+        raise NotFound("Not found.")  # the same answer for "no such person" and "nothing in common"
+    g = request.GET
+    page = cards.group_page(
+        viewer, kind, other, chip=g.get("filter", cards.DEFAULT_FILTER), q=g.get("q", ""),
+        after=g.get("after", ""), team=team,
+    )  # fmt: skip
+    rows = _decorate(viewer, page.rows, "assignee" if kind == "to" else "assigner")
+    here = request.get_full_path()
+    base = {"team": "1"} if team else {}
+    chips = [
+        {"key": k, "label": label, "count": page.counts.get(k, 0), "on": k == page.filter,
+         "url": "?" + urlencode({**base, "filter": k, **({"q": page.q} if page.q else {})})}
+        for k, label in CHIPS
+    ]  # fmt: skip
+    more_url = (
+        "?" + urlencode({**base, "filter": page.filter, "q": page.q, "after": page.more_after})
+        if page.more_after
+        else ""
+    )
+    title = f"Given to {other.full_name}" if kind == "to" else f"Given to me by {other.full_name}"
+    return render(
+        request,
+        "tasks/group.html",
+        {
+            "page_title": title,
+            "page": page,
+            "other": other,
+            "kind": kind,
+            "rows": rows,
+            "chips": chips,
+            "more_url": more_url,
+            "from_url": here,
+            "team": team,
+            "crumbs": [("Tasks", "/app/tasks"), (title, "")],
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_list(request: HttpRequest) -> HttpResponse:  # /app/tasks/all: the flat table
     permissions.require(request.user, "task.view")
     g = request.GET
     qs = (
@@ -305,7 +440,9 @@ def task_detail(request: HttpRequest, task_id: str) -> HttpResponse:
     task = _task_or_404(request, task_id)
     note_services.mark_task_read(request.user, task.pk)  # opening the task clears its dot and bell entries
     receipts.mark_seen(request.user, task)  # and tells whoever sent it that it was seen
-    return render(request, "tasks/task_detail.html", _detail_ctx(request, task))
+    ctx = _detail_ctx(request, task)
+    ctx["back_url"] = safe_back(request.GET.get("from", ""))  # "back to where I was", only inside /app/tasks
+    return render(request, "tasks/task_detail.html", ctx)
 
 
 def _rerender(

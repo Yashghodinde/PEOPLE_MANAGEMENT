@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-5">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <h2 class="sr-only">Tasks</h2>
+    <div class="flex items-center gap-2 flex-wrap">
+      {% if can_create %}{% include "components/button.html" with label="Add task" href="/app/tasks/new" icon="plus" %}{% endif %}
+      {% include "components/button.html" with label="All tasks (table)" href="/app/tasks/all" variant="secondary" %}
+    </div>
+  </div>
+
+  {% if review %}
+  <section aria-label="Needs my review" class="flex flex-col gap-2">
+    <h3 class="text-sec font-semibold">Needs my review <span class="text-cap font-normal text-ink-600">({{ review|length }})</span></h3>
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{% for a in review %}{% include "components/task_card.html" with a=a from="/app/tasks" %}{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  <section aria-label="Assigned to me" class="flex flex-col gap-2">
+    <h3 class="text-sec font-semibold">Assigned to me</h3>
+    {% if to_me %}<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{% for c in to_me %}{% include "components/person_card.html" with c=c href=c.href %}{% endfor %}</div>
+    {% else %}<p class="text-body text-ink-600">Nobody has given you a task yet.</p>{% endif %}
+  </section>
+
+  {% if show_by_me %}
+  <section aria-label="Assigned by me" class="flex flex-col gap-2">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <h3 class="text-sec font-semibold">{% if team %}{{ team_label }}{% else %}Assigned by me{% endif %}</h3>
+      {% if wider %}<a class="text-cap text-accent hover:text-ink-900" href="/app/tasks{% if not team %}?team=1{% endif %}">{% if team %}Show only people I assigned{% else %}Show {{ team_label|lower }}{% endif %}</a>{% endif %}
+    </div>
+    {% if by_me %}<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{% for c in by_me %}{% include "components/person_card.html" with c=c href=c.href %}{% endfor %}</div>
+    {% else %}<p class="text-body text-ink-600">{% if team %}No work is assigned in your area yet.{% else %}You have not assigned a task yet.{% endif %}</p>{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% load ots_ui %}{% comment %}task_card.html: params a (an assignment decorated by the view), from (the page to come back to).{% endcomment %}
+<a href="/app/tasks/{{ a.task_id }}?from={{ from|urlencode }}" class="bg-canvas border border-line border-l-4 {% if a.accent == 'overdue' or a.accent == 'urgent' %}border-l-bad{% elif a.accent == 'soon' or a.accent == 'high' %}border-l-warn{% elif a.accent == 'done' or a.accent == 'low' %}border-l-line opacity-80{% else %}border-l-accent{% endif %} rounded-md shadow-card p-4 flex flex-col gap-2 hover:border-accent" data-accent="{{ a.accent }}"
+   aria-label="{{ a.task.task_code }} {{ a.task.title }}, {{ a.status_text }}{% if a.accent_label %}, {{ a.accent_label }}{% endif %}, due {{ a.due_text }}{% if a.unread_text %}, {{ a.unread_text }} unread message{{ a.unread_text|pluralize }}{% endif %}{% if a.unread_voice %}, {{ a.unread_voice }} unread voice note{{ a.unread_voice|pluralize }}{% endif %}">
+  <div class="flex items-start justify-between gap-2">
+    <p class="text-body font-medium text-ink-900 break-words min-w-0">{{ a.task.title }}</p>
+    {% if a.unread_text or a.unread_voice %}<span class="flex items-center gap-1 shrink-0" aria-hidden="true">
+      {% if a.unread_text %}<span class="ots-count" style="position:static" title="Unread messages">{{ a.unread_text }}</span>{% endif %}
+      {% if a.unread_voice %}<span class="ots-count" style="position:static" title="Unread voice notes">{% icon "mic" %}{{ a.unread_voice }}</span>{% endif %}
+    </span>{% elif a.dot %}<span class="ots-dot ots-dot-{{ a.dot }}" aria-hidden="true"></span>{% endif %}
+  </div>
+  <p class="text-cap text-ink-600">{{ a.task.task_code }} · {{ a.task.get_priority_display }} priority</p>
+  <div class="flex items-center justify-between gap-2 flex-wrap">
+    <span class="text-cap font-medium text-ink-900">{{ a.status_text }}</span>
+    <span class="text-cap {% if a.accent == 'overdue' %}text-bad font-medium{% elif a.accent == 'soon' %}text-warn font-medium{% else %}text-ink-600{% endif %}">{% if a.accent_label and a.accent != 'done' and a.accent != 'low' %}{{ a.accent_label }} · {% endif %}due {{ a.due_text }}</span>
+  </div>
+  {% if a.who %}<p class="text-cap text-ink-600 truncate">{% if a.who.pk == a.user_id %}Assigned to {{ a.who.full_name }}{% else %}From {{ a.who.full_name }}{% endif %}</p>{% endif %}
+</a>

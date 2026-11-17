@@ -163,6 +163,9 @@ class TaskAssignment(models.Model):
         indexes = [
             models.Index(fields=["user", "status"], name="assign_user_status_idx"),
             models.Index(fields=["task", "status"], name="assign_task_status_idx"),
+            # the card landing (IMP-09): who gave whom work, oldest first
+            models.Index(fields=["assigned_by", "user"], name="assign_by_user_idx"),
+            models.Index(fields=["user", "assigned_by", "assigned_at"], name="assign_user_by_at_idx"),
         ]
 
     def __str__(self) -> str:

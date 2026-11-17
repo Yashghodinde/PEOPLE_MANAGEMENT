@@ -78,12 +78,12 @@ def test_completion_tells_the_task_creator_when_someone_else_approves(org):
 def test_bell_count_dots_and_clearing(org, task):
     services.add_comment(org["mgr"], task.pk, "Look at this")
     emp = login("emp")
-    assert '<span class="ots-count">1</span>' in emp.get("/app/tasks").content.decode()
-    assert "ots-dot-chat" in emp.get("/app/tasks").content.decode()
+    assert '<span class="ots-count">1</span>' in emp.get("/app/tasks/all").content.decode()
+    assert "ots-dot-chat" in emp.get("/app/tasks/all").content.decode()
     assert "ots-dot-chat" in emp.get("/app/dashboard").content.decode()
     assert "Look at this" in emp.get("/app/notifications").content.decode()
     emp.get(f"/app/tasks/{task.pk}")  # opening the task clears it
-    body = emp.get("/app/tasks").content.decode()
+    body = emp.get("/app/tasks/all").content.decode()
     assert "ots-count" not in body and "ots-dot-chat" not in body
 
 
@@ -92,9 +92,9 @@ def test_finished_work_shows_a_green_dot_and_a_message_wins_over_it(org, task):
     services.transition(a.pk, "start", org["emp"])
     services.transition(a.pk, "submit", org["emp"], note="All done, files attached.")
     services.transition(a.pk, "approve", org["mgr"])
-    assert "ots-dot-done" in login("emp").get("/app/tasks").content.decode()
+    assert "ots-dot-done" in login("emp").get("/app/tasks/all").content.decode()
     services.add_comment(org["mgr"], task.pk, "Well done")
-    body = login("emp").get("/app/tasks").content.decode()
+    body = login("emp").get("/app/tasks/all").content.decode()
     assert "ots-dot-chat" in body and "ots-dot-done" not in body
 
 

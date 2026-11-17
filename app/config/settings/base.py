@@ -141,6 +141,7 @@ OTS_NAME_PLACEHOLDERS = env.list(
     ],
 )  # fmt: skip
 OTS_NAME_MIN_WORD = env.int("OTS_NAME_MIN_WORD", default=3)
+OTS_NEAR_DEADLINE_HOURS = env.int("OTS_NEAR_DEADLINE_HOURS", default=24)  # amber accent on a task card
 OTS_UPLOAD_PIECE_BYTES = 8 * 1024 * 1024
 OTS_CACHE_CAP_GB = env.float("OTS_CACHE_CAP_GB", default=25.0)
 OTS_DISK_FREE_MIN_PERCENT = env.float("OTS_DISK_FREE_MIN_PERCENT", default=10.0)  # F-FL-3

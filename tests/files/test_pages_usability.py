@@ -45,6 +45,6 @@ def test_every_files_page_has_a_title_and_a_heading(office):
 
 
 def test_table_cells_carry_their_column_name_so_phones_can_stack_them(office):
-    html = login("boss").get("/app/tasks").content.decode()
+    html = login("boss").get("/app/tasks/all").content.decode()
     labels = set(re.findall(r'<td data-label="([^"]*)"', html))
     assert {"Code", "Title", "Due", "Status"} <= labels

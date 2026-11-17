@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4">
+  {% include "components/breadcrumb.html" with crumbs=crumbs %}
+  <div class="flex items-center gap-3">
+    {% include "components/avatar.html" with name=other.full_name size="5" %}
+    <div class="min-w-0"><h2 class="text-sec font-semibold truncate">{{ other.full_name }}</h2><p class="text-cap text-ink-600 truncate">{{ other.designation|default:other.get_role_display }}</p></div>
+  </div>
+  <form method="get" class="flex items-end gap-2 flex-wrap" aria-label="Search in this group">
+    <input type="hidden" name="filter" value="{{ page.filter }}">{% if team %}<input type="hidden" name="team" value="1">{% endif %}
+    <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Search these tasks
+      <input name="q" value="{{ page.q }}" maxlength="100" placeholder="Title or code" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-full sm:w-[280px]"></label>
+    {% include "components/button.html" with label="Search" type="submit" variant="secondary" %}
+  </form>
+  <nav class="flex gap-2 flex-wrap" aria-label="Filter">
+    {% for c in chips %}<a href="{{ c.url }}" {% if c.on %}aria-current="true"{% endif %} class="inline-flex items-center gap-1 h-5 px-3 rounded-full border text-cap {% if c.on %}border-accent bg-accent text-canvas{% else %}border-line text-ink-600 hover:bg-line{% endif %}">{{ c.label }} <span class="tabular-nums">{{ c.count }}</span></a>{% endfor %}
+  </nav>
+  {% if rows %}
+  <p class="text-cap text-ink-600">Oldest first. {{ page.total }} task{{ page.total|pluralize }}{% if page.q %} matching "{{ page.q }}"{% endif %}.</p>
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" id="cards">{% for a in rows %}{% include "components/task_card.html" with a=a from=from_url %}{% endfor %}</div>
+  {% if more_url %}<div><a class="inline-flex items-center h-5 px-4 rounded-full border border-accent text-accent hover:bg-line" href="{{ more_url }}">Load more</a></div>{% endif %}
+  {% else %}{% include "components/empty_state.html" with icon="inbox" text="No tasks match this filter." %}{% endif %}
+</div>
+{% endblock %}

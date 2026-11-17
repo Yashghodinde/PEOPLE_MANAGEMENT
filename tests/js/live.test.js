@@ -8,7 +8,10 @@ const OTHER = "01a1cfa6-3672-7574-bee4-0261217b60d8";
 
 test("page kinds", () => {
   assert.deepEqual(Core.pageKind(`/app/tasks/${ID}`), { kind: "detail", id: ID });
-  assert.equal(Core.pageKind("/app/tasks").kind, "list");
+  assert.equal(Core.pageKind("/app/tasks").kind, "landing");
+  assert.equal(Core.pageKind("/app/tasks/all").kind, "list");
+  assert.equal(Core.pageKind(`/app/tasks/by/${ID}`).kind, "group");
+  assert.equal(Core.pageKind(`/app/tasks/to/${ID}`).kind, "group");
   assert.equal(Core.pageKind("/app/dashboard").kind, "dashboard");
   assert.equal(Core.pageKind("/app/notifications").kind, "notifications");
   for (const p of ["/app/tasks/new", `/app/tasks/${ID}/edit`, "/app/people/new", "/app/attendance", "/files/library"]) {
@@ -20,14 +23,18 @@ test("a task change refreshes only the page that shows that task, the list and t
   const m = { type: "task-changed", task_id: ID };
   assert.equal(Core.wants(m, `/app/tasks/${ID}`).page, true);
   assert.equal(Core.wants(m, `/app/tasks/${OTHER}`).page, false);
-  assert.equal(Core.wants(m, "/app/tasks").page, true);
-  assert.equal(Core.wants(m, "/app/dashboard").page, true);
+  for (const p of ["/app/tasks", "/app/tasks/all", `/app/tasks/by/${ID}`, `/app/tasks/to/${OTHER}`, "/app/dashboard"]) {
+    assert.equal(Core.wants(m, p).page, true, p);
+  }
   assert.equal(Core.wants(m, "/app/tasks/new").page, false); // never under a form
   assert.equal(Core.wants({ type: "task-changed", task_id: ID.toUpperCase() }, `/app/tasks/${ID}`).page, true);
 });
 
 test("notifications, files, alerts and reload", () => {
-  assert.deepEqual(Core.wants({ type: "notification" }, "/app/tasks"), { page: false, bell: true, files: false, alert: false });
+  assert.deepEqual(Core.wants({ type: "notification" }, "/app/tasks/all"), { page: false, bell: true, files: false, alert: false });
+  for (const p of ["/app/tasks", `/app/tasks/by/${ID}`, `/app/tasks/to/${ID}`]) {
+    assert.deepEqual(Core.wants({ type: "notification" }, p), { page: true, bell: true, files: false, alert: false }, p); // unread marks change
+  }
   assert.equal(Core.wants({ type: "notification" }, "/app/notifications").page, true);
   assert.equal(Core.wants({ type: "file-archived" }, "/app/tasks").files, true);
   assert.equal(Core.wants({ type: "alert" }, "/app/tasks").alert, true);

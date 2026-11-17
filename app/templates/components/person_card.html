@@ -1,0 +1,20 @@
+{% load ots_ui %}{% comment %}person_card.html: params c (a PersonCard), href. A person with counts and unread marks; no attendance photo, initials only.{% endcomment %}
+<a href="{{ href }}" class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3 hover:border-accent focus-visible:border-accent" aria-label="{{ c.user.full_name }}: {{ c.active }} active, {{ c.completed }} completed, {{ c.overdue }} overdue, {{ c.total }} in all{% if c.unread_text %}, {{ c.unread_text }} unread message{{ c.unread_text|pluralize }}{% endif %}{% if c.unread_voice %}, {{ c.unread_voice }} unread voice note{{ c.unread_voice|pluralize }}{% endif %}">
+  <div class="flex items-center gap-3 min-w-0">
+    {% include "components/avatar.html" with name=c.user.full_name %}
+    <div class="min-w-0 flex-1">
+      <p class="text-body font-medium text-ink-900 truncate">{{ c.user.full_name }}</p>
+      <p class="text-cap text-ink-600 truncate">{{ c.user.designation|default:c.user.get_role_display }}</p>
+    </div>
+    {% if c.unread_text or c.unread_voice %}<span class="flex items-center gap-1 shrink-0" aria-hidden="true">
+      {% if c.unread_text %}<span class="ots-count" style="position:static" title="Unread messages">{{ c.unread_text }}</span>{% endif %}
+      {% if c.unread_voice %}<span class="ots-count" style="position:static" title="Unread voice notes">{% icon "mic" %}{{ c.unread_voice }}</span>{% endif %}
+    </span>{% endif %}
+  </div>
+  <dl class="grid grid-cols-4 gap-2 text-center">
+    <div><dt class="text-cap text-ink-600">Total</dt><dd class="text-sec font-semibold tabular-nums">{{ c.total }}</dd></div>
+    <div><dt class="text-cap text-ink-600">Active</dt><dd class="text-sec font-semibold tabular-nums">{{ c.active }}</dd></div>
+    <div><dt class="text-cap text-ink-600">Done</dt><dd class="text-sec font-semibold tabular-nums">{{ c.completed }}</dd></div>
+    <div><dt class="text-cap text-ink-600">Overdue</dt><dd class="text-sec font-semibold tabular-nums{% if c.overdue %} text-bad{% endif %}">{{ c.overdue }}</dd></div>
+  </dl>
+</a>

@@ -23,10 +23,10 @@ def login(login_id):
 
 def test_task_list_is_scoped_by_role(org, task):
     stranger = make_task(org["other"], org["outsider"], title="Secret plans")
-    assert task.task_code in login("emp").get("/app/tasks").content.decode()
-    assert stranger.task_code not in login("emp").get("/app/tasks").content.decode()
-    assert stranger.task_code not in login("mgr").get("/app/tasks").content.decode()
-    body = login("boss").get("/app/tasks").content.decode()
+    assert task.task_code in login("emp").get("/app/tasks/all").content.decode()
+    assert stranger.task_code not in login("emp").get("/app/tasks/all").content.decode()
+    assert stranger.task_code not in login("mgr").get("/app/tasks/all").content.decode()
+    body = login("boss").get("/app/tasks/all").content.decode()
     assert task.task_code in body and stranger.task_code in body
 
 
@@ -47,9 +47,9 @@ def test_list_filters_and_bad_input_never_500(org, task):
         "mine=1",
         "page=abc",
     ):
-        assert c.get(f"/app/tasks?{qs}").status_code == 200
-    assert task.task_code in c.get("/app/tasks?q=monthly").content.decode()
-    assert task.task_code not in c.get("/app/tasks?q=nothing-like-this").content.decode()
+        assert c.get(f"/app/tasks/all?{qs}").status_code == 200
+    assert task.task_code in c.get("/app/tasks/all?q=monthly").content.decode()
+    assert task.task_code not in c.get("/app/tasks/all?q=nothing-like-this").content.decode()
 
 
 def test_list_query_count_is_flat(org):
@@ -57,7 +57,7 @@ def test_list_query_count_is_flat(org):
         make_task(org["mgr"], org["emp"], org["peer"], title=f"Task {i}")
     c = login("mgr")
     with CaptureQueriesContext(connection) as q:
-        assert c.get("/app/tasks").status_code == 200
+        assert c.get("/app/tasks/all").status_code == 200
     assert len(q) <= 12  # session + user + count + page + prefetch, not 50 more
 
 

@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
+{% if back_url %}<p class="mb-3"><a class="text-cap text-accent hover:text-ink-900" href="{{ back_url }}">&larr; Back</a></p>{% endif %}
 <div class="grid grid-cols-1 lg:grid-cols-split gap-4">
   <div class="flex flex-col gap-4">
     <section class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-2">

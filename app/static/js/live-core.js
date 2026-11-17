@@ -9,7 +9,9 @@
   function pageKind(pathname) {
     var m = DETAIL.exec(pathname);
     if (m) return { kind: "detail", id: m[1].toLowerCase() };
-    if (pathname === "/app/tasks" || pathname === "/app/tasks/") return { kind: "list" };
+    if (pathname === "/app/tasks" || pathname === "/app/tasks/") return { kind: "landing" };
+    if (pathname === "/app/tasks/all" || pathname === "/app/tasks/all/") return { kind: "list" };
+    if (/^\/app\/tasks\/(by|to)\/[^/]+\/?$/.test(pathname)) return { kind: "group" };
     if (pathname === "/app/dashboard" || pathname === "/app/dashboard/") return { kind: "dashboard" };
     if (pathname === "/app/notifications" || pathname === "/app/notifications/") return { kind: "notifications" };
     return { kind: "other" };
@@ -22,11 +24,12 @@
     switch (msg && msg.type) {
       case "task-changed":
         if (p.kind === "detail") out.page = String(msg.task_id || "").toLowerCase() === p.id;
-        else out.page = p.kind === "list" || p.kind === "dashboard";
+        else out.page = p.kind === "list" || p.kind === "dashboard" || p.kind === "landing" || p.kind === "group";
         break;
       case "notification":
         out.bell = true;
-        out.page = p.kind === "notifications";
+        // a new message changes the unread marks on the cards, so the card pages refresh as well
+        out.page = p.kind === "notifications" || p.kind === "landing" || p.kind === "group";
         break;
       case "file-archived":
         out.files = true;
