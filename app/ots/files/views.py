@@ -365,8 +365,12 @@ def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
 def _files_nav(request: HttpRequest, active: str) -> list[dict[str, Any]]:
     from ots.accounts.models import Role
 
-    tabs = [("search", "Search", "/files/search"), ("mine", "My storage", "/files/mine"),
-            ("shared", "Shared with me", "/files/shared"), ("library", "Library", "/files/library")]  # fmt: skip
+    tabs = [
+        ("search", "Search", "/files/search"),
+        ("mine", "My storage", "/files/mine"),
+        ("shared", "Shared with me", "/files/shared"),
+        ("library", "Library", "/files/library"),
+    ]
     if request.user.role == Role.SUPER_ADMIN:
         tabs.append(("deleted", "Deleted", "/files/deleted"))
     return [{"key": k, "label": label, "url": url, "on": k == active} for k, label, url in tabs]
@@ -425,7 +429,9 @@ def shared(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "files/shared.html",
-        _personal_ctx(request, "shared", page_title="Shared with me", rows=personal.shared_with_me(request.user)),
+        _personal_ctx(
+            request, "shared", page_title="Shared with me", rows=personal.shared_with_me(request.user)
+        ),
     )
 
 
@@ -446,7 +452,8 @@ def _personal_post(request: HttpRequest, run: Any, back: str) -> HttpResponse:
     from django.shortcuts import redirect
 
     run()
-    return redirect(request.POST.get("next") if (request.POST.get("next") or "").startswith("/files/") else back)
+    nxt = request.POST.get("next") or ""
+    return redirect(nxt if nxt.startswith("/files/") and not nxt.startswith("//") else back)
 
 
 @login_required
@@ -455,7 +462,9 @@ def personal_rename(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
     from . import personal
 
     return _personal_post(
-        request, lambda: personal.rename(request.user, file_id, request.POST.get("name", ""), request), "/files/mine"
+        request,
+        lambda: personal.rename(request.user, file_id, request.POST.get("name", ""), request),
+        "/files/mine",
     )
 
 

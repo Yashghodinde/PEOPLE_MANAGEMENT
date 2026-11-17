@@ -1,9 +1,10 @@
-"""Personal storage (IMP-02): reads for "My storage" and "Shared with me", and the writes (rename, hide, restore).
+"""Personal storage (IMP-02): reads for "My storage" and "Shared with me", and the writes (rename, hide,
+restore).
 
-"Today" and the date folders come from `FileVersion.uploaded_on`, the Indian calendar date stored at upload, and
-"today" is worked out for each request. There is no job at midnight, so nothing can move, duplicate or vanish
-when the date changes. Hiding a file only takes it out of its owner's view: no version, blob or SharePoint
-object is touched, and people it was already handed to keep their access.
+"Today" and the date folders come from `FileVersion.uploaded_on`, the Indian calendar date stored at
+upload, and "today" is worked out for each request. There is no job at midnight, so nothing can move,
+duplicate or vanish when the date changes. Hiding a file only takes it out of its owner's view: no
+version, blob or SharePoint object is touched, and people it was already handed to keep their access.
 """
 
 from __future__ import annotations
@@ -30,7 +31,10 @@ DAYS_PER_PAGE = 30
 def _mine(user: Any) -> QuerySet[FileVersion]:
     """Every version of the user's own, visible personal files."""
     return FileVersion.objects.filter(
-        uploaded_by=user, file__visibility=FileVisibility.PRIVATE, file__status=FileStatus.ACTIVE, is_voice=False
+        uploaded_by=user,
+        file__visibility=FileVisibility.PRIVATE,
+        file__status=FileStatus.ACTIVE,
+        is_voice=False,
     ).select_related("file", "blob", "uploaded_by")
 
 
@@ -99,7 +103,9 @@ def rename(user: Any, file_id: Any, name: str, request: HttpRequest | None = Non
         raise ValidationFailed("Type a name.", fields={"name": ["Required."]})
     verdict = naming.judge(name)
     if not verdict.ok:
-        raise ValidationFailed(verdict.message, fields={"name": [verdict.message]}, suggestion=verdict.suggestion)
+        raise ValidationFailed(
+            verdict.message, fields={"name": [verdict.message]}, suggestion=verdict.suggestion
+        )
     if name == f.display_name:
         return f
     old, f.display_name = f.display_name, name
@@ -110,7 +116,7 @@ def rename(user: Any, file_id: Any, name: str, request: HttpRequest | None = Non
 
 @transaction.atomic
 def hide(user: Any, file_id: Any, request: HttpRequest | None = None) -> File:
-    """"Delete" in the owner's words: it leaves the owner's view; nothing is removed anywhere."""
+    """ "Delete" in the owner's words: it leaves the owner's view; nothing is removed anywhere."""
     f = File.objects.select_for_update().filter(pk=file_id, visibility=FileVisibility.PRIVATE).first()
     if f is None or f.owner_id != user.pk:
         raise NotFound("File not found.")
