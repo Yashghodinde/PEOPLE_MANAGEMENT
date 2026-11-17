@@ -39,6 +39,7 @@ MIDDLEWARE = [
     "ots.core.middleware.RequestIdMiddleware",
     "ots.core.middleware.ErrorMappingMiddleware",
     "ots.accounts.middleware.MustChangePasswordMiddleware",
+    "ots.accounts.middleware.HrFenceMiddleware",
     "ots.core.idempotency.IdempotencyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]

@@ -15,10 +15,13 @@ from ots.core.ids import uuid7
 class Role(models.TextChoices):
     SUPER_ADMIN = "SUPER_ADMIN", "Super Admin"
     SUB_ADMIN = "SUB_ADMIN", "Sub-Admin"
+    HR = "HR", "HR"
     EMPLOYEE = "EMPLOYEE", "Employee"
 
 
-ROLE_RANK = {Role.SUPER_ADMIN: 3, Role.SUB_ADMIN: 2, Role.EMPLOYEE: 1}
+# Rank decides who may manage whom (never what a role may do). HR ranks with a Sub-Admin so that only a Super
+# Admin can be its manager; a database trigger also stops an HR account from managing anyone.
+ROLE_RANK = {Role.SUPER_ADMIN: 3, Role.SUB_ADMIN: 2, Role.HR: 2, Role.EMPLOYEE: 1}
 
 
 class Qualification(models.TextChoices):
@@ -65,16 +68,21 @@ def _default_weekly_off() -> list[int]:
 
 class UserQuerySet(models.QuerySet["User"]):
     def visible_to(self, viewer: User | None) -> UserQuerySet:
-        """Rows `viewer` may see: Super Admin all; Sub-Admin own subtree + self; Employee self only."""
+        """Rows `viewer` may see: Super Admin all; HR everyone except the break-glass account; Sub-Admin own
+        subtree + self; Employee self only."""
         from . import selectors
 
         if viewer is None or not viewer.is_active:
             return self.none()
         if viewer.role == Role.SUPER_ADMIN:
             return self.all()
+        if viewer.role == Role.HR:
+            return self.filter(is_break_glass=False)
         if viewer.role == Role.SUB_ADMIN:
             return self.filter(models.Q(pk=viewer.pk) | models.Q(pk__in=selectors.subtree_ids(viewer.pk)))
-        return self.filter(pk=viewer.pk)
+        if viewer.role == Role.EMPLOYEE:
+            return self.filter(pk=viewer.pk)
+        return self.none()  # an unknown role sees nobody; it never falls through to Employee rights
 
 
 class UserManager(BaseUserManager["User"]):
@@ -144,7 +152,7 @@ class User(AbstractBaseUser):
                 name="users_reports_to_required",
             ),
             models.CheckConstraint(
-                condition=models.Q(role__in=["SUPER_ADMIN", "SUB_ADMIN", "EMPLOYEE"]),
+                condition=models.Q(role__in=["SUPER_ADMIN", "SUB_ADMIN", "HR", "EMPLOYEE"]),
                 name="users_role_valid",
             ),
         ]

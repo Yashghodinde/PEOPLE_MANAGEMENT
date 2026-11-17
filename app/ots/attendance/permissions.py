@@ -20,7 +20,7 @@ def _correct(user: Any, target: Any = None) -> bool:
         bool(user)
         and user.is_active
         and target is not None
-        and user.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN)
+        and user.role in (Role.SUPER_ADMIN, Role.HR, Role.SUB_ADMIN)
     )
 
 

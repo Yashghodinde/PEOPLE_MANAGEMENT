@@ -81,7 +81,9 @@ class TaskQuerySet(models.QuerySet["Task"]):
                 TaskAssignment.objects.filter(task=OuterRef("pk"), user_id__in=team)
             )
             return self.filter(mine)
-        return self.filter(Exists(TaskAssignment.objects.filter(task=OuterRef("pk"), user_id=viewer.pk)))
+        if viewer.role == Role.EMPLOYEE:
+            return self.filter(Exists(TaskAssignment.objects.filter(task=OuterRef("pk"), user_id=viewer.pk)))
+        return self.none()  # HR (no tasks at all) and any role not named above never fall through to Employee
 
     def overdue(self, at: datetime.datetime | None = None) -> TaskQuerySet:
         """Past its due time with an assignment still open. Overdue is never stored (M07 section 2)."""

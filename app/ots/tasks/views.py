@@ -20,6 +20,7 @@ from django.shortcuts import redirect, render
 from django.utils.html import format_html
 from django.views.decorators.http import require_http_methods
 
+from ots.accounts.hr import hr_dashboard
 from ots.accounts.models import Role
 from ots.attendance import selectors as attendance_selectors
 from ots.attendance import sessions as attendance_sessions
@@ -401,6 +402,8 @@ def task_comment(request: HttpRequest, task_id: str) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def dashboard_view(request: HttpRequest) -> HttpResponse:
+    if request.user.role == Role.HR:  # people and attendance only: HR has no tasks
+        return render(request, "tasks/hr_dashboard.html", hr_dashboard(request.user))
     if request.user.role == Role.EMPLOYEE:
         ctx = {"page_title": "Dashboard", "employee": True, **dashboard.employee_dashboard(request.user)}
     else:

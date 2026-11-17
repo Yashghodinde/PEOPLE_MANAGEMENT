@@ -21,6 +21,10 @@ class AuditLogQuerySet(models.QuerySet["AuditLog"]):
             ids = selectors.subtree_ids(viewer.pk) | {viewer.pk}
             about_them = models.Q(target_type="user", target_id__in=[str(i) for i in ids])
             return self.filter(models.Q(actor_id__in=ids) | about_them)
+        if (
+            viewer.role == Role.HR
+        ):  # people matters only: accounts, attendance, sign-ins; never tasks or files
+            return self.filter(action__regex=r"^(user|auth|attendance|org|session)\.")
         mine = models.Q(actor_id=viewer.pk) | models.Q(target_type="user", target_id=str(viewer.pk))
         return self.filter(mine, action__startswith="auth.")
 

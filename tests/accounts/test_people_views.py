@@ -105,12 +105,14 @@ def test_profile_shows_admin_actions_to_super_admin(org):
     assert "Reset password" in body and "Deactivate" in body and "/edit" in body
 
 
-def test_create_form_is_admin_only(org):
+def test_create_form_is_for_admins_and_sub_admins_only(org):
     assert login("boss").get("/app/people/new").status_code == 200
-    for who in ("sub", "emp"):
-        c = login(who)
-        assert c.get("/app/people/new").status_code == 403
-        assert c.post("/app/people/new", {"login_id": "x"}, **key()).status_code == 403
+    assert (
+        login("sub").get("/app/people/new").status_code == 200
+    )  # a Sub-Admin may add Employees to their team
+    c = login("emp")
+    assert c.get("/app/people/new").status_code == 403
+    assert c.post("/app/people/new", {"login_id": "x"}, **key()).status_code == 403
 
 
 def test_manager_dropdown_is_server_filtered(org):

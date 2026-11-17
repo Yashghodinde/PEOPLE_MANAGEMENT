@@ -176,13 +176,21 @@ def people_list(request: HttpRequest) -> HttpResponse:
 # ---------------------------------------------------------------- create / edit
 
 
-def _manager_choices(role: str, exclude: Any = None) -> list[User]:
-    """Valid managers for a role: active and strictly higher rank. Server-filtered; the DB enforces it too."""
+def _manager_choices(role: str, exclude: Any = None, actor: User | None = None) -> list[User]:
+    """Valid managers for a role: active and strictly higher rank, never an HR account. A Sub-Admin may only
+    create people under themselves. Server-filtered; the database enforces the rank rules too."""
     if role not in Role.values:
         return []
-    higher = [r for r, k in ROLE_RANK.items() if k > ROLE_RANK[Role(role)]]
+    if actor is not None and actor.role == Role.SUB_ADMIN:
+        return [actor] if role == Role.EMPLOYEE else []
+    higher = [r for r, k in ROLE_RANK.items() if k > ROLE_RANK[Role(role)] and r != Role.HR]
     qs = User.objects.filter(is_active=True, role__in=higher, is_break_glass=False).order_by("full_name")
     return list(qs.exclude(pk=exclude) if exclude else qs)
+
+
+def _role_choices(actor: User) -> list[tuple[str, str]]:
+    """Only the roles this person is allowed to give to somebody."""
+    return [(v, label) for v, label in Role.choices if permissions.can(actor, "user.assign_role", v)]
 
 
 def _parse(post: Any) -> tuple[dict[str, Any], dict[str, list[str]]]:
@@ -275,12 +283,12 @@ def _form_ctx(
         "v": {k: _display(val) for k, val in values.items()},
         "errors": errors,
         "message": message,
-        "roles": ROLE_CHOICES,
+        "roles": _role_choices(request.user),
         "qualifications": QUAL_CHOICES,
         "departments": list(Department.objects.filter(is_active=True).order_by("name")),
         "weekdays": WEEKDAYS,
         "weekly_off": values.get("weekly_off", target.weekly_off if target else [6]),
-        "managers": _manager_choices(role, target.pk if target else None),
+        "managers": _manager_choices(role, target.pk if target else None, request.user),
         "manager_id": manager_id,
         "role": role,
     }
@@ -316,7 +324,7 @@ def manager_options(request: HttpRequest) -> HttpResponse:
         request,
         "accounts/_manager_field.html",
         {
-            "managers": _manager_choices(role),
+            "managers": _manager_choices(role, actor=request.user),  # type: ignore[arg-type]
             "manager_id": request.GET.get("selected", ""),
             "role": role,
             "errors": {},
@@ -333,7 +341,16 @@ def person_new(request: HttpRequest) -> HttpResponse:
         return render(
             request,
             "accounts/person_form.html",
-            _form_ctx(request, target=None, values={"role": Role.EMPLOYEE, "weekly_off": [6]}, errors={}),
+            _form_ctx(
+                request,
+                target=None,
+                values={
+                    "role": Role.EMPLOYEE,
+                    "weekly_off": [6],
+                    "reports_to": request.user.pk if request.user.role == Role.SUB_ADMIN else "",
+                },
+                errors={},
+            ),
         )
     values, errors = _parse(request.POST)
     values["reports_to"] = request.POST.get("reports_to", "")
@@ -343,6 +360,8 @@ def person_new(request: HttpRequest) -> HttpResponse:
         if errors:
             raise ValidationFailed("Please fix the highlighted fields.", fields=errors)
         manager = _pick_manager(values["reports_to"])
+        if request.user.role == Role.SUB_ADMIN:  # a Sub-Admin's new person is always in their own team
+            manager = request.user  # type: ignore[assignment]
         profile = {
             k: val
             for k, val in values.items()
@@ -365,9 +384,10 @@ def person_new(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET"])
 def person_edit(request: HttpRequest, pk: Any) -> HttpResponse:
     permissions.require(request.user, "user.update")
-    target = User.objects.select_related("reports_to").filter(pk=pk).first()
+    target = User.objects.visible_to(request.user).select_related("reports_to").filter(pk=pk).first()
     if target is None:
         raise NotFound("Person not found.")
+    permissions.require(request.user, "user.update", target)
     return render(
         request,
         "accounts/person_form.html",
@@ -425,7 +445,7 @@ def person_profile(request: HttpRequest, pk: Any) -> HttpResponse:
         "tabs": [
             ("work", "Work"),
             ("attendance", "Attendance"),
-            ("files", "Files"),
+            *([] if request.user.role == Role.HR else [("files", "Files")]),  # HR has no file access
             ("activity", "Activity"),
         ],
         "initial_tab": "work",
@@ -568,6 +588,8 @@ def build_org_tree(viewer: User) -> tuple[list[dict[str, Any]], list[dict[str, A
         lst.sort(key=lambda x: (x.full_name.lower(), x.employee_id))
     if viewer.role == Role.SUB_ADMIN:
         roots = [people[viewer.pk]] if viewer.pk in people else []
+    elif viewer.role not in (Role.SUPER_ADMIN, Role.HR):
+        roots = []
     else:
         roots = sorted(
             (u for u in people.values() if u.role == Role.SUPER_ADMIN), key=lambda x: x.full_name.lower()
@@ -583,7 +605,7 @@ def build_org_tree(viewer: User) -> tuple[list[dict[str, Any]], list[dict[str, A
 
     tree = [walk(r, 0) for r in roots]
     stray: list[dict[str, Any]] = []
-    if viewer.role == Role.SUPER_ADMIN:
+    if viewer.role in (Role.SUPER_ADMIN, Role.HR):
         stray = [_org_person(u) for u in people.values() if u.pk not in seen]
         stray.sort(key=lambda x: (x["full_name"].lower(), x["employee_id"]))
     return tree, stray

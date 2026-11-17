@@ -4,6 +4,8 @@ Reports (M11) and System health (M12) join the list when their pages are built."
 
 from dataclasses import dataclass
 
+ALL_ROLES = ("SUPER_ADMIN", "SUB_ADMIN", "HR", "EMPLOYEE")
+
 
 @dataclass(frozen=True)
 class NavItem:
@@ -15,13 +17,13 @@ class NavItem:
 
 
 ITEMS = [
-    NavItem("Dashboard", "layout-dashboard", "/app/dashboard"),
-    NavItem("Tasks", "list-checks", "/app/tasks"),
+    NavItem("Dashboard", "layout-dashboard", "/app/dashboard", ALL_ROLES),
+    NavItem("Tasks", "list-checks", "/app/tasks"),  # HR has no tasks and no files
     NavItem("Files", "folder", "/files/search", match="/files"),
-    NavItem("Attendance", "calendar", "/app/attendance"),
-    NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "SUB_ADMIN")),
-    NavItem("Org chart", "user", "/app/org", ("SUPER_ADMIN", "SUB_ADMIN")),
-    NavItem("Audit", "shield", "/audit"),
+    NavItem("Attendance", "calendar", "/app/attendance", ALL_ROLES),
+    NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "HR", "SUB_ADMIN")),
+    NavItem("Org chart", "user", "/app/org", ("SUPER_ADMIN", "HR", "SUB_ADMIN")),
+    NavItem("Audit", "shield", "/audit", ALL_ROLES),
     NavItem("Displays", "tv", "/app/displays", ("SUPER_ADMIN",)),
     NavItem("Settings", "settings", "/shells/settings", ("SUPER_ADMIN",)),
 ]

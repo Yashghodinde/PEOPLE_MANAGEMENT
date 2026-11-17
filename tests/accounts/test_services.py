@@ -42,9 +42,13 @@ def test_create_user_writes_history_audit_event(sa, sub):
 
 def test_only_super_admin_may_write(sa, sub):
     emp = _new(sa, Role.EMPLOYEE, sub)
+    assert (
+        _new(sub, Role.EMPLOYEE, sub).reports_to_id == sub.pk
+    )  # a Sub-Admin may add to their own team (IMP-08)
     for actor in (sub, emp):
-        with pytest.raises(PermissionDenied):
-            _new(actor, Role.EMPLOYEE, sub)
+        if actor is emp:  # an Employee may create nobody
+            with pytest.raises(PermissionDenied):
+                _new(actor, Role.EMPLOYEE, sub)
         with pytest.raises(PermissionDenied):
             services.update_profile(actor, emp, designation="x")
         with pytest.raises(PermissionDenied):

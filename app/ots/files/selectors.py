@@ -45,6 +45,8 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     qs = FileVersion.objects.all()
     if viewer.role == Role.SUPER_ADMIN:
         return qs
+    if viewer.role not in (Role.SUB_ADMIN, Role.EMPLOYEE):
+        return FileVersion.objects.none()  # HR has no file access of any kind
     visible_tasks = Task.objects.visible_to(viewer).values("pk")
     wanted = (
         Q(uploaded_by_id=viewer.pk)
@@ -65,7 +67,11 @@ def handover_targets(sender: Any) -> QuerySet[Any]:
 
     if sender is None or not getattr(sender, "is_active", False):
         return User.objects.none()
-    others = User.objects.filter(is_active=True).exclude(pk=sender.pk)
+    if sender.role not in (Role.SUPER_ADMIN, Role.SUB_ADMIN, Role.EMPLOYEE):
+        return User.objects.none()  # HR has no files to send
+    others = (
+        User.objects.filter(is_active=True).exclude(pk=sender.pk).exclude(role=Role.HR)
+    )  # HR can't receive
     if sender.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN):
         return others
     mine = TaskAssignment.objects.filter(user=sender).values("task_id")

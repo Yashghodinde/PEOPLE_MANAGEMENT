@@ -13,6 +13,7 @@ from ots.core.errors import Conflict, Locked, ValidationFailed
 
 from . import auth, guards, passwords, photos, selectors
 from .models import ROLE_RANK, Company, Department, ReportingHistory, Role, User
+from .permissions import NewPerson
 
 PROFILE_FIELDS = {
     "full_name",
@@ -51,6 +52,8 @@ def _check_manager(role: str, manager: User | None, user_id: Any = None) -> None
         )
     if not manager.is_active:
         raise ValidationFailed("The chosen manager is not active.", fields={"reports_to": ["Inactive."]})
+    if manager.role == Role.HR:
+        raise ValidationFailed("An HR account cannot manage people.", fields={"reports_to": ["Not allowed."]})
     if _rank(manager.role) <= _rank(role):
         raise ValidationFailed(
             "The manager must have a higher role than the person.", fields={"reports_to": ["Rank too low."]}
@@ -159,7 +162,7 @@ def create_user(
     **profile: Any,
 ) -> User:
     if actor is not None:  # actor None only for bootstrap_admins (server shell)
-        permissions.require(actor, "user.create")
+        permissions.require(actor, "user.create", NewPerson(role, reports_to))
     unknown = set(profile) - PROFILE_FIELDS
     if unknown:
         raise ValidationFailed(f"Unknown fields: {', '.join(sorted(unknown))}")
@@ -261,6 +264,7 @@ def update_profile(
     if role_changed:
         if new_role not in Role.values:
             raise ValidationFailed("Unknown role.", fields={"role": ["Invalid."]})
+        permissions.require(actor, "user.assign_role", new_role)
         if new_role == Role.SUPER_ADMIN:
             raise ValidationFailed("Promote to Super Admin by creating a new account.")
         if _rank(new_role) < _rank(cur.role):
