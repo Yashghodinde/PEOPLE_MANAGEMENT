@@ -217,6 +217,9 @@ class UploadSession(models.Model):
     created_at = models.DateTimeField(default=now)
     last_piece_at = models.DateTimeField(default=now)
     state = models.CharField(max_length=20, choices=FileState.choices, default=FileState.RECEIVING)
+    note = models.CharField(
+        max_length=200, blank=True, default=""
+    )  # an optional line the uploader adds (IMP-03)
     scope = models.CharField(max_length=10, blank=True, default="")  # "" = a task or the library; "personal"
     override_block = models.BooleanField(default=False)  # a Super Admin allowed a blocked type, audited
 

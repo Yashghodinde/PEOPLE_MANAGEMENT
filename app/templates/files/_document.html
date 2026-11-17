@@ -1,0 +1,5 @@
+<div class="border border-line rounded-sm p-3 flex flex-col gap-1">
+  <strong class="text-body text-ink-900 break-all">{{ d.file.display_name }}</strong>
+  <p class="text-cap text-ink-600">{{ d.rows|length }} version{{ d.rows|length|pluralize }}</p>
+  <ul class="flex flex-col divide-y divide-line">{% for r in d.rows %}{% include "files/_version_row.html" with r=r %}{% endfor %}</ul>
+</div>

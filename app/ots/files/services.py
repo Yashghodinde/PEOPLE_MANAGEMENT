@@ -172,6 +172,7 @@ def start_upload(
     display_name: str = "",
     purpose: str = "",
     scope: str = "",
+    note: str = "",
     request: Any = None,
 ) -> tuple[UploadSession, bool]:
     """Open (or find) the upload for this key: (session, created). The same key returns the same session."""
@@ -228,6 +229,7 @@ def start_upload(
                 expected_sha256=sha,
                 original_filename=name,
                 scope=scope if personal else "",
+                note=" ".join((note or "").split())[:200],
                 display_name=shown,
                 override_block=override,
             )
@@ -424,6 +426,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         file_code=code,
         original_filename=s.original_filename,
         display_name=s.display_name,
+        note=s.note,
         uploaded_on=at.astimezone(IST).date(),  # the Indian calendar day: "Today" and the date folders use it
         is_voice=s.relation == FileRelation.VOICE,
         blob=blob,

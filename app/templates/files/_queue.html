@@ -5,6 +5,11 @@
           <span class="text-body font-medium break-all" x-text="item.name"></span>
           <button type="button" class="text-cap text-bad" x-show="item.cancellable" :data-id="item.id" @click="cancel">Cancel</button>
         </div>
+        <div class="flex items-center gap-2 flex-wrap" x-show="item.askVersion" x-cloak data-same-row :data-id="item.id" role="group" aria-label="Same name found">
+          <p class="text-body text-ink-900" x-text="item.sameText"></p>
+          <button type="button" class="px-4 h-5 rounded-sm bg-accent text-canvas text-body font-medium" @click="sameYes">Yes, new version</button>
+          <button type="button" class="px-4 h-5 rounded-sm border border-line text-ink-600 hover:bg-line text-body" @click="sameNo">No, separate file</button>
+        </div>
         <div class="flex flex-col gap-2" x-show="item.needsName" data-name-row :data-id="item.id">
           <p class="text-cap text-bad" x-text="item.message" role="alert"></p>
           <label class="text-cap text-ink-600" :for="item.inputId">New name for this file</label>

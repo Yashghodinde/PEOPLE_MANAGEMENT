@@ -96,8 +96,38 @@ def check_name(request: HttpRequest) -> JsonResponse:
     ctx = naming.NameContext(
         task_code=task.task_code if task else "", task_title=task.title if task else "", today=today_local()
     )
-    verdict = naming.judge(str(data.get("name") or "")[:255], ctx)
-    return JsonResponse({"ok": verdict.ok, "message": verdict.message, "suggestion": verdict.suggestion})
+    name = str(data.get("name") or "")[:255]
+    verdict = naming.judge(name, ctx)
+    same = _same_name(request.user, task, name) if verdict.ok and task is not None else None
+    return JsonResponse(
+        {"ok": verdict.ok, "message": verdict.message, "suggestion": verdict.suggestion, "same": same}
+    )
+
+
+def _same_name(user: Any, task: Task, name: str) -> dict[str, Any] | None:
+    """A document on this task the person can already see with the same name (ignoring capitals): the uploader
+    asks whether this is its next version. Never decided for them."""
+    from .models import TaskFile
+
+    wanted = " ".join(name.split()).casefold()
+    visible = selectors.versions_visible_to(user).filter(is_voice=False).values("pk")
+    for link in (
+        TaskFile.objects.filter(task=task, version__in=visible)
+        .select_related("file", "version")
+        .order_by("-linked_at")[:200]
+    ):
+        if " ".join(link.file.display_name.split()).casefold() == wanted:
+            top = (
+                link.file.versions.order_by("-version_number")
+                .values_list("version_number", flat=True)
+                .first()
+            )
+            return {
+                "file_id": str(link.file_id),
+                "name": link.file.display_name,
+                "next_version": (top or 0) + 1,
+            }
+    return None
 
 
 @login_required
@@ -129,6 +159,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         original_filename=str(data.get("original_filename") or ""),
         display_name=str(data.get("display_name") or ""),
         scope="personal" if data.get("scope") == "personal" else "",
+        note=str(data.get("note") or "")[:200],
         size=size,
         sha256=str(data.get("sha256") or ""),
         allow_blocked=data.get("allow_blocked") is True,
@@ -367,6 +398,7 @@ def _files_nav(request: HttpRequest, active: str) -> list[dict[str, Any]]:
 
     tabs = [
         ("search", "Search", "/files/search"),
+        ("tasks", "Task files", "/files/tasks"),
         ("mine", "My storage", "/files/mine"),
         ("shared", "Shared with me", "/files/shared"),
         ("library", "Library", "/files/library"),
@@ -433,6 +465,48 @@ def shared(request: HttpRequest) -> HttpResponse:
             request, "shared", page_title="Shared with me", rows=personal.shared_with_me(request.user)
         ),
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_storage_page(request: HttpRequest) -> HttpResponse:
+    """/files/tasks: date, then task, then document, newest day first, a week at a time."""
+    import datetime
+
+    from . import taskstorage
+
+    try:
+        before = (
+            datetime.date.fromisoformat(request.GET.get("before", "")) if request.GET.get("before") else None
+        )
+    except ValueError:
+        before = None
+    days, next_before = taskstorage.task_storage(request.user, before)
+    return render(
+        request,
+        "files/task_storage.html",
+        _personal_ctx(request, "tasks", page_title="Task files", days=days, next_before=next_before),
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_exchange_page(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
+    """/files/tasks/<id>: one task's documents with every version, and the exchange timeline."""
+    from . import taskstorage
+
+    task = Task.objects.visible_to(request.user).filter(pk=task_id).first()
+    if task is None:
+        raise NotFound("Task not found.")
+    return render(
+        request,
+        "files/task_exchange.html",
+        _personal_ctx(
+            request, "tasks", page_title=f"Files of {task.task_code}", task=task,
+            documents=taskstorage.document_groups(request.user, task),
+            timeline=taskstorage.task_timeline(request.user, task),
+        ),
+    )  # fmt: skip
 
 
 @login_required

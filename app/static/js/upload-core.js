@@ -35,20 +35,21 @@
         var label = {
           queued: "Waiting", hashing: "Checking file", uploading: "Uploading", waiting: "Connection lost, retrying",
           done: "Done", failed: it.error || "Failed", cancelled: "Cancelled",
-          checking: "Checking the name", needsname: "Needs a name",
+          checking: "Checking the name", needsname: "Needs a name", askversion: "Is this a new version?",
         }[it.state];
         return {
           id: it.id, name: it.displayName, size: it.size,
           needsName: it.state === "needsname", checking: it.state === "checking",
+          askVersion: it.state === "askversion", sameText: it.same ? "Add as version " + it.same.next_version + " of " + it.same.name + "?" : "",
           message: it.nameMessage || "", suggestion: it.suggestion || "",
           prefill: it.suggestion || it.displayName, inputId: "rename-" + it.id,
-          cancellable: it.state === "queued" || it.state === "hashing" || it.state === "uploading" || it.state === "waiting" || it.state === "needsname" || it.state === "checking", state: it.state, percent: pct, label: label,
+          cancellable: it.state === "askversion" || it.state === "queued" || it.state === "hashing" || it.state === "uploading" || it.state === "waiting" || it.state === "needsname" || it.state === "checking", state: it.state, percent: pct, label: label,
           barStyle: "width:" + pct + "%", error: it.error || "", versionId: it.versionId || "",
           fileCode: it.fileCode || "",
           active: it.state === "queued" || it.state === "hashing" || it.state === "uploading" || it.state === "waiting",
           finished: it.state === "done" || it.state === "failed" || it.state === "cancelled",
           failed: it.state === "failed", ok: it.state === "done",
-          showBar: it.state !== "failed" && it.state !== "cancelled" && it.state !== "needsname" && it.state !== "checking",
+          showBar: it.state !== "failed" && it.state !== "cancelled" && it.state !== "needsname" && it.state !== "checking" && it.state !== "askversion",
           labelClass: it.state === "failed" || it.state === "needsname" ? "text-bad" : "text-ink-600",
         };
       });
@@ -79,7 +80,7 @@
 
     function startBody(it, sha, key) {
       return JSON.stringify({
-        idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation, scope: it.scope || "",
+        idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation, scope: it.scope || "", note: it.note || "",
         original_filename: it.name, display_name: it.displayName, size: it.size, sha256: sha,
       });
     }
@@ -194,6 +195,7 @@
       return Promise.resolve(opts.checkName(it.displayName, it.taskId)).then(function (v) {
         if (it.cancelled) return;
         if (v && v.ok === false) say(it, { state: "needsname", nameMessage: v.message || "", suggestion: v.suggestion || "", started: false });
+        else if (v && v.same && !it.fileId && !it.sameAnswered) say(it, { state: "askversion", same: v.same, nameMessage: "", started: false });
         else say(it, { state: "queued", nameMessage: "", started: false });
         pump();
       }, function () {
@@ -213,13 +215,23 @@
       add: function (file, meta) {
         var it = {
           id: nextId++, file: file, name: file.name, displayName: file.name, size: file.size, modified: file.lastModified || 0,
-          taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION", scope: meta.scope || "",
+          taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION", scope: meta.scope || "", note: meta.note || "",
           state: "queued", sent: 0, hashed: 0, started: false, cancelled: false,
         };
         if (!it.size) { it.state = "failed"; it.error = "This file is empty."; }
         items.push(it);
         if (it.size) judgeName(it); else changed();
         return it.id;
+      },
+      // "Add as version N of <name>?" Yes sends it as the next version of that document; No makes a separate one.
+      // Never decided for the person.
+      answerSame: function (id, yes) {
+        var it = items.filter(function (x) { return x.id === id; })[0];
+        if (!it || it.state !== "askversion") return;
+        it.sameAnswered = true;
+        if (yes) it.fileId = it.same.file_id;
+        say(it, { state: "queued", started: false });
+        pump();
       },
       // The person typed (or accepted) a better name for a file that was waiting for one; the other files carry on.
       rename: function (id, name) {

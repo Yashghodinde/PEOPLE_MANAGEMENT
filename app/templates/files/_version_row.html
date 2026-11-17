@@ -1,0 +1,14 @@
+{% load ots_ui %}<li class="py-3 flex flex-col gap-1">
+  <div class="flex items-center justify-between gap-2 flex-wrap">
+    <p class="text-body text-ink-900"><span class="font-medium">Version {{ r.version.version_number }}</span> · <span class="text-cap font-medium px-2 rounded-full border border-line">{{ r.action }}</span></p>
+    {% include "components/offsite_badge.html" with state=r.version.state %}
+  </div>
+  <p class="text-cap text-ink-600">{{ r.version.uploaded_by.full_name }} ({{ r.uploader_label }}) · {{ r.version.uploaded_at|date:"d M Y, H:i" }} · {{ r.version.size_bytes|filesizeformat }}</p>
+  {% if r.differs %}<p class="text-cap text-ink-600 break-all">{{ r.version.shown_name }} <span class="text-ink-400">(original: {{ r.version.original_filename }})</span></p>{% endif %}
+  <p class="text-cap text-ink-600 break-all">{{ r.version.file_code }}</p>
+  {% if r.version.note %}<p class="text-cap text-ink-900">Note: {{ r.version.note }}</p>{% endif %}
+  <div class="flex items-center gap-2 flex-wrap pt-1">
+    {% include "components/button.html" with label="Download" href="/files/v/"|add:r.version.pk|stringformat:"s"|add:"/download" variant="secondary" %}
+    {% if r.version.preview_type %}{% include "components/button.html" with label="Preview" href="/files/v/"|add:r.version.pk|stringformat:"s"|add:"/preview" variant="ghost" %}{% endif %}
+  </div>
+</li>

@@ -273,3 +273,58 @@ test("a name check that cannot reach the server does not block the upload", asyn
   await settle(q, finished);
   assert.equal(q.snapshot()[0].state, "done");
 });
+
+
+// --- IMP-03.3: the same-name question and the note -----------------------------------------------------------------
+const SAME = { file_id: "file-A", name: "2026-11-17_Budget.xlsx", next_version: 3 };
+const sameJudge = async (name) => (name === "2026-11-17_Budget.xlsx" ? { ok: true, same: SAME } : { ok: true });
+
+test("a name that matches a document on the task asks before doing anything", async () => {
+  const st = server(); const { q } = make(st, { checkName: sameJudge });
+  q.add(fakeFile("2026-11-17_Budget.xlsx", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].askVersion);
+  const it = q.snapshot()[0];
+  assert.equal(it.state, "askversion"); assert.equal(it.sameText, "Add as version 3 of 2026-11-17_Budget.xlsx?");
+  assert.equal(it.showBar, false); assert.deepEqual(st.log, []); // nothing is sent until they answer
+});
+
+test("Yes sends it as the next version of that document (file_id set)", async () => {
+  const st = server(); const { q } = make(st, { checkName: sameJudge });
+  const id = q.add(fakeFile("2026-11-17_Budget.xlsx", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].askVersion);
+  q.answerSame(id, true);
+  await settle(q, finished);
+  assert.equal(q.snapshot()[0].state, "done"); assert.equal(st.starts[0].file_id, "file-A");
+});
+
+test("No makes a separate document (no file_id)", async () => {
+  const st = server(); const { q } = make(st, { checkName: sameJudge });
+  const id = q.add(fakeFile("2026-11-17_Budget.xlsx", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].askVersion);
+  q.answerSame(id, false);
+  await settle(q, finished);
+  assert.equal(q.snapshot()[0].state, "done"); assert.equal(st.starts[0].file_id, null);
+});
+
+test("a name with no match, or a file chosen as 'Upload a new version', is never asked", async () => {
+  const st = server(); const { q } = make(st, { checkName: sameJudge });
+  q.add(fakeFile("2026-11-17_Other.xlsx", 250), { taskId: "t" });
+  q.add(fakeFile("2026-11-17_Budget.xlsx", 250, 2), { taskId: "t", fileId: "file-A" });
+  await settle(q, finished);
+  assert.deepEqual(q.snapshot().map((i) => i.state), ["done", "done"]);
+});
+
+test("the note travels with the upload", async () => {
+  const st = server(); const { q } = make(st);
+  q.add(fakeFile("a.xlsx", 250), { taskId: "t", note: "Totals fixed" });
+  q.add(fakeFile("b.xlsx", 250, 2), { taskId: "t" });
+  await settle(q, finished);
+  assert.deepEqual(st.starts.map((b) => b.note), ["Totals fixed", ""]);
+});
+
+test("a personal upload says so, and carries no task", async () => {
+  const st = server(); const { q } = make(st);
+  q.add(fakeFile("2026-11-17_Notes.txt", 250), { scope: "personal" });
+  await settle(q, finished);
+  assert.equal(st.starts[0].scope, "personal"); assert.equal(st.starts[0].task_id, null);
+});

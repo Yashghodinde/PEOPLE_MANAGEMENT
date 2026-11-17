@@ -5,6 +5,7 @@
     <h3 class="text-sec font-semibold">Files</h3>
     <span class="flex items-center gap-3">
       {% if can_attach %}<a class="text-cap text-accent" href="/files/search?attach={{ task.pk }}">Attach an existing file</a>{% endif %}
+      <a class="text-cap text-accent" href="/files/tasks/{{ task.pk }}">History</a>
       <a class="text-cap text-accent" href="/files/library">Library</a>
     </span>
   </div>
@@ -16,6 +17,8 @@
     <p class="text-body text-ink-900">Drop files here, or choose them</p>
     <p class="text-cap text-ink-600">Up to {{ max_mb }} MB each. Large files upload in pieces and carry on if the connection drops.</p>
     <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
+    <label class="text-cap text-ink-600 flex items-center gap-2 flex-wrap justify-center">Note for these files (optional)
+      <input type="text" x-model="note" maxlength="200" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-[260px] max-w-full" placeholder="What changed?"></label>
     <div class="flex items-center gap-2 flex-wrap justify-center">
       <button type="button" class="px-4 h-5 rounded-sm bg-accent text-canvas text-body font-medium" @click="choose">Choose files</button>
       {% if relations %}

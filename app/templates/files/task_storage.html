@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  {% for day in days %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="{{ day.day|date:'d M Y' }}">
+    <h3 class="text-sec font-semibold">{{ day.day|date:"l, d M Y" }}</h3>
+    {% for tb in day.tasks %}
+    <div class="flex flex-col gap-2">
+      <p class="text-body"><a class="text-accent font-medium" href="/files/tasks/{{ tb.task.pk }}">{{ tb.task.task_code }} · {{ tb.task.title }}</a></p>
+      {% for d in tb.documents %}{% include "files/_document.html" with d=d %}{% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+  {% empty %}{% include "components/empty_state.html" with icon="inbox" text="No task files yet." %}{% endfor %}
+  {% if next_before %}<div><a class="inline-flex items-center h-5 px-4 rounded-full border border-accent text-accent hover:bg-line" href="?before={{ next_before|date:'Y-m-d' }}">Older days</a></div>{% endif %}
+</div>
+{% endblock %}

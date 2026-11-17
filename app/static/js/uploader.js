@@ -56,7 +56,7 @@ document.addEventListener("alpine:init", function () {
 
   Alpine.data("uploader", function () {
     return {
-      items: [], relation: "SUBMISSION", fileId: "", dragging: false, queue: null,
+      items: [], relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
       init: function () {
         var self = this, d = this.$el.dataset;
         this.taskId = d.taskId; this.scope = d.scope || ""; // scope "personal" = into My storage, no task
@@ -78,9 +78,9 @@ document.addEventListener("alpine:init", function () {
       get hasItems() { return this.items.length > 0; },
       get anyFinished() { return this.items.some(function (i) { return i.finished; }); },
       take: function (fileList) {
-        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope };
+        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope, note: this.note };
         for (var i = 0; i < fileList.length; i++) this.queue.add(fileList[i], meta);
-        this.fileId = ""; this.relation = this.$el.dataset.defaultRelation || "SUBMISSION";
+        this.fileId = ""; this.note = ""; this.relation = this.$el.dataset.defaultRelation || "SUBMISSION";
       },
       picked: function (e) { this.take(e.target.files); e.target.value = ""; },
       dropped: function (e) {
@@ -92,6 +92,8 @@ document.addEventListener("alpine:init", function () {
       dragLeave: function () { this.dragging = false; },
       choose: function () { this.fileId = ""; this.$refs.input.click(); }, // a cancelled "new version" must not stick
       newVersion: function (e) { this.fileId = e.currentTarget.dataset.fileId; this.$refs.input.click(); },
+      sameYes: function (e) { this.queue.answerSame(Number(e.currentTarget.closest("[data-same-row]").dataset.id), true); },
+      sameNo: function (e) { this.queue.answerSame(Number(e.currentTarget.closest("[data-same-row]").dataset.id), false); },
       sendName: function (e) {
         var row = e.currentTarget.closest("[data-name-row]"), input = row.querySelector("input");
         this.queue.rename(Number(row.dataset.id), input.value);
