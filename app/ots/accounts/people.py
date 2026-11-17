@@ -20,6 +20,7 @@ from ots.core.errors import NotFound, ValidationFailed
 from ots.core.idempotency import idempotency_optional
 
 from . import photos, selectors, services
+from .designations import order_by_designation
 from .models import ROLE_RANK, Department, Qualification, Role, User
 
 PAGE_SIZE = 50
@@ -127,7 +128,7 @@ def people_list(request: HttpRequest) -> HttpResponse:
     active = g.get("active", "1")
     if active in ("0", "1"):
         qs = qs.filter(is_active=active == "1")
-    page = Paginator(qs.order_by("full_name", "id"), PAGE_SIZE).get_page(g.get("page"))
+    page = Paginator(order_by_designation(qs), PAGE_SIZE).get_page(g.get("page"))
     is_admin = request.user.role != Role.EMPLOYEE
     rows = [
         [

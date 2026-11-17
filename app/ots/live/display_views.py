@@ -13,8 +13,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from ots.core import permissions
-from ots.core.errors import NotFound, ValidationFailed
 from ots.core.clock import now
+from ots.core.errors import NotFound, ValidationFailed
 from ots.core.idempotency import idempotency_optional
 
 from . import board, displays
