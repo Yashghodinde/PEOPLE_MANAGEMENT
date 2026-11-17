@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import itertools
+import re
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,53 @@ def _read_file(path: Path) -> Iterator[bytes]:
     with path.open("rb") as fh:
         while chunk := fh.read(CHUNK):
             yield chunk
+
+
+def _read_range(path: Path, start: int, end: int) -> Iterator[bytes]:
+    """Bytes `start..end` (inclusive) of a file, one chunk at a time."""
+    with path.open("rb") as fh:
+        fh.seek(start)
+        left = end - start + 1
+        while left > 0 and (chunk := fh.read(min(CHUNK, left))):
+            left -= len(chunk)
+            yield chunk
+
+
+_RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
+RANGE_FILL_MAX = (
+    16 * 1024 * 1024
+)  # a ranged request on a file that is not cached fills the cache first, up to this size
+
+
+def parse_range(header: str, size: int) -> tuple[int, int] | str | None:
+    """One byte range of `size` bytes as (first, last), inclusive. None = no usable range header (send it
+    all); "bad" = a well-formed range that cannot be satisfied (416). Several ranges are not supported."""
+    m = _RANGE.match((header or "").strip())
+    if not m or (m.group(1) == "" and m.group(2) == ""):
+        return None
+    a, b = m.group(1), m.group(2)
+    if a == "":  # the last n bytes
+        n = int(b)
+        if n == 0 or size == 0:
+            return "bad"
+        return max(0, size - n), size - 1
+    first = int(a)
+    last = min(int(b), size - 1) if b else size - 1
+    if first >= size or last < first:
+        return "bad"
+    return first, last
+
+
+def _fill_cache(blob: Blob) -> Path | None:
+    """Pull a small file from SharePoint into the cache (hash-checked) so a range can be served from disk.
+    None when it cannot be done right now (offline, or somebody else is already filling it)."""
+    opened = _open_remote(blob)
+    if opened is None:
+        return None
+    for _ in _tee(blob, *opened):  # the tee writes and verifies the cache copy as it goes
+        pass
+    blob.refresh_from_db()
+    return _local_copy(blob)
 
 
 def _tee(blob: Blob, first: bytes, rest: Iterator[bytes]) -> Iterator[bytes]:
@@ -185,10 +233,22 @@ def serve(request: HttpRequest, version_id: Any, action: str) -> HttpResponse:
     if preview and version.preview_type is None:
         raise UnsupportedPreview("This kind of file cannot be previewed. Download it instead.")
     blob = version.blob
+    wanted = parse_range(request.headers.get("Range", ""), blob.size_bytes)
+    if wanted == "bad":
+        bad = HttpResponse(status=416)
+        bad["Content-Range"] = f"bytes */{blob.size_bytes}"
+        return bad
 
     path = _local_copy(blob)
+    if path is None and isinstance(wanted, tuple) and blob.size_bytes <= RANGE_FILL_MAX:
+        if blob.state not in (FileState.ARCHIVED, FileState.DRIFTED):
+            raise StorageUnavailable("The stored copy of this file is not available. Tell the Super Admin.")
+        path = _fill_cache(
+            blob
+        )  # seeking needs the bytes on disk; if it cannot be had, the whole file is sent below
+    span = wanted if isinstance(wanted, tuple) and path is not None else None
     if path is not None:
-        body: Iterator[bytes] = _read_file(path)
+        body: Iterator[bytes] = _read_range(path, *span) if span else _read_file(path)
         source = FileAccessLog.Source.CACHE
         _touch(blob)
     elif blob.state not in (FileState.ARCHIVED, FileState.DRIFTED):
@@ -198,12 +258,18 @@ def serve(request: HttpRequest, version_id: Any, action: str) -> HttpResponse:
         if opened is None:
             return _offline(request, version)
         body, source = _tee(blob, *opened), FileAccessLog.Source.ONEDRIVE
-    _log(request, version, action, source)
+    if span is None or span[0] == 0:  # a player's later range requests are not new "opens"
+        _log(request, version, action, source)
 
-    response = StreamingHttpResponse(aiter_blocking(body))
-    response["Content-Length"] = str(blob.size_bytes)
+    response = StreamingHttpResponse(aiter_blocking(body), status=206 if span else 200)
+    if span:
+        response["Content-Range"] = f"bytes {span[0]}-{span[1]}/{blob.size_bytes}"
+        response["Content-Length"] = str(span[1] - span[0] + 1)
+    else:
+        response["Content-Length"] = str(blob.size_bytes)
+    response["Accept-Ranges"] = "bytes"
     response["X-Content-Type-Options"] = "nosniff"
-    response["Cache-Control"] = "private, no-store"
+    response["Cache-Control"] = "private, max-age=3600" if version.is_voice else "private, no-store"
     if preview:
         response["Content-Type"] = version.preview_type
         response["Content-Disposition"] = f'inline; filename="{version.file_code}"'
