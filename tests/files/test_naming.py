@@ -137,7 +137,7 @@ def test_check_name_answers_without_writing_anything(checker):
     assert bad["ok"] is False and bad["message"] == MESSAGE
     assert bad["suggestion"].endswith("_Monthly-Sales-Report.pdf")  # built from the task's own title
     good = check(c, "GST details.pdf").json()
-    assert good == {"ok": True, "message": "", "suggestion": ""}
+    assert good == {"ok": True, "message": "", "suggestion": "", "same": None}
     assert not (File.objects.exists() or UploadSession.objects.exists())
 
 
