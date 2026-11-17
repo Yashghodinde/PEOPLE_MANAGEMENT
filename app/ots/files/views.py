@@ -149,6 +149,17 @@ def uploads(request: HttpRequest) -> JsonResponse:
         size = int(data.get("size"))
     except (TypeError, ValueError):
         raise ValidationFailed("The size is not valid.", fields={"size": ["Invalid."]}) from None
+    scope_in = data.get("scope") if data.get("scope") in ("personal", "workspace") else ""
+    ws = None
+    if (
+        scope_in == "workspace"
+    ):  # the same 404 for a File ID that does not exist and one the person cannot open
+        from ots.workspaces.selectors import workspaces_visible_to
+
+        wid = _uuid(data.get("workspace_id"), "workspace_id")
+        ws = workspaces_visible_to(request.user).filter(pk=wid).first() if wid else None
+        if ws is None:
+            raise NotFound("Not found.")
     session, created = services.start_upload(
         request.user,  # type: ignore[arg-type]
         key=_uuid(data.get("idempotency_key"), "idempotency_key", required=True),  # type: ignore[arg-type]
@@ -158,7 +169,8 @@ def uploads(request: HttpRequest) -> JsonResponse:
         relation=str(data.get("relation") or "SUBMISSION"),
         original_filename=str(data.get("original_filename") or ""),
         display_name=str(data.get("display_name") or ""),
-        scope="personal" if data.get("scope") == "personal" else "",
+        scope=scope_in,
+        workspace=ws,
         note=str(data.get("note") or "")[:200],
         size=size,
         sha256=str(data.get("sha256") or ""),

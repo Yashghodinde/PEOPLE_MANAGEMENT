@@ -48,6 +48,7 @@ class FileVisibility(models.TextChoices):
     PRIVATE = "PRIVATE"
     TASK = "TASK"
     LIBRARY = "LIBRARY"
+    WORKSPACE = "WORKSPACE"  # uploaded into a File ID workspace: readable only through that link (IMP-04)
 
 
 class LibraryFolder(models.Model):
@@ -220,6 +221,9 @@ class UploadSession(models.Model):
     note = models.CharField(
         max_length=200, blank=True, default=""
     )  # an optional line the uploader adds (IMP-03)
+    workspace_id = models.UUIDField(
+        null=True, blank=True
+    )  # the File ID workspace this goes into (scope "workspace")
     scope = models.CharField(max_length=10, blank=True, default="")  # "" = a task or the library; "personal"
     override_block = models.BooleanField(default=False)  # a Super Admin allowed a blocked type, audited
 

@@ -79,6 +79,15 @@ def _voice_name(task: Task | None, original: str) -> str:
     return f"voice-{task.task_code}-{now().astimezone(IST):%Y%m%d-%H%M%S}.{ext}"
 
 
+def _workspace_token(s: UploadSession) -> str | None:
+    """The File ID in the code of a file uploaded into a workspace, so the code says where it belongs."""
+    if s.scope != WORKSPACE_SCOPE or not s.workspace_id:
+        return None
+    from ots.workspaces.models import FileIdWorkspace
+
+    return FileIdWorkspace.objects.filter(pk=s.workspace_id).values_list("file_id", flat=True).first()
+
+
 def _clean_name(raw: str, field: str = "original_filename") -> str:
     name = (raw or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not name or name in {".", ".."} or len(name) > 255 or "\x00" in name:
@@ -101,6 +110,24 @@ def _require_meaningful_name(name: str, task: Task | None) -> None:
 
 
 PERSONAL = "personal"  # an upload into the sender's own private storage (IMP-02)
+WORKSPACE_SCOPE = "workspace"  # an upload into a File ID workspace (IMP-04)
+
+
+def _resolve_workspace_target(user: User, workspace: Any, file_id: uuid.UUID | None) -> File | None:
+    """A Contributor or Owner (or the Super Admin) uploads into the workspace. A new version may only be added
+    to a document that is linked there now."""
+    require(user, "fileid.contribute", workspace)
+    if not file_id:
+        return None
+    from ots.workspaces.models import FileIdDocument
+
+    linked = FileIdDocument.objects.filter(
+        workspace=workspace, file_id=file_id, removed_at__isnull=True
+    ).exists()
+    existing = File.objects.filter(pk=file_id).first() if linked else None
+    if existing is None:
+        raise ValidationFailed("That document is not in this File ID.", fields={"file_id": ["Invalid."]})
+    return existing
 
 
 def _resolve_target(
@@ -173,6 +200,7 @@ def start_upload(
     purpose: str = "",
     scope: str = "",
     note: str = "",
+    workspace: Any = None,
     request: Any = None,
 ) -> tuple[UploadSession, bool]:
     """Open (or find) the upload for this key: (session, created). The same key returns the same session."""
@@ -212,9 +240,15 @@ def start_upload(
             )
         override = True
     personal = scope == PERSONAL
-    if personal and task is not None:
-        raise ValidationFailed("A personal file does not belong to a task.", fields={"scope": ["Invalid."]})
-    target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
+    in_workspace = scope == WORKSPACE_SCOPE
+    if (personal or in_workspace) and task is not None:
+        raise ValidationFailed("That upload does not belong to a task.", fields={"scope": ["Invalid."]})
+    if in_workspace and workspace is None:
+        raise NotFound("Not found.")
+    if in_workspace:
+        target, assignment = _resolve_workspace_target(user, workspace, file_id), None
+    else:
+        target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
     layout.admit(size)
     try:
         with transaction.atomic():
@@ -228,7 +262,8 @@ def start_upload(
                 expected_size=size,
                 expected_sha256=sha,
                 original_filename=name,
-                scope=scope if personal else "",
+                scope=scope if (personal or in_workspace) else "",
+                workspace_id=workspace.pk if in_workspace else None,
                 note=" ".join((note or "").split())[:200],
                 display_name=shown,
                 override_block=override,
@@ -402,6 +437,8 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             owner=user,
             visibility=FileVisibility.PRIVATE
             if s.scope == PERSONAL
+            else FileVisibility.WORKSPACE
+            if s.scope == WORKSPACE_SCOPE
             else FileVisibility.TASK
             if task
             else FileVisibility.LIBRARY,
@@ -413,7 +450,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             employee_id=user.employee_id,
             full_name=user.full_name,
             task_code=task.task_code if task else None,
-            place="PERS" if s.scope == PERSONAL else None,
+            place="PERS" if s.scope == PERSONAL else _workspace_token(s),
             title=task.title if task else file.display_name,
             version=number,
             original_filename=s.original_filename,
@@ -439,6 +476,11 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
     )
     file.current_version = version
     file.save(update_fields=["current_version"])
+    if s.scope == WORKSPACE_SCOPE and s.workspace_id:  # the new document joins its File ID (no copy, a link)
+        from ots.workspaces.models import FileIdWorkspace
+        from ots.workspaces.services import link_new_file
+
+        link_new_file(user, FileIdWorkspace.objects.get(pk=s.workspace_id), file, request)
 
     body = {
         "file_id": str(file.pk),

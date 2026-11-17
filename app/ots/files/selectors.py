@@ -9,6 +9,7 @@ from django.db.models import Exists, F, OuterRef, Q, QuerySet
 
 from ots.files.models import FileStatus, FileVersion, TaskFile
 from ots.tasks.models import Task, TaskComment
+from ots.workspaces.models import FileIdDocument
 
 PANEL_LIMIT = 200  # files shown on one task page (CLAUDE.md: never an unbounded list)
 
@@ -64,6 +65,16 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
         )  # a team's private files stay private
     # A voice note is heard only by people who can see the task it was sent on: not by its sender's manager
     # through the team rule, not by the sender after losing the task. Every other rule above ignores voice.
+    from ots.workspaces.selectors import workspaces_visible_to
+
+    in_workspace = Exists(
+        FileIdDocument.objects.filter(
+            file_id=OuterRef("file_id"),
+            removed_at__isnull=True,
+            workspace__in=workspaces_visible_to(viewer).values("pk"),
+        )
+    )  # a document of a File ID the viewer belongs to (IMP-04); grants nothing on its other links
+    wanted = wanted | in_workspace
     heard = Exists(TaskComment.objects.filter(voice_version=OuterRef("pk"), task__in=visible_tasks))
     return qs.filter((Q(is_voice=False) & wanted) | (Q(is_voice=True) & heard))
 
