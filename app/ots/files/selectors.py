@@ -52,7 +52,12 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     # A personal (PRIVATE) file belongs to its owner. Hiding it takes it out of the owner's own view; people
     # it was handed to keep what they were given, and the Super Admin (who returned above) sees everything.
     private = Q(file__visibility=FileVisibility.PRIVATE)
-    mine = Q(uploaded_by_id=viewer.pk) & ~(private & Q(file__status=FileStatus.DELETED))
+    in_a_workspace = Q(file__visibility=FileVisibility.WORKSPACE)  # reached only through its workspace
+    mine = (
+        Q(uploaded_by_id=viewer.pk)
+        & ~(private & Q(file__status=FileStatus.DELETED))
+        & ~in_a_workspace  # a member removed from a File ID loses what they uploaded there (history stays)
+    )
     wanted = (
         mine
         | Q(file__visibility=FileVisibility.LIBRARY)
@@ -61,8 +66,8 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     )
     if viewer.role == Role.SUB_ADMIN:
         wanted |= (
-            Q(uploaded_by_id__in=accounts.subtree_ids(viewer.pk)) & ~private
-        )  # a team's private files stay private
+            Q(uploaded_by_id__in=accounts.subtree_ids(viewer.pk)) & ~private & ~in_a_workspace
+        )  # a team's private and File ID files are not the manager's by the team rule
     # A voice note is heard only by people who can see the task it was sent on: not by its sender's manager
     # through the team rule, not by the sender after losing the task. Every other rule above ignores voice.
     from ots.workspaces.selectors import workspaces_visible_to
