@@ -14,6 +14,7 @@ from django.views.decorators.http import require_http_methods
 
 from ots.core import permissions
 from ots.core.errors import NotFound, ValidationFailed
+from ots.core.clock import now
 from ots.core.idempotency import idempotency_optional
 
 from . import board, displays
@@ -86,14 +87,19 @@ def displays_admin(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @idempotency_optional
-@require_http_methods(["POST"])
+@require_http_methods(["GET", "POST"])
 def displays_code(request: HttpRequest) -> HttpResponse:
+    if request.method == "GET":  # the code is only made by the form; a plain visit goes back to the list
+        return redirect("/app/displays")
     name = request.POST.get("name", "")
     try:
         code, row = displays.create_code(request.user, name, request)
     except ValidationFailed as exc:
         return render(request, "display/admin.html", _admin_ctx(error=str(exc)), status=422)
-    return render(request, "display/admin.html", _admin_ctx(code=code, code_name=row.name))
+    left = max(0, int((row.expires_at - now()).total_seconds()))  # counted down from the server's own expiry
+    return render(
+        request, "display/admin.html", _admin_ctx(code=code, code_name=row.name, expires_in=left)
+    )
 
 
 @login_required

@@ -1,29 +1,50 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
-<div class="flex flex-col gap-4 max-w-[760px]">
+<div class="mx-auto w-full max-w-[1100px] flex flex-col gap-4 py-3 sm:py-4">
   {% if code %}
-  <section class="bg-canvas border border-accent rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="New pairing code" role="status">
-    <p class="text-body text-ink-900">On the TV open <strong>/display/pair</strong> and type this code. It works once, for {{ minutes }} minutes.</p>
-    <p class="text-ink-900 font-semibold tabular-nums" style="font-size:55px;letter-spacing:.3em">{{ code }}</p>
+  <section class="bg-canvas border border-accent rounded-md shadow-card p-4 sm:p-5 flex flex-col items-center gap-3 text-center" aria-label="New pairing code" role="status"
+           x-data="pairCode" data-seconds="{{ expires_in }}" data-code="{{ code }}">
+    <h2 class="text-cap font-semibold uppercase tracking-widest text-ink-600">Pairing code</h2>
+    <p class="text-body text-ink-600 max-w-[520px]">Open the Displays pairing page on your TV and enter the following code. It works once.</p>
+    <p class="font-mono font-bold text-ink-900 tabular-nums text-[44px] sm:text-[64px] leading-none tracking-[0.18em] pl-[0.18em]" :class="codeClass" aria-label="Pairing code {{ code }}">{{ code }}</p>
+    <p class="text-body text-ink-900" x-show="live">Expires in <span class="font-semibold tabular-nums" x-text="remaining">{{ minutes }}:00</span></p>
+    <p class="text-body text-bad font-medium" x-show="expired" x-cloak>This code has expired. Get a new one below.</p>
+    <div class="flex items-center gap-2" x-show="live">
+      <button type="button" @click="copy" class="inline-flex items-center justify-center h-5 px-4 rounded-full border border-accent text-accent bg-canvas hover:bg-line text-body font-medium">Copy code</button>
+      <span class="text-cap text-ink-600" x-show="copied" x-cloak>Copied</span>
+    </div>
+    <ol class="text-cap text-ink-600 list-decimal text-left pl-4 flex flex-col gap-1 bg-line/40 rounded-sm px-5 py-3 w-full max-w-[420px]">
+      <li>Open <strong>/display/pair</strong> on the TV.</li>
+      <li>Enter the six-digit code.</li>
+      <li>Wait for the TV to show the board; the display then appears below.</li>
+    </ol>
     <p class="text-cap text-ink-600">For: {{ code_name }}. Shown only now; make a new one if you lose it.</p>
   </section>
   {% endif %}
-  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Pair a new display">
+  <section class="bg-canvas border border-line rounded-md shadow-card p-4 sm:p-5 flex flex-col gap-3" aria-label="Pair a new display">
     <h2 class="text-sec font-semibold">Pair a new display</h2>
-    <form method="post" action="/app/displays/code" class="flex items-start gap-3 flex-wrap">{% csrf_token %}
-      <div class="grow max-w-[377px]">{% include "components/form_field.html" with name="name" label="Name of the display" required=True placeholder="Reception" error=error %}</div>
-      <div class="pt-[22px]">{% include "components/button.html" with label="Get a code" type="submit" icon="tv" %}</div>
+    <form method="post" action="/app/displays/code" class="flex flex-col sm:flex-row sm:items-end gap-3">{% csrf_token %}
+      <div class="grow sm:max-w-[420px]">{% include "components/form_field.html" with name="name" label="Name of the display" required=True placeholder="Reception" error=error %}</div>
+      <div>{% include "components/button.html" with label="Get a code" type="submit" icon="tv" %}</div>
     </form>
   </section>
-  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Paired displays">
-    <h2 class="text-sec font-semibold">Displays</h2>
+  <section class="bg-canvas border border-line rounded-md shadow-card flex flex-col" aria-label="Paired displays">
+    <h2 class="text-sec font-semibold px-4 sm:px-5 pt-4 sm:pt-5 pb-3">Displays</h2>
     {% for d in devices %}
-    <div class="flex items-center justify-between gap-3 flex-wrap border-t border-line pt-2">
-      <div><strong class="text-body text-ink-900">{{ d.name }}</strong>
-        <p class="text-cap text-ink-600">Paired {{ d.created_at|date:"d M Y, H:i" }}{% if d.last_seen_at %} · last seen {{ d.last_seen_at|date:"d M, H:i" }}{% endif %}{% if d.revoked_at %} · <span class="text-bad">revoked {{ d.revoked_at|date:"d M, H:i" }}</span>{% endif %}</p></div>
+    <div class="flex items-start sm:items-center justify-between gap-3 flex-wrap border-t border-line px-4 sm:px-5 py-3">
+      <div class="min-w-0 flex flex-col gap-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <strong class="text-body text-ink-900 break-words">{{ d.name }}</strong>
+          {% if d.revoked_at %}<span class="text-cap px-2 rounded-full border border-line text-bad">Revoked</span>
+          {% elif d.last_seen_at %}<span class="text-cap px-2 rounded-full border border-line text-ok">Active</span>
+          {% else %}<span class="text-cap px-2 rounded-full border border-line text-ink-600">Never seen</span>{% endif %}
+        </div>
+        <p class="text-cap text-ink-600">Paired: {{ d.created_at|date:"d M Y, H:i" }}</p>
+        <p class="text-cap text-ink-600">Last seen: {% if d.last_seen_at %}{{ d.last_seen_at|date:"d M Y, H:i" }}{% else %}never{% endif %}{% if d.revoked_at %} · revoked {{ d.revoked_at|date:"d M Y, H:i" }}{% endif %}</p>
+      </div>
       {% if not d.revoked_at %}<form method="post" action="/app/displays/{{ d.pk }}/revoke">{% csrf_token %}{% include "components/button.html" with label="Revoke" type="submit" variant="danger" %}</form>{% endif %}
     </div>
-    {% empty %}<p class="text-body text-ink-600">No display is paired yet.</p>{% endfor %}
+    {% empty %}<p class="text-body text-ink-600 px-4 sm:px-5 pb-4 sm:pb-5">No display is paired yet.</p>{% endfor %}
   </section>
 </div>
 {% endblock %}

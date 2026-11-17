@@ -172,6 +172,31 @@ def test_the_admin_page_shows_the_code_once_and_lists_displays(team):
     )
 
 
+def test_the_code_page_counts_down_from_the_servers_expiry(team):
+    with freeze_time("2026-11-17 10:00:00"):
+        page = login("boss").post("/app/displays/code", {"name": "Lobby"}).content.decode()
+    row = DisplayPairingCode.objects.get()
+    assert row.expires_at - row.created_at == datetime.timedelta(minutes=displays.CODE_MINUTES)
+    assert 'data-seconds="600"' in page  # the server's own remaining time, not a number made up by the browser
+    assert "Copy code" in page
+
+
+def test_a_plain_visit_to_the_code_url_goes_back_to_the_list(team):
+    r = login("boss").get("/app/displays/code")
+    assert r.status_code == 302 and r["Location"] == "/app/displays"
+    assert login("emp").get("/app/displays/code").status_code in (302, 403)
+
+
+def test_each_display_shows_its_state_and_revoked_ones_have_no_revoke_button(team):
+    paired_tv(team, "Reception")
+    paired_tv(team, "Kitchen")
+    kitchen = DisplayDevice.objects.get(name="Kitchen")
+    displays.revoke(team["boss"], kitchen.pk)
+    page = login("boss").get("/app/displays").content.decode()
+    assert page.count(">Revoked<") == 1 and page.count(">Active<") + page.count(">Never seen<") == 1
+    assert page.count("/revoke") == 1  # only the live display can be revoked
+
+
 def test_displays_are_in_the_super_admin_sidebar_only(team):
     assert b'href="/app/displays"' in login("boss").get("/app/dashboard").content
     assert b'href="/app/displays"' not in login("sub").get("/app/dashboard").content

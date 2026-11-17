@@ -15,9 +15,36 @@ document.addEventListener("alpine:init", function () {
       toggleMobile: function () { this.mobileOpen = !this.mobileOpen; },
       toggle: function () { this.collapsed = !this.collapsed; store("ots.sidebar", this.collapsed ? "1" : "0"); },
       get expanded() { return !this.collapsed; },
+      get linkClass() { return this.collapsed && !this.mobileOpen ? "justify-center px-0" : "px-3"; },
       get sidebarClass() {
-        var w = this.collapsed ? "w-sidebar-collapsed" : "w-sidebar";
+        var w = (this.collapsed ? "w-sidebar-collapsed p-2" : "w-sidebar p-3");
         return this.mobileOpen ? w + " max-md:flex max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-sidebar" : w;
+      },
+    };
+  });
+
+  // Pairing code: counts down from the seconds the server reported at render time (no client clock needed).
+  Alpine.data("pairCode", function () {
+    return {
+      left: 0, copied: false,
+      init: function () {
+        var self = this;
+        this.t0 = Date.now(); this.total = Number(this.$el.dataset.seconds) || 0;
+        this.tick();
+        this.timer = setInterval(function () { self.tick(); }, 1000);
+      },
+      tick: function () {
+        this.left = Math.max(0, this.total - Math.floor((Date.now() - this.t0) / 1000));
+        if (this.left === 0) clearInterval(this.timer);
+      },
+      get expired() { return this.left <= 0; },
+      get live() { return this.left > 0; },
+      get codeClass() { return this.left > 0 ? "" : "opacity-30 line-through"; },
+      get remaining() { var m = Math.floor(this.left / 60), s = this.left % 60; return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s; },
+      copy: function () {
+        var self = this;
+        if (this.left <= 0 || !navigator.clipboard) return;
+        navigator.clipboard.writeText(this.$el.dataset.code).then(function () { self.copied = true; setTimeout(function () { self.copied = false; }, 2000); });
       },
     };
   });
