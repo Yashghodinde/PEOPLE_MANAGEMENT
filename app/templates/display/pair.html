@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect this display</title>
+<style>
+:root{--ink:#111111;--soft:#555555;--line:#E8E8E8;--accent:#2F3E56;--bad:#B23A3A}
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;font:26px/1.35 Inter,system-ui,sans-serif;color:var(--ink);background:var(--canvas)}
+main{width:min(760px,92vw);border:2px solid var(--line);border-radius:21px;padding:55px;display:flex;flex-direction:column;gap:26px}
+h1{font-size:42px}p{color:var(--soft)}.bad{color:var(--bad)}
+input[name=code]{font:inherit;font-size:55px;letter-spacing:.35em;text-align:center;border:2px solid var(--line);border-radius:13px;padding:13px;width:100%}
+input[name=code]:focus{outline:3px solid var(--accent)}
+button{font:inherit;font-weight:600;background:var(--accent);color:var(--canvas);border:0;border-radius:9999px;padding:16px 34px;cursor:pointer}
+button:focus{outline:3px solid var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Connect this display</h1>
+  <p>Ask the office admin for a 6-digit code (Displays page), then type it here with the remote.</p>
+  {% if error %}<p class="bad" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" autocomplete="off">
+    {% csrf_token %}
+    <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autofocus required aria-label="6-digit code">
+    <p></p>
+    <button type="submit">Connect</button>
+  </form>
+</main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-[760px]">
+  {% if code %}
+  <section class="bg-canvas border border-accent rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="New pairing code" role="status">
+    <p class="text-body text-ink-900">On the TV open <strong>/display/pair</strong> and type this code. It works once, for {{ minutes }} minutes.</p>
+    <p class="text-ink-900 font-semibold tabular-nums" style="font-size:55px;letter-spacing:.3em">{{ code }}</p>
+    <p class="text-cap text-ink-600">For: {{ code_name }}. Shown only now; make a new one if you lose it.</p>
+  </section>
+  {% endif %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Pair a new display">
+    <h2 class="text-sec font-semibold">Pair a new display</h2>
+    <form method="post" action="/app/displays/code" class="flex items-start gap-3 flex-wrap">{% csrf_token %}
+      <div class="grow max-w-[377px]">{% include "components/form_field.html" with name="name" label="Name of the display" required=True placeholder="Reception" error=error %}</div>
+      <div class="pt-[22px]">{% include "components/button.html" with label="Get a code" type="submit" icon="tv" %}</div>
+    </form>
+  </section>
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Paired displays">
+    <h2 class="text-sec font-semibold">Displays</h2>
+    {% for d in devices %}
+    <div class="flex items-center justify-between gap-3 flex-wrap border-t border-line pt-2">
+      <div><strong class="text-body text-ink-900">{{ d.name }}</strong>
+        <p class="text-cap text-ink-600">Paired {{ d.created_at|date:"d M Y, H:i" }}{% if d.last_seen_at %} · last seen {{ d.last_seen_at|date:"d M, H:i" }}{% endif %}{% if d.revoked_at %} · <span class="text-bad">revoked {{ d.revoked_at|date:"d M, H:i" }}</span>{% endif %}</p></div>
+      {% if not d.revoked_at %}<form method="post" action="/app/displays/{{ d.pk }}/revoke">{% csrf_token %}{% include "components/button.html" with label="Revoke" type="submit" variant="danger" %}</form>{% endif %}
+    </div>
+    {% empty %}<p class="text-body text-ink-600">No display is paired yet.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

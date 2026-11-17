@@ -1,0 +1,38 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ office }}</title>
+<style>
+:root{--canvas:#FFFFFF;--ink:#111111;--soft:#555555;--line:#E8E8E8;--accent:#2F3E56;--ok:#2E7D4F;--bad:#B23A3A}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--canvas);color:var(--ink);font:26px/1.3 Inter,system-ui,sans-serif;overflow:hidden}
+#board{width:100vw;height:100vh;padding:18px 34px 16px;display:flex;flex-direction:column;gap:13px;animation:fade 233ms ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.top{display:flex;align-items:center;justify-content:space-between;gap:34px;border-bottom:2px solid var(--line);padding-bottom:8px}
+.office{font-size:42px;font-weight:600}
+.counts{display:flex;gap:42px;color:var(--soft)}
+.counts b{color:var(--ink);font-size:42px;font-weight:600;margin-right:8px}
+.counts .bad b,.bad{color:var(--bad)}
+.when{text-align:right;line-height:1.1}.clock{font-size:55px;font-weight:600;line-height:1}.date{color:var(--soft)}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(0,1fr);grid-template-rows:repeat(8,minmax(0,1fr));gap:10px}
+.card{border:2px solid var(--line);border-radius:13px;padding:4px 18px;overflow:hidden;display:flex;flex-direction:column;justify-content:center;line-height:1.15}
+.card.overdue{border-color:var(--bad)}
+.card h2{font-size:28px;font-weight:600;display:flex;justify-content:space-between;gap:13px;white-space:nowrap}
+.card .name{overflow:hidden;text-overflow:ellipsis}.card .st{font-size:26px;font-weight:400;color:var(--soft)}
+.task{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{color:var(--soft);font-size:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.empty{grid-column:1/-1;grid-row:1/-1;align-self:center;text-align:center;color:var(--soft);font-size:42px}
+.more{color:var(--soft);text-align:right}
+.strip{display:flex;gap:34px;align-items:center;border-top:2px solid var(--line);padding-top:8px;white-space:nowrap;overflow:hidden;color:var(--ok)}
+.strip .label{color:var(--ink);font-weight:600}.strip .none{color:var(--soft)}
+@media(max-width:1500px){.grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div id="board">{% include "display/_board.html" %}</div>
+<script src="{% static 'js/display-core.js' %}"></script>
+<script src="{% static 'js/display.js' %}"></script>
+</body>
+</html>

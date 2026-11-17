@@ -35,3 +35,11 @@ def check_lag() -> bool:
 @job("live.lag_check", schedule="* * * * *")
 def lag_check() -> None:
     check_lag()
+
+
+@job("live.display_reload", schedule="0 3 * * *")
+def display_reload() -> None:
+    """03:00: every office TV reloads its page, so a long-running browser starts fresh each day (F-TV-1)."""
+    from .publisher import send
+
+    send(roles=["DISPLAY"], type_="reload")

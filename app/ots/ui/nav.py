@@ -22,6 +22,7 @@ ITEMS = [
     NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "SUB_ADMIN")),
     NavItem("Org chart", "user", "/app/org", ("SUPER_ADMIN", "SUB_ADMIN")),
     NavItem("Audit", "shield", "/audit"),
+    NavItem("Displays", "tv", "/app/displays", ("SUPER_ADMIN",)),
     NavItem("Settings", "settings", "/shells/settings", ("SUPER_ADMIN",)),
 ]
 

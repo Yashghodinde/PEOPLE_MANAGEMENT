@@ -1,0 +1,26 @@
+{# The board's content. Names, short titles, due times, priority, status. Never descriptions, comments or files. #}
+<header class="top">
+  <div class="office">{{ office }}</div>
+  <div class="counts" aria-label="Totals">
+    <span><b>{{ counts.active }}</b> active</span>
+    <span><b>{{ counts.review }}</b> awaiting review</span>
+    <span class="{% if counts.overdue %}bad{% endif %}"><b>{{ counts.overdue }}</b> overdue</span>
+  </div>
+  <div class="when"><div id="clock" class="clock">{{ now|date:"H:i" }}</div><div id="today" class="date">{{ now|date:"l, j F" }}</div></div>
+</header>
+<section class="grid" aria-label="Who is working on what">
+  {% for c in cards %}
+  <article class="card{% if c.overdue %} overdue{% endif %}">
+    <h2><span class="name">{{ c.name }}</span><span class="st">{{ c.top.status }}{% if c.more %} · +{{ c.more }} more{% endif %}</span></h2>
+    <p class="task">{{ c.top.title }}</p>
+    <p class="meta"><span class="{% if c.top.overdue %}bad{% endif %}">{% if c.top.overdue %}Overdue · {% endif %}{{ c.top.due|date:"j M H:i" }}</span> · {{ c.top.priority }}</p>
+  </article>
+  {% empty %}
+  <p class="empty">Nothing is being worked on right now.</p>
+  {% endfor %}
+</section>
+{% if hidden_cards %}<p class="more">+{{ hidden_cards }} more people not shown</p>{% endif %}
+<footer class="strip" aria-label="Approved today">
+  <span class="label">Approved today</span>
+  {% for a in approvals %}<span class="done">{{ a.name }}: {{ a.title }}</span>{% empty %}<span class="none">None yet</span>{% endfor %}
+</footer>

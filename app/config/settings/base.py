@@ -146,3 +146,5 @@ GRAPH_DRIVE_DR = env("GRAPH_DRIVE_DR", default="")
 # an URGENT one still not received after the second time tells the sender once.
 OTS_RECEIPT_LATE_SECONDS = env.int("OTS_RECEIPT_LATE_SECONDS", default=120)
 OTS_RECEIPT_URGENT_SECONDS = env.int("OTS_RECEIPT_URGENT_SECONDS", default=900)
+
+OTS_OFFICE_NAME = env("OTS_OFFICE_NAME", default="Office")  # shown in the TV board header

@@ -10,10 +10,11 @@ ROOT = Path(__file__).resolve().parents[2]
 NODE = shutil.which("node")
 
 
-@pytest.mark.skipif(NODE is None, reason="node not installed: live refresh code NOT tested")
-def test_live_refresh_rules():
+@pytest.mark.skipif(NODE is None, reason="node not installed: live and TV code NOT tested")
+@pytest.mark.parametrize("name", ["live.test.js", "display.test.js"])
+def test_live_refresh_rules(name):
     r = subprocess.run(
-        [NODE, "--test", "tests/js/live.test.js"],
+        [NODE, "--test", f"tests/js/{name}"],
         cwd=ROOT,
         capture_output=True,
         text=True,
