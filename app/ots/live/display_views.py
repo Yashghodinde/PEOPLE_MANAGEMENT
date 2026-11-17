@@ -97,9 +97,7 @@ def displays_code(request: HttpRequest) -> HttpResponse:
     except ValidationFailed as exc:
         return render(request, "display/admin.html", _admin_ctx(error=str(exc)), status=422)
     left = max(0, int((row.expires_at - now()).total_seconds()))  # counted down from the server's own expiry
-    return render(
-        request, "display/admin.html", _admin_ctx(code=code, code_name=row.name, expires_in=left)
-    )
+    return render(request, "display/admin.html", _admin_ctx(code=code, code_name=row.name, expires_in=left))
 
 
 @login_required

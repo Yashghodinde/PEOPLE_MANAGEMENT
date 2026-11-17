@@ -177,7 +177,9 @@ def test_the_code_page_counts_down_from_the_servers_expiry(team):
         page = login("boss").post("/app/displays/code", {"name": "Lobby"}).content.decode()
     row = DisplayPairingCode.objects.get()
     assert row.expires_at - row.created_at == datetime.timedelta(minutes=displays.CODE_MINUTES)
-    assert 'data-seconds="600"' in page  # the server's own remaining time, not a number made up by the browser
+    assert (
+        'data-seconds="600"' in page
+    )  # the server's own remaining time, not a number made up by the browser
     assert "Copy code" in page
 
 
