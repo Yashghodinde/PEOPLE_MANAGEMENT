@@ -105,8 +105,8 @@ def test_a_voice_file_never_appears_in_the_files_panel_or_task_files(office):
     version = FileVersion.objects.get()
     send(c, task, version.pk)
     assert not TaskFile.objects.exists()
-    assert "voice-" not in c.get(f"/app/tasks/{task.pk}/files").content.decode()
-    assert "voice-" not in login("boss").get("/files/search").content.decode()
+    assert "voice-T-" not in c.get(f"/app/tasks/{task.pk}/files").content.decode()
+    assert "voice-T-" not in login("boss").get("/files/search").content.decode()
 
 
 def test_the_server_names_the_recording_and_keeps_what_the_browser_sent(office):

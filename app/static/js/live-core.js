@@ -74,7 +74,24 @@
     return { request: request, pending: function () { return timer !== null || running; } };
   }
 
-  var api = { pageKind: pageKind, wants: wants, scheduler: scheduler };
+  // Anything that must not be swapped out from under the person (an upload, a recording, a voice note playing)
+  // takes a hold and gives it back. Several can be held at once; when the last one is released the page that
+  // was waiting for a refresh gets it (onRelease).
+  function holdCounter() {
+    var held = {}, n = 0, seq = 0, api = { onRelease: null };
+    api.acquire = function (reason) { var id = ++seq; held[id] = reason || "busy"; n++; return id; };
+    api.release = function (id) {
+      if (!(id in held)) return;
+      delete held[id]; n--;
+      if (n === 0 && api.onRelease) api.onRelease();
+    };
+    api.held = function () { return n > 0; };
+    api.reasons = function () { return Object.keys(held).map(function (k) { return held[k]; }); };
+    return api;
+  }
+
+  var api = { pageKind: pageKind, wants: wants, scheduler: scheduler, holdCounter: holdCounter };
+  if (typeof root !== "undefined" && !(typeof module !== "undefined" && module.exports)) root.OtsLiveHold = holdCounter();
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OtsLiveCore = api;
 })(typeof self !== "undefined" ? self : this);

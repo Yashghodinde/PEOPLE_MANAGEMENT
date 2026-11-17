@@ -11,6 +11,7 @@ import uuid
 from typing import Any
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -425,6 +426,8 @@ def _detail_ctx(
         "open_action": open_action,
         "can_manage": permissions.can(viewer, "task.update", task) and not task.is_cancelled,
         "can_comment": permissions.can(viewer, "task.comment", task),
+        "voice_max_seconds": settings.OTS_VOICE_MAX_SECONDS,
+        "voice_max_mb": settings.OTS_VOICE_MAX_MB,
         "block_reasons": [(v, state.BLOCKED_LABELS[BlockReason(v)]) for v in BlockReason.values],
         "overdue": overdue,
         "can_add": can_add,

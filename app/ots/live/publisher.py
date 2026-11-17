@@ -77,6 +77,7 @@ def _task_changed(event: Event) -> None:
 
 for _name in (
     "task.created", "task.updated", "task.cancelled", "task.deadline_changed", "comment.added",
+    "comment.voice_added",
     "assignment.created", "assignment.started", "assignment.paused", "assignment.resumed",
     "assignment.blocked", "assignment.unblocked", "assignment.submitted", "assignment.changes_requested",
     "assignment.approved", "assignment.removed", "assignment.cancelled",

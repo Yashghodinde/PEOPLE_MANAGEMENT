@@ -12,7 +12,7 @@ NODE = shutil.which("node")
 
 
 @pytest.mark.skipif(NODE is None, reason="node is not installed: the browser upload code was NOT tested")
-@pytest.mark.parametrize("name", ["sha256.test.js", "core.test.js", "uploader.test.js"])
+@pytest.mark.parametrize("name", ["sha256.test.js", "core.test.js", "uploader.test.js", "voice.test.js"])
 def test_browser_code(name):
     r = subprocess.run(
         [NODE, "--test", f"tests/js/{name}"],

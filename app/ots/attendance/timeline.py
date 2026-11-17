@@ -46,6 +46,7 @@ _TASK_TITLES = {
     "assignment.approved": "Work approved",
     "assignment.removed": "Removed from a task",
     "comment.added": "Wrote on a task",
+    "comment.voice_added": "Sent a voice message",
     "file.version_added": "Uploaded a file",
     "task.created": "Created a task",
     "task.cancelled": "Cancelled a task",

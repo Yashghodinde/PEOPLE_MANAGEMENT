@@ -24,7 +24,7 @@
       var tag = a.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || a.isContentEditable) return false;
     }
-    if (document.body.hasAttribute("data-live-hold")) return false; // an upload is running
+    if (window.OtsLiveHold && window.OtsLiveHold.held()) return false; // an upload, a recording or a playing note
     if (document.querySelector("dialog[open], [aria-modal='true']")) return false;
     return true;
   }
@@ -95,6 +95,8 @@
     onStale: function () { toast("warning", "This page has new changes. They will appear as soon as you finish typing."); },
   });
   document.addEventListener("visibilitychange", function () { if (!document.hidden) page.request(); });
+  if (window.OtsLiveHold) window.OtsLiveHold.onRelease = function () { page.request(); }; // the refresh that was waiting
+  document.addEventListener("ots:comment-added", function () { page.request(); }); // my own voice message just sent
 
   function act(w) {
     if (w.page) page.request();

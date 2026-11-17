@@ -52,6 +52,8 @@ document.addEventListener("alpine:init", function () {
     }).then(function (r) { if (!r.ok) throw new Error("check failed"); return r.json(); });
   }
 
+  window.OtsUploadEnv = { csrf: csrf, storage: storage, uuid: uuid, hashFile: hashFile }; // voice.js reuses these
+
   Alpine.data("uploader", function () {
     return {
       items: [], relation: "SUBMISSION", fileId: "", dragging: false, queue: null,
@@ -64,9 +66,10 @@ document.addEventListener("alpine:init", function () {
           concurrency: 2, checkName: checkName,
           onChange: function (list) {
             self.items = list;
-            // the page must not swap itself under a running upload (live.js looks at this)
-            if (list.some(function (i) { return i.active; })) document.body.setAttribute("data-live-hold", "uploading");
-            else document.body.removeAttribute("data-live-hold");
+            // the page must not swap itself under a running upload (live.js looks at the hold counter)
+            var busy = list.some(function (i) { return i.active; });
+            if (busy && !self.hold && window.OtsLiveHold) self.hold = window.OtsLiveHold.acquire("uploading");
+            else if (!busy && self.hold && window.OtsLiveHold) { window.OtsLiveHold.release(self.hold); self.hold = 0; }
           },
           onDone: function () { document.body.dispatchEvent(new CustomEvent("ots:file-uploaded")); },
         });

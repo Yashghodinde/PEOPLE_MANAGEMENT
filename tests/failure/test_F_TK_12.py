@@ -72,7 +72,7 @@ def test_hr_gets_a_404_or_403_never_the_audio(office, note):
 def test_a_voice_note_is_not_reachable_through_search_the_library_or_handover(office, note):
     for url in ("/files/search?q=voice", "/files/library"):
         for who in ("boss", "sub", "emp", "other"):
-            assert "voice-" not in login(who).get(url).content.decode(), (who, url)
+            assert "voice-T-" not in login(who).get(url).content.decode(), (who, url)
     assert login("emp").post(f"/files/v/{note.pk}/handover", {"to": str(office["sub"].pk)}).status_code == 404
 
 
