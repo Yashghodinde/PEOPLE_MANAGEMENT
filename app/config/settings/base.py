@@ -131,6 +131,15 @@ OTS_REFERENCE_PHOTO_DIR = Path(
 OTS_STAGING_DIR = Path(env("OTS_STAGING_DIR", default=str(OTS_DATA_DIR / "staging")))  # uploads in progress
 OTS_BLOB_DIR = Path(env("OTS_BLOB_DIR", default=str(OTS_DATA_DIR / "blobs")))  # the cache, by SHA-256
 OTS_UPLOAD_MAX_MB = env.int("OTS_UPLOAD_MAX_MB", default=500)
+# File-name rule (IMP-01): words that do not describe a file; shortest run of letters that counts as a word.
+OTS_NAME_PLACEHOLDERS = env.list(
+    "OTS_NAME_PLACEHOLDERS",
+    default=[
+        "untitled", "document", "doc", "file", "newfile", "scan", "scanned", "image", "img", "photo",
+        "screenshot", "download", "sheet1", "book1", "page", "temp", "test",
+    ],
+)  # fmt: skip
+OTS_NAME_MIN_WORD = env.int("OTS_NAME_MIN_WORD", default=3)
 OTS_UPLOAD_PIECE_BYTES = 8 * 1024 * 1024
 OTS_CACHE_CAP_GB = env.float("OTS_CACHE_CAP_GB", default=25.0)
 OTS_DISK_FREE_MIN_PERCENT = env.float("OTS_DISK_FREE_MIN_PERCENT", default=10.0)  # F-FL-3
