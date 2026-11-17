@@ -49,6 +49,86 @@ document.addEventListener("alpine:init", function () {
     };
   });
 
+  // Org chart: branches open and close one at a time (class toggle, no re-render); zoom scales the tree and keeps its frame
+  // sized to match, so the scroll area, pan and the connector lines (plain borders) stay aligned.
+  Alpine.data("orgChart", function () {
+    return {
+      scale: 1, searchNote: "", drag: null,
+      init: function () { var self = this; this.$nextTick(function () { self.fit(); }); },
+      get zoomLabel() { return Math.round(this.scale * 100) + "%"; },
+      apply: function () {
+        var c = this.$refs.canvas, f = this.$refs.frame;
+        c.style.transform = "scale(" + this.scale + ")";
+        f.style.width = (c.offsetWidth * this.scale + 42) + "px";
+        f.style.height = (c.offsetHeight * this.scale + 42) + "px";
+      },
+      setScale: function (v) { this.scale = Math.min(2, Math.max(0.2, Math.round(v * 100) / 100)); this.apply(); },
+      zoomIn: function () { this.setScale(this.scale + 0.1); },
+      zoomOut: function () { this.setScale(this.scale - 0.1); },
+      fit: function () {
+        var c = this.$refs.canvas, v = this.$refs.viewport;
+        c.style.transform = "scale(1)";
+        this.setScale(Math.min(1, (v.clientWidth - 42) / Math.max(c.offsetWidth, 1)));
+        v.scrollLeft = 0; v.scrollTop = 0;
+      },
+      nodes: function () { return this.$refs.canvas.querySelectorAll("li[data-org-node]"); },
+      setOpen: function (li, open) {
+        li.classList.toggle("org-collapsed", !open);
+        var b = li.querySelector(":scope > [data-org-card] [data-org-toggle]");
+        if (b) b.setAttribute("aria-expanded", open ? "true" : "false");
+      },
+      expandAll: function () { var self = this; this.nodes().forEach(function (li) { self.setOpen(li, true); }); this.apply(); },
+      collapseAll: function () {
+        var self = this;
+        this.nodes().forEach(function (li) { if (li.querySelector(":scope > ul")) self.setOpen(li, false); });
+        this.apply();
+      },
+      onClick: function (e) {
+        var b = e.target.closest("[data-org-toggle]");
+        if (!b) return;
+        var li = b.closest("li[data-org-node]");
+        this.setOpen(li, li.classList.contains("org-collapsed"));
+        this.apply();
+      },
+      clearMarks: function () {
+        this.$refs.canvas.querySelectorAll(".org-hit,.org-path").forEach(function (el) { el.classList.remove("org-hit", "org-path"); });
+      },
+      onSearch: function (e) {
+        var q = (e.target.value || "").trim().toLowerCase(), v = this.$refs.viewport;
+        this.clearMarks();
+        if (!q) { this.searchNote = ""; return; }
+        var hit = null;
+        this.nodes().forEach(function (li) { if (!hit && li.dataset.name.indexOf(q) !== -1) hit = li; });
+        if (!hit) { this.searchNote = "No one found."; return; }
+        this.searchNote = "";
+        var up = hit.parentElement.closest("li[data-org-node]");
+        while (up) { this.setOpen(up, true); up.querySelector(":scope > [data-org-card]").classList.add("org-path"); up = up.parentElement.closest("li[data-org-node]"); }
+        this.apply();
+        var card = hit.querySelector(":scope > [data-org-card]");
+        card.classList.add("org-hit");
+        var c = this.$refs.canvas.getBoundingClientRect(), r = card.getBoundingClientRect();
+        v.scrollTo({
+          left: Math.max(0, v.scrollLeft + (r.left - c.left) + r.width / 2 - v.clientWidth / 2 + 21),
+          top: Math.max(0, v.scrollTop + (r.top - c.top) + r.height / 2 - v.clientHeight / 2 + 21),
+          behavior: "smooth",
+        });
+      },
+      dragStart: function (e) {
+        if (e.pointerType === "touch" || e.target.closest("a,button")) return;
+        var v = this.$refs.viewport;
+        this.drag = { x: e.clientX, y: e.clientY, l: v.scrollLeft, t: v.scrollTop };
+        v.classList.add("is-dragging");
+      },
+      dragMove: function (e) {
+        if (!this.drag) return;
+        var v = this.$refs.viewport;
+        v.scrollLeft = this.drag.l - (e.clientX - this.drag.x);
+        v.scrollTop = this.drag.t - (e.clientY - this.drag.y);
+      },
+      dragEnd: function () { this.drag = null; this.$refs.viewport.classList.remove("is-dragging"); },
+    };
+  });
+
   Alpine.data("dropdown", function () {
     return {
       open: false,

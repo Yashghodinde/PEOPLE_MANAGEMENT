@@ -1,6 +1,37 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
-<section aria-label="Organisation chart" class="flex flex-col gap-3">
-  {% include "accounts/_org_nodes.html" with nodes=tree %}
+<section aria-label="Organisation chart" class="flex flex-col gap-3" x-data="orgChart">
+  <div class="flex items-center gap-2 flex-wrap">
+    <label class="sr-only" for="org-search">Find a person</label>
+    <input id="org-search" type="search" placeholder="Find a person or ID" autocomplete="off" @input="onSearch" @keydown.enter.prevent="onSearch"
+           class="h-5 w-full sm:w-[280px] px-3 rounded-sm border border-line bg-canvas text-body text-ink-900 placeholder:text-ink-400 focus:border-accent">
+    <p class="text-cap text-ink-600" x-text="searchNote" aria-live="polite"></p>
+    <div class="flex items-center gap-1 ml-auto" role="toolbar" aria-label="Chart controls">
+      <button type="button" @click="zoomOut" class="org-btn" aria-label="Zoom out">&minus;</button>
+      <span class="text-cap text-ink-600 tabular-nums w-[44px] text-center" x-text="zoomLabel">100%</span>
+      <button type="button" @click="zoomIn" class="org-btn" aria-label="Zoom in">+</button>
+      <button type="button" @click="fit" class="org-btn px-3">Fit</button>
+      <button type="button" @click="expandAll" class="org-btn px-3">Expand all</button>
+      <button type="button" @click="collapseAll" class="org-btn px-3">Collapse all</button>
+    </div>
+  </div>
+  <div x-ref="viewport" @click="onClick" @pointerdown="dragStart" @pointermove="dragMove" @pointerup="dragEnd" @pointerleave="dragEnd"
+       class="org-viewport border border-line rounded-md bg-canvas overflow-auto" tabindex="0" aria-label="Organisation tree (drag to pan)">
+    <div x-ref="frame" class="org-frame">
+      <div x-ref="canvas" class="org-tree">
+        {% if tree %}<ul>{% for n in tree %}{% include "accounts/_org_node.html" %}{% endfor %}</ul>
+        {% else %}<p class="text-body text-ink-600 p-4">Nobody to show yet.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if stray %}
+  <section class="border border-line rounded-md bg-canvas p-4 flex flex-col gap-2" aria-label="People not placed in the chart">
+    <h2 class="text-sec font-semibold">Not placed in the chart</h2>
+    <p class="text-cap text-ink-600">These active people have no reachable manager (for example their manager is deactivated). Open the person to set who they report to.</p>
+    <ul class="flex flex-wrap gap-2">{% for n in stray %}
+      <li class="org-card"><a class="text-body font-medium text-ink-900 hover:text-accent" href="/app/people/{{ n.pk }}">{{ n.full_name }}</a><span class="text-cap text-ink-600">{{ n.designation }} · {{ n.employee_id }}</span></li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
 </section>
 {% endblock %}

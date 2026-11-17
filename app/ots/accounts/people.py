@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Exists, OuterRef
 from django.http import FileResponse, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.html import format_html
@@ -19,7 +18,7 @@ from ots.core import permissions
 from ots.core.errors import NotFound, ValidationFailed
 from ots.core.idempotency import idempotency_optional
 
-from . import photos, selectors, services
+from . import photos, services
 from .designations import order_by_designation
 from .models import ROLE_RANK, Department, Qualification, Role, User
 
@@ -533,73 +532,68 @@ def person_photo(request: HttpRequest, pk: Any) -> HttpResponse:
 # ---------------------------------------------------------------- org chart
 
 
-def _node_user(u: User, detail: bool) -> Any:
-    """What the org-chart template may see. Outside a Sub-Admin's subtree only the name and id are handed
-    over, so a later template edit cannot leak designation, employee ID or anything else by accident."""
-    return u if detail else {"pk": u.pk, "full_name": u.full_name}
+ORG_OPEN_LEVELS = 2  # the chart opens with the top two levels showing; deeper branches start collapsed
 
 
-def _nodes(viewer: User, parent_ids: list[Any]) -> dict[Any, list[dict[str, Any]]]:
-    """Children grouped by parent, one query. `detail` is False for people outside a Sub-Admin's subtree."""
-    kids = (
-        User.objects.filter(reports_to_id__in=parent_ids, is_active=True, is_break_glass=False)
-        .annotate(
-            has_children=Exists(
-                User.objects.filter(reports_to_id=OuterRef("pk"), is_active=True, is_break_glass=False)
-            )
+def _org_person(u: Any) -> dict[str, Any]:
+    return {
+        "pk": u.pk,
+        "full_name": u.full_name,
+        "designation": u.designation or u.get_role_display(),
+        "employee_id": u.employee_id,
+        "photo": f"/app/people/{u.pk}/photo?v={u.version}" if u.reference_photo_path else "",
+        "kids": [],
+    }
+
+
+def build_org_tree(viewer: User) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """The reporting tree the viewer may see, from one query, plus people who cannot be placed in it.
+
+    Source of truth is `reports_to`. A Sub-Admin's chart is their own team (D-036). Each person appears
+    once; a reporting loop (which the services already refuse) can never make the walk run forever.
+    Anyone active but not reachable from a root (say their manager is deactivated) is returned in the
+    second list, never silently dropped; only a Super Admin gets that list.
+    """
+    people = {
+        u.pk: u
+        for u in User.objects.filter(is_active=True, is_break_glass=False).only(
+            "id", "full_name", "designation", "employee_id", "role", "reports_to_id", "version",
+            "reference_photo_path",
         )
-        .order_by("full_name")
-    )
-    own = selectors.subtree_ids(viewer.pk) | {viewer.pk} if viewer.role == Role.SUB_ADMIN else None
-    out: dict[Any, list[dict[str, Any]]] = {}
-    for k in kids:
-        detail = own is None or k.pk in own
-        out.setdefault(k.reports_to_id, []).append(
-            {"u": _node_user(k, detail), "detail": detail, "has_children": k.has_children, "kids": []}
+    }  # fmt: skip
+    kids: dict[Any, list[Any]] = {}
+    for u in people.values():
+        kids.setdefault(u.reports_to_id, []).append(u)
+    for lst in kids.values():
+        lst.sort(key=lambda x: (x.full_name.lower(), x.employee_id))
+    if viewer.role == Role.SUB_ADMIN:
+        roots = [people[viewer.pk]] if viewer.pk in people else []
+    else:
+        roots = sorted(
+            (u for u in people.values() if u.role == Role.SUPER_ADMIN), key=lambda x: x.full_name.lower()
         )
-    return out
+    seen: set[Any] = set()
+
+    def walk(u: Any, depth: int) -> dict[str, Any]:
+        seen.add(u.pk)
+        node = _org_person(u)
+        node["open"] = depth < ORG_OPEN_LEVELS - 1
+        node["kids"] = [walk(k, depth + 1) for k in kids.get(u.pk, []) if k.pk not in seen]
+        return node
+
+    tree = [walk(r, 0) for r in roots]
+    stray: list[dict[str, Any]] = []
+    if viewer.role == Role.SUPER_ADMIN:
+        stray = [_org_person(u) for u in people.values() if u.pk not in seen]
+        stray.sort(key=lambda x: (x["full_name"].lower(), x["employee_id"]))
+    return tree, stray
 
 
 @login_required
 @require_http_methods(["GET"])
 def org_chart(request: HttpRequest) -> HttpResponse:
     permissions.require(request.user, "org.view_chart")
-    if request.user.role == Role.SUB_ADMIN:  # a Sub-Admin's chart starts at themselves: own team only
-        roots = [request.user]
-    else:
-        roots = list(
-            User.objects.filter(role=Role.SUPER_ADMIN, is_active=True, is_break_glass=False).order_by(
-                "full_name"
-            )
-        )
-    own = (
-        selectors.subtree_ids(request.user.pk) | {request.user.pk}
-        if request.user.role == Role.SUB_ADMIN
-        else None
-    )
-    level2 = _nodes(request.user, [r.pk for r in roots])
-    tree = [
-        {
-            "u": _node_user(r, own is None or r.pk in own),
-            "detail": own is None or r.pk in own,
-            "has_children": r.pk in level2,
-            "kids": level2.get(r.pk, []),
-        }
-        for r in roots
-    ]
-    return render(request, "accounts/org_chart.html", {"page_title": "Org chart", "tree": tree})
-
-
-@login_required
-@require_http_methods(["GET"])
-def org_children(request: HttpRequest, pk: Any) -> HttpResponse:
-    permissions.require(request.user, "org.view_chart")
-    if not User.objects.filter(pk=pk, is_active=True, is_break_glass=False).exists():
-        raise NotFound("Person not found.")
-    if request.user.role == Role.SUB_ADMIN and pk not in selectors.subtree_ids(request.user.pk) | {
-        request.user.pk
-    }:
-        raise NotFound("Person not found.")  # outside their own team: same answer as a missing person
+    tree, stray = build_org_tree(request.user)
     return render(
-        request, "accounts/_org_nodes.html", {"nodes": _nodes(request.user, [pk]).get(pk, []), "nested": True}
+        request, "accounts/org_chart.html", {"page_title": "Org chart", "tree": tree, "stray": stray}
     )

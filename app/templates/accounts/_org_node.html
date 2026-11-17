@@ -1,0 +1,14 @@
+{% load ots_ui %}<li data-org-node data-name="{{ n.full_name|lower }} {{ n.employee_id|lower }}" id="node-{{ n.pk }}"{% if n.kids and not n.open %} class="org-collapsed"{% endif %}>
+  <div class="org-card" data-org-card>
+    {% include "components/avatar.html" with name=n.full_name photo=n.photo %}
+    <a class="text-body font-medium text-ink-900 hover:text-accent truncate max-w-full" href="/app/people/{{ n.pk }}" title="{{ n.full_name }}">{{ n.full_name }}</a>
+    <span class="text-cap text-ink-600 truncate max-w-full" title="{{ n.designation }}">{{ n.designation }}</span>
+    <span class="text-cap text-ink-400">{{ n.employee_id }}</span>
+    {% if n.kids %}
+    <button type="button" data-org-toggle class="org-toggle" aria-expanded="{% if n.open %}true{% else %}false{% endif %}" aria-controls="kids-{{ n.pk }}" aria-label="Show or hide the team of {{ n.full_name }}">
+      <span>{{ n.kids|length }} direct report{{ n.kids|length|pluralize }}</span>{% icon "chevron-down" %}
+    </button>
+    {% endif %}
+  </div>
+  {% if n.kids %}<ul id="kids-{{ n.pk }}">{% for k in n.kids %}{% include "accounts/_org_node.html" with n=k %}{% endfor %}</ul>{% endif %}
+</li>

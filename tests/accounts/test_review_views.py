@@ -187,21 +187,17 @@ def test_other_data_changing_views_still_require_a_key(org):
 
 
 def test_sub_admin_org_chart_is_own_team_only(org):
-    c = login("sub")
-    body = c.get("/app/org").content.decode()
-    assert "Sub Admin" in body and "Boss Person" not in body and "Other Sub" not in body
-    assert "Ravi Other" not in body and "SECRET-DESIGNATION" not in body
-    assert "Asha Employee" in c.get(f"/app/org/children/{org['sub'].pk}").content.decode()
-    for outside in ("sa", "sub2", "outsider"):  # anyone outside the team answers like a missing person
-        assert c.get(f"/app/org/children/{org[outside].pk}").status_code == 404
+    body = login("sub").get("/app/org").content.decode()
+    assert "Sub Admin" in body and "Asha Employee" in body
+    assert "Boss Person" not in body and "Other Sub" not in body and "Ravi Other" not in body
+    assert "Not placed in the chart" not in body  # only a Super Admin sees the exceptions list
 
 
-def test_org_children_of_unknown_or_break_glass_is_404(org):
+def test_org_chart_hides_break_glass_and_never_exposes_a_children_url(org):
     bg = make_user(Role.SUPER_ADMIN, login_id="breakglass", is_break_glass=True)
     c = login("boss")
-    assert c.get(f"/app/org/children/{uuid.uuid4()}").status_code == 404
-    assert c.get(f"/app/org/children/{bg.pk}").status_code == 404
     assert "breakglass" not in c.get("/app/org").content.decode().lower()
+    assert c.get(f"/app/org/children/{bg.pk}").status_code == 404  # the old lazy endpoint is gone
 
 
 # --- P5: admin row actions look people up through the scoped manager ----------------------------

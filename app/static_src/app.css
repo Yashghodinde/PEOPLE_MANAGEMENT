@@ -28,4 +28,38 @@
   .ots-dot-off { background: theme("colors.line"); }
   .ots-count { position: absolute; top: 0; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9999px;
     background: theme("colors.bad"); color: theme("colors.canvas"); font-size: 11px; line-height: 18px; text-align: center; font-weight: 600; }
+
+  /* Org chart: a top-down tree. Each parent sits centred over its children; the lines are drawn with borders, so
+     they stay attached as branches open and close. */
+  .org-viewport { max-height: 70vh; min-height: 320px; cursor: grab; touch-action: pan-x pan-y; }
+  .org-viewport.is-dragging { cursor: grabbing; user-select: none; }
+  .org-frame { margin: 0 auto; padding: 21px; }
+  .org-tree { transform-origin: top left; width: max-content; }
+  .org-tree ul { display: flex; justify-content: center; padding-top: 21px; position: relative; }
+  .org-tree > ul { padding-top: 0; }
+  .org-tree li { position: relative; display: flex; flex-direction: column; align-items: center; padding: 21px 8px 0; }
+  .org-tree > ul > li { padding-top: 0; }
+  .org-tree li::before, .org-tree li::after { content: ""; position: absolute; top: 0; right: 50%; width: 50%; height: 21px;
+    border-top: 1px solid theme("colors.ink-400"); }
+  .org-tree li::after { right: auto; left: 50%; border-left: 1px solid theme("colors.ink-400"); }
+  .org-tree > ul > li::before, .org-tree > ul > li::after { display: none; }
+  .org-tree li:only-child::before, .org-tree li:only-child::after { display: none; }
+  .org-tree li:only-child { padding-top: 21px; }
+  .org-tree li:first-child::before, .org-tree li:last-child::after { border: 0 none; }
+  .org-tree li:last-child::before { border-right: 1px solid theme("colors.ink-400"); border-radius: 0 8px 0 0; }
+  .org-tree li:first-child::after { border-radius: 8px 0 0 0; }
+  .org-tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; height: 21px; border-left: 1px solid theme("colors.ink-400"); }
+  .org-tree li.org-collapsed > ul { display: none; }
+  .org-card { width: 188px; min-height: 108px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 13px 8px 8px;
+    background: theme("colors.canvas"); border: 1px solid theme("colors.ink-400"); border-radius: 13px; box-shadow: theme("boxShadow.card"); text-align: center; }
+  .org-card.org-hit { border-color: theme("colors.accent"); box-shadow: 0 0 0 3px rgba(47, 62, 86, 0.2); }
+  .org-card.org-path { border-color: theme("colors.accent"); }
+  .org-toggle { margin-top: 5px; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; line-height: 18px; padding: 0 8px;
+    border-radius: 9999px; color: theme("colors.ink-600"); }
+  .org-toggle:hover { background: theme("colors.line"); }
+  .org-toggle svg { width: 13px; height: 13px; transition: transform 144ms; }
+  .org-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+  .org-btn { display: inline-flex; align-items: center; justify-content: center; height: 34px; min-width: 34px; border-radius: 9999px;
+    border: 1px solid theme("colors.ink-400"); background: theme("colors.canvas"); color: theme("colors.ink-900"); font-size: 13px; }
+  .org-btn:hover { background: theme("colors.line"); }
 }

@@ -209,16 +209,12 @@ def test_deactivate_and_reset_password_endpoints(org):
         )
 
 
-def test_org_chart_renders_three_levels_with_lazy_children(org):
-    c = login("boss")
-    r = c.get("/app/org")
-    body = r.content.decode()
-    assert r.status_code == 200
-    assert "Boss Person" in body and "Sub Admin" in body and "Other Sub" in body  # levels 1 and 2
-    assert "Asha Employee" not in body  # level 3 is lazy
-    assert f"/app/org/children/{org['sub'].pk}" in body
-    kids = c.get(f"/app/org/children/{org['sub'].pk}").content.decode()
-    assert "Asha Employee" in kids  # level 3 arrives through HTMX
+def test_org_chart_renders_the_whole_tree_in_one_page(org):
+    body = login("boss").get("/app/org").content.decode()
+    for who in ("sa", "sub", "sub2", "emp", "emp2"):
+        assert body.count(f'id="node-{org[who].pk}"') == 1  # every person appears exactly once
+    assert body.index("Boss Person") < body.index("Sub Admin") < body.index("Asha Employee")
+    assert "2 direct reports" in body and "1 direct report<" in body  # child counts on the cards
 
 
 def test_org_chart_permissions_and_own_team_for_sub_admin(org):
@@ -246,3 +242,32 @@ def test_nav_has_people_and_org_for_admins_only(org):
 def test_forms_carry_csrf_and_htmx_attributes(org):
     body = login("boss").get("/app/people/new").content.decode()
     assert "csrfmiddlewaretoken" in body and 'hx-post="/app/people/new"' in body
+
+
+def test_org_chart_surfaces_people_it_cannot_place_for_the_super_admin_only(org):
+    with connection.cursor() as cur:  # the database refuses this state, so lift its guard for this test only
+        cur.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        cur.execute("ALTER TABLE users DROP CONSTRAINT users_reports_to_required")
+    User.objects.filter(pk=org["emp"].pk).update(reports_to=None)  # a broken link: nobody to report to
+    body = login("boss").get("/app/org").content.decode()
+    assert "Not placed in the chart" in body and f'id="node-{org["emp"].pk}"' not in body
+    assert body.count("Asha Employee") == 1  # shown in the exceptions list, not dropped
+    assert "Not placed in the chart" not in login("sub2").get("/app/org").content.decode()
+
+
+def test_org_chart_uses_reporting_lines_not_designations(org):
+    org["emp"].designation = "Director"
+    org["emp"].save()
+    body = login("boss").get("/app/org").content.decode()
+    assert body.index("Sub Admin") < body.index("Asha Employee")  # still below their manager
+
+
+def test_org_chart_query_count_stays_flat(org):
+    boss = login("boss")
+    with CaptureQueriesContext(connection) as small:
+        boss.get("/app/org")
+    for i in range(30):
+        make_user(Role.EMPLOYEE, reports_to=org["sub"], full_name=f"Extra {i}")
+    with CaptureQueriesContext(connection) as big:
+        boss.get("/app/org")
+    assert len(big) == len(small)
