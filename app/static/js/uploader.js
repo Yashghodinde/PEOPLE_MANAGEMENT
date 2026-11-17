@@ -42,6 +42,16 @@ document.addEventListener("alpine:init", function () {
     });
   }
 
+  // Ask the server if a name is acceptable (it writes nothing). If this cannot be answered the upload still goes
+  // ahead, because the server judges the name again when the upload starts.
+  function checkName(name, taskId) {
+    return fetch("/files/check-name", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf(), Accept: "application/json" },
+      body: JSON.stringify({ name: name, task_id: taskId || null }),
+    }).then(function (r) { if (!r.ok) throw new Error("check failed"); return r.json(); });
+  }
+
   Alpine.data("uploader", function () {
     return {
       items: [], relation: "SUBMISSION", fileId: "", dragging: false, queue: null,
@@ -51,7 +61,7 @@ document.addEventListener("alpine:init", function () {
         this.relation = d.defaultRelation || "SUBMISSION";
         this.queue = OtsUploadCore.create({
           fetch: window.fetch.bind(window), hashFile: hashFile, uuid: uuid, storage: storage(), csrf: csrf,
-          concurrency: 2,
+          concurrency: 2, checkName: checkName,
           onChange: function (list) {
             self.items = list;
             // the page must not swap itself under a running upload (live.js looks at this)
@@ -79,6 +89,10 @@ document.addEventListener("alpine:init", function () {
       dragLeave: function () { this.dragging = false; },
       choose: function () { this.fileId = ""; this.$refs.input.click(); }, // a cancelled "new version" must not stick
       newVersion: function (e) { this.fileId = e.currentTarget.dataset.fileId; this.$refs.input.click(); },
+      sendName: function (e) {
+        var row = e.currentTarget.closest("[data-name-row]"), input = row.querySelector("input");
+        this.queue.rename(Number(row.dataset.id), input.value);
+      },
       cancel: function (e) { this.queue.cancel(Number(e.currentTarget.dataset.id)); },
       clearFinished: function () { this.queue.clearFinished(); },
     };

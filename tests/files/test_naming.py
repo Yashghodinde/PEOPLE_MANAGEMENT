@@ -107,3 +107,55 @@ def test_the_original_name_is_not_changed_by_judging():
     name = "  Weird   Name .PDF "
     judge(name)
     assert name == "  Weird   Name .PDF "
+
+
+# --- POST /files/check-name ----------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def checker(office):
+    from ots.files import views
+
+    views._CHECKS.clear()
+    from tests.files.conftest import login
+
+    return login("emp"), office
+
+
+def check(c, name, **extra):
+    import json
+
+    return c.post("/files/check-name", json.dumps({"name": name, **extra}), content_type="application/json")
+
+
+@pytest.mark.django_db
+def test_check_name_answers_without_writing_anything(checker):
+    from ots.files.models import File, UploadSession
+
+    c, office = checker
+    bad = check(c, "Untitled.pdf", task_id=str(office["task"].pk)).json()
+    assert bad["ok"] is False and bad["message"] == MESSAGE
+    assert bad["suggestion"].endswith("_Monthly-Sales-Report.pdf")  # built from the task's own title
+    good = check(c, "GST details.pdf").json()
+    assert good == {"ok": True, "message": "", "suggestion": ""}
+    assert not (File.objects.exists() or UploadSession.objects.exists())
+
+
+@pytest.mark.django_db
+def test_check_name_needs_a_login_and_is_rate_limited(checker):
+    from django.test import Client
+
+    c, _ = checker
+    assert Client().post("/files/check-name", "{}", content_type="application/json").status_code == 302
+    codes = [check(c, "Untitled.pdf").status_code for _ in range(65)]
+    assert codes[:60] == [200] * 60 and set(codes[60:]) == {429}
+
+
+@pytest.mark.django_db
+def test_check_name_does_not_reveal_a_task_the_person_cannot_see(checker, office):
+    c, _ = checker
+    from tests.tasks.factories import make_task
+
+    hidden = make_task(office["sa"], office["other"], title="Secret Merger Plan")
+    body = check(c, "Untitled.pdf", task_id=str(hidden.pk)).json()
+    assert "Secret" not in body["suggestion"]

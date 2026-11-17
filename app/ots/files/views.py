@@ -6,8 +6,10 @@ names every later piece, so the generic header middleware is not involved.
 
 from __future__ import annotations
 
+import collections
 import json
 import re
+import time
 import uuid
 from typing import Any
 
@@ -18,11 +20,12 @@ from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 from ots.core import permissions
+from ots.core.clock import today_local
 from ots.core.errors import NotFound, ValidationFailed
 from ots.tasks.models import Task
 
 from . import download as download_mod
-from . import selectors, services
+from . import naming, selectors, services
 from .models import FileState
 
 _RANGE = re.compile(r"^bytes (\d+)-(\d+)/(\d+)$")
@@ -55,6 +58,46 @@ def _body(progress: services.Progress) -> dict[str, Any]:
         out["version"] = v.version_number
         out["archived"] = v.state == FileState.ARCHIVED
     return out
+
+
+_CHECKS: dict[Any, collections.deque[float]] = collections.defaultdict(collections.deque)
+CHECKS_PER_MINUTE = 60  # one server process, so a plain in-memory window per person is enough
+
+
+def _check_allowed(user_id: Any) -> bool:
+    at = time.monotonic()
+    window = _CHECKS[user_id]
+    while window and at - window[0] > 60:
+        window.popleft()
+    if len(window) >= CHECKS_PER_MINUTE:
+        return False
+    window.append(at)
+    return True
+
+
+@login_required
+@require_http_methods(["POST"])
+def check_name(request: HttpRequest) -> JsonResponse:
+    """Live feedback on a file name while the person types it. Reads nothing private and writes nothing."""
+    if not _check_allowed(request.user.pk):
+        return JsonResponse(
+            {"error": "rate_limited", "message": "Too many checks. Wait a moment."}, status=429
+        )
+    try:
+        data = json.loads(request.body or b"{}")
+        if not isinstance(data, dict):
+            raise ValueError
+    except ValueError:
+        raise ValidationFailed("The request is not valid JSON.") from None
+    task = None
+    task_id = _uuid(data.get("task_id"), "task_id")
+    if task_id is not None:
+        task = Task.objects.visible_to(request.user).filter(pk=task_id).first()  # type: ignore[arg-type]
+    ctx = naming.NameContext(
+        task_code=task.task_code if task else "", task_title=task.title if task else "", today=today_local()
+    )
+    verdict = naming.judge(str(data.get("name") or "")[:255], ctx)
+    return JsonResponse({"ok": verdict.ok, "message": verdict.message, "suggestion": verdict.suggestion})
 
 
 @login_required

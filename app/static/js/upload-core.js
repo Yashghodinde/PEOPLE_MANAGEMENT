@@ -35,22 +35,27 @@
         var label = {
           queued: "Waiting", hashing: "Checking file", uploading: "Uploading", waiting: "Connection lost, retrying",
           done: "Done", failed: it.error || "Failed", cancelled: "Cancelled",
+          checking: "Checking the name", needsname: "Needs a name",
         }[it.state];
         return {
-          id: it.id, name: it.name, size: it.size, state: it.state, percent: pct, label: label,
+          id: it.id, name: it.displayName, size: it.size,
+          needsName: it.state === "needsname", checking: it.state === "checking",
+          message: it.nameMessage || "", suggestion: it.suggestion || "",
+          prefill: it.suggestion || it.displayName, inputId: "rename-" + it.id,
+          cancellable: it.state === "queued" || it.state === "hashing" || it.state === "uploading" || it.state === "waiting" || it.state === "needsname" || it.state === "checking", state: it.state, percent: pct, label: label,
           barStyle: "width:" + pct + "%", error: it.error || "", versionId: it.versionId || "",
           fileCode: it.fileCode || "",
           active: it.state === "queued" || it.state === "hashing" || it.state === "uploading" || it.state === "waiting",
           finished: it.state === "done" || it.state === "failed" || it.state === "cancelled",
           failed: it.state === "failed", ok: it.state === "done",
-          showBar: it.state !== "failed" && it.state !== "cancelled",
-          labelClass: it.state === "failed" ? "text-bad" : "text-ink-600",
+          showBar: it.state !== "failed" && it.state !== "cancelled" && it.state !== "needsname" && it.state !== "checking",
+          labelClass: it.state === "failed" || it.state === "needsname" ? "text-bad" : "text-ink-600",
         };
       });
     }
 
     function fingerprint(it) {
-      return ["ots.up", it.taskId || "-", it.fileId || "new", it.relation, it.name, it.size, it.modified].join("|");
+      return ["ots.up", it.taskId || "-", it.fileId || "new", it.relation, it.displayName, it.size, it.modified].join("|");
     }
     function keyFor(it, fresh) {
       var fp = fingerprint(it), key = fresh ? null : opts.storage.get(fp);
@@ -75,7 +80,7 @@
     function startBody(it, sha, key) {
       return JSON.stringify({
         idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation,
-        original_filename: it.name, size: it.size, sha256: sha,
+        original_filename: it.name, display_name: it.displayName, size: it.size, sha256: sha,
       });
     }
 
@@ -96,6 +101,9 @@
       }).then(function (r) {
         if (r.status !== 200 && r.status !== 201) {
           if (r.status === 409 && restarts < 1) { forget(it); return begin(it, sha, restarts + 1); }
+          if (r.status === 422 && r.body && r.body.fields && r.body.fields.display_name) {
+            throw { needsName: true, message: r.body.message, suggestion: r.body.suggestion || "" };
+          }
           throw { fatal: errMessage(r.status, r.body) };
         }
         var b = r.body;
@@ -173,8 +181,26 @@
         return begin(it, sha, 0);
       }).catch(function (err) {
         if (err && err.cancelled || it.cancelled) return say(it, { state: "cancelled" });
+        // the server refused the name (a check was skipped or the rule changed): ask for a better one, keep the rest going
+        if (err && err.needsName) return say(it, { state: "needsname", nameMessage: err.message, suggestion: err.suggestion, started: false });
         say(it, { state: "failed", error: err && err.fatal ? err.fatal : "Upload failed. Choose the file again to continue." });
       }).then(function () { running--; pump(); });
+    }
+
+    // Ask the server whether the name is acceptable. A failed check never blocks: the server judges again at start.
+    function judgeName(it) {
+      if (!opts.checkName) { say(it, { state: "queued", started: false }); return pump(); }
+      say(it, { state: "checking" });
+      return Promise.resolve(opts.checkName(it.displayName, it.taskId)).then(function (v) {
+        if (it.cancelled) return;
+        if (v && v.ok === false) say(it, { state: "needsname", nameMessage: v.message || "", suggestion: v.suggestion || "", started: false });
+        else say(it, { state: "queued", nameMessage: "", started: false });
+        pump();
+      }, function () {
+        if (it.cancelled) return;
+        say(it, { state: "queued", started: false });
+        pump();
+      });
     }
 
     function pump() {
@@ -186,27 +212,36 @@
     return {
       add: function (file, meta) {
         var it = {
-          id: nextId++, file: file, name: file.name, size: file.size, modified: file.lastModified || 0,
+          id: nextId++, file: file, name: file.name, displayName: file.name, size: file.size, modified: file.lastModified || 0,
           taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION",
           state: "queued", sent: 0, hashed: 0, started: false, cancelled: false,
         };
         if (!it.size) { it.state = "failed"; it.error = "This file is empty."; }
-        items.push(it); changed(); pump();
+        items.push(it);
+        if (it.size) judgeName(it); else changed();
         return it.id;
+      },
+      // The person typed (or accepted) a better name for a file that was waiting for one; the other files carry on.
+      rename: function (id, name) {
+        var it = items.filter(function (x) { return x.id === id; })[0];
+        name = (name || "").trim();
+        if (!it || it.state !== "needsname" || !name) return;
+        it.displayName = name;
+        judgeName(it);
       },
       cancel: function (id) {
         var it = items.filter(function (x) { return x.id === id; })[0];
         if (!it || it.state === "done" || it.state === "failed" || it.state === "cancelled") return;
         it.cancelled = true;
         if (it.abort) it.abort.abort();
-        if (it.state === "queued") { it.state = "cancelled"; changed(); }
+        if (it.state === "queued" || it.state === "needsname" || it.state === "checking") { it.state = "cancelled"; changed(); }
         if (it.uploadId) {
           request(it, "DELETE", "/files/uploads/" + it.uploadId).catch(function () {});
           forget(it);
         }
       },
       clearFinished: function () {
-        items = items.filter(function (x) { return x.state === "queued" || x.state === "hashing" || x.state === "uploading" || x.state === "waiting"; });
+        items = items.filter(function (x) { return x.state === "queued" || x.state === "hashing" || x.state === "uploading" || x.state === "waiting" || x.state === "needsname" || x.state === "checking"; });
         changed();
       },
       snapshot: snapshot,

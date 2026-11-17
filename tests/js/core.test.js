@@ -11,7 +11,7 @@ function memStorage() {
   return { get: (k) => m.get(k) ?? null, set: (k, v) => m.set(k, v), remove: (k) => m.delete(k), m };
 }
 function server(opts = {}) {
-  const st = { sessions: {}, byKey: {}, log: [], inFlight: 0, maxInFlight: 0, n: 0, drops: opts.drops || [], puts: 0, downAfter: opts.downAfter || 0 };
+  const st = { starts: [], sessions: {}, byKey: {}, log: [], inFlight: 0, maxInFlight: 0, n: 0, drops: opts.drops || [], puts: 0, downAfter: opts.downAfter || 0 };
   const resp = (status, body) => ({ status, json: async () => body });
   const view = (s) => ({ upload_id: s.id, received_bytes: s.received, piece_size: opts.piece || 100, size: s.size,
     state: s.state, ...(s.version ? { version_id: s.version, file_code: "code-" + s.version, version: 1 } : {}) });
@@ -24,7 +24,10 @@ function server(opts = {}) {
       await new Promise((r) => setImmediate(r));
       if (init.method === "POST") {
         const b = JSON.parse(init.body);
+        st.starts.push(b);
         if (opts.startStatus) return resp(opts.startStatus, { message: "no way" });
+        if (opts.refuseNames && opts.refuseNames.includes(b.display_name))
+          return resp(422, { error: "validation_failed", message: "bad name", fields: { display_name: ["bad name"] }, suggestion: "2026-11-17_x.pdf" });
         let s = st.byKey[b.idempotency_key];
         if (!s) { s = { id: "u" + ++st.n, size: b.size, received: 0, state: "RECEIVING", key: b.idempotency_key, version: null };
           st.byKey[b.idempotency_key] = s; st.sessions[s.id] = s; }
@@ -56,7 +59,7 @@ function make(st, extra = {}) {
   let k = 0;
   const q = Core.create({
     fetch: st.fetch, hashFile: async (f, p) => { p(0.5); p(1); return "a".repeat(64); },
-    uuid: () => "key-" + ++k, storage: store, csrf: () => "tok", concurrency: extra.concurrency || 2,
+    uuid: () => "key-" + ++k, storage: store, checkName: extra.checkName, csrf: () => "tok", concurrency: extra.concurrency || 2,
     sleep: async (ms) => { sleeps.push(ms); }, onDone: (it, b) => done.push(b),
   });
   return { q, store, done, sleeps };
@@ -188,4 +191,85 @@ test("the Idempotency key is stable for one file and different for another", asy
   q.add(fakeFile("a", 100, 1), { taskId: "t" }); q.add(fakeFile("b", 100, 1), { taskId: "t" });
   await settle(q, finished);
   assert.equal(Object.keys(st.byKey).length, 2);
+});
+
+
+// --- IMP-01.3: the name check and the rename flow --------------------------------------------------------------
+const BAD = new Set(["Untitled.pdf", "123456.pdf"]);
+const judgeName = async (name) => (BAD.has(name) ? { ok: false, message: "give it a real name", suggestion: "2026-11-17_.pdf" } : { ok: true });
+
+test("a refused name never starts an upload, and shows the message and suggestion", async () => {
+  const st = server(); const { q } = make(st, { checkName: judgeName });
+  q.add(fakeFile("Untitled.pdf", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].needsName);
+  const it = q.snapshot()[0];
+  assert.equal(it.state, "needsname"); assert.equal(it.message, "give it a real name"); assert.equal(it.suggestion, "2026-11-17_.pdf");
+  assert.equal(it.showBar, false); assert.equal(it.label, "Needs a name");
+  assert.deepEqual(st.log, []); // nothing reached the server's upload endpoint
+});
+
+test("renaming sends the file, with the original name and the confirmed name both in the request", async () => {
+  const st = server(); const { q, done } = make(st, { checkName: judgeName });
+  const id = q.add(fakeFile("Untitled.pdf", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].needsName);
+  q.rename(id, "2026-11-17_Budget-Review.pdf");
+  await settle(q, finished);
+  assert.equal(q.snapshot()[0].state, "done"); assert.equal(done.length, 1);
+  assert.equal(Object.keys(st.sessions).length, 1);
+  const start = st.starts[0];
+  assert.equal(start.original_filename, "Untitled.pdf"); assert.equal(start.display_name, "2026-11-17_Budget-Review.pdf");
+});
+
+test("renaming to another bad name keeps the file waiting; an empty name is ignored", async () => {
+  const st = server(); const { q } = make(st, { checkName: judgeName });
+  const id = q.add(fakeFile("Untitled.pdf", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].needsName);
+  q.rename(id, "   "); assert.equal(q.snapshot()[0].state, "needsname");
+  q.rename(id, "123456.pdf");
+  await settle(q, (s) => s[0].needsName && s[0].name === "123456.pdf");
+  assert.equal(q.snapshot()[0].state, "needsname"); assert.equal(st.puts, 0);
+});
+
+test("one file waiting for a name does not hold up the others", async () => {
+  const st = server(); const { q } = make(st, { checkName: judgeName });
+  q.add(fakeFile("Untitled.pdf", 250), { taskId: "t" });
+  q.add(fakeFile("Invoice-Aug.pdf", 250, 2), { taskId: "t" });
+  q.add(fakeFile("Payroll-Sep.pdf", 250, 3), { taskId: "t" });
+  await settle(q, (s) => s.filter((i) => i.state === "done").length === 2);
+  const states = q.snapshot().map((i) => i.state);
+  assert.deepEqual(states, ["needsname", "done", "done"]);
+});
+
+test("after a reload the same file and the same confirmed name resume the same upload", async () => {
+  const store = memStorage();
+  const st1 = server({ downAfter: 1 }); const a = make(st1, { checkName: judgeName, storage: store });
+  const id = a.q.add(fakeFile("Untitled.pdf", 400), { taskId: "t" });
+  await settle(a.q, (s) => s[0].needsName);
+  a.q.rename(id, "2026-11-17_Budget.pdf");
+  await settle(a.q, (s) => s[0].state === "failed" || s[0].state === "waiting", 2000);
+  const firstKey = Object.keys(st1.byKey)[0];
+  const st2 = server(); st2.byKey = st1.byKey; st2.sessions = st1.sessions; st2.n = st1.n;
+  const b = make(st2, { checkName: judgeName, storage: store });
+  const id2 = b.q.add(fakeFile("Untitled.pdf", 400), { taskId: "t" });
+  await settle(b.q, (s) => s[0].needsName);
+  b.q.rename(id2, "2026-11-17_Budget.pdf");
+  await settle(b.q, finished);
+  assert.equal(b.q.snapshot()[0].state, "done");
+  assert.deepEqual(Object.keys(st2.byKey), [firstKey]); // no second upload was opened
+});
+
+test("if the server refuses a name at start, the file asks for a better one instead of failing", async () => {
+  const st = server({ refuseNames: ["Quarterly.pdf"] }); const { q } = make(st, { checkName: async () => ({ ok: true }) });
+  q.add(fakeFile("Quarterly.pdf", 250), { taskId: "t" });
+  await settle(q, (s) => s[0].needsName);
+  const it = q.snapshot()[0];
+  assert.equal(it.state, "needsname"); assert.equal(it.message, "bad name"); assert.equal(it.suggestion, "2026-11-17_x.pdf");
+  assert.equal(it.failed, false);
+});
+
+test("a name check that cannot reach the server does not block the upload", async () => {
+  const st = server(); const { q } = make(st, { checkName: async () => { throw new TypeError("offline"); } });
+  q.add(fakeFile("a.xlsx", 250), { taskId: "t" });
+  await settle(q, finished);
+  assert.equal(q.snapshot()[0].state, "done");
 });
