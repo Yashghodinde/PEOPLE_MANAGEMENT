@@ -9,6 +9,7 @@ from types import FrameType
 from django.core.management.base import BaseCommand
 
 from ots.attendance import jobs as attendance_jobs  # registers the attendance jobs
+from ots.backup import jobs as backup_jobs  # noqa: F401  (registers the backup jobs)
 from ots.core import builtin_jobs  # noqa: F401  (registers core jobs)
 from ots.core.dispatcher import Listener
 from ots.core.jobs import Scheduler

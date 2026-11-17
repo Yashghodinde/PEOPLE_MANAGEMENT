@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "ots.attendance",
     "ots.live",
     "ots.files",
+    "ots.backup",
     "ots.ui",
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -57,7 +58,9 @@ TEMPLATES = [
     }
 ]
 DATABASES = {"default": env.db("DATABASE_URL", default="postgres://localhost/ots")}
-DATABASES["default"]["CONN_MAX_AGE"] = 60
+# 0: under ASGI every request has its own thread, so a kept-open connection is never reused and just piles up
+# (it filled PostgreSQL's connection limit in testing). The worker, which has no requests, keeps its own.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("OTS_DB_CONN_MAX_AGE", default=0)
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DATABASES["default"]["ATOMIC_REQUESTS"] = False
 
@@ -147,4 +150,19 @@ GRAPH_DRIVE_DR = env("GRAPH_DRIVE_DR", default="")
 OTS_RECEIPT_LATE_SECONDS = env.int("OTS_RECEIPT_LATE_SECONDS", default=120)
 OTS_RECEIPT_URGENT_SECONDS = env.int("OTS_RECEIPT_URGENT_SECONDS", default=900)
 
-OTS_OFFICE_NAME = env("OTS_OFFICE_NAME", default="Office")  # shown in the TV board header
+OTS_OFFICE_NAME = env("OTS_OFFICE_NAME", default="Trop Organic Office")  # shown in the TV board header
+
+# Backup (M04): the WAL archive script writes here, the worker ships from the spool.
+OTS_WAL_LOCAL_DIR = Path(env("OTS_WAL_LOCAL_DIR", default=str(OTS_DATA_DIR / "wal-local")))
+OTS_WAL_SPOOL_DIR = Path(env("OTS_WAL_SPOOL_DIR", default=str(OTS_DATA_DIR / "wal-spool")))
+OTS_WAL_SPOOL_WARN_BYTES = env.int("OTS_WAL_SPOOL_WARN_BYTES", default=6 * 1024**3)
+OTS_WAL_SPOOL_CRITICAL_BYTES = env.int("OTS_WAL_SPOOL_CRITICAL_BYTES", default=int(7.5 * 1024**3))
+OTS_BACKUP_LOCAL_DIR = Path(env("OTS_BACKUP_LOCAL_DIR", default=str(OTS_DATA_DIR / "backup-local")))
+OTS_BACKUP_STAGING_DIR = Path(env("OTS_BACKUP_STAGING_DIR", default=str(OTS_DATA_DIR / "backup-staging")))
+OTS_BACKUP_AGE_PUBLIC_KEY_PATH = Path(env("OTS_BACKUP_AGE_PUBLIC_KEY_PATH", default="/etc/ots/backup.pub"))
+# pg_basebackup connects as the replication-only role `ots_backup` (created by the first core migration)
+OTS_BACKUP_DB_HOST = env("OTS_BACKUP_DB_HOST", default="db")
+OTS_BACKUP_DB_PORT = env.int("OTS_BACKUP_DB_PORT", default=5432)
+OTS_BACKUP_DB_USER = env("OTS_BACKUP_DB_USER", default="ots_backup")
+OTS_BACKUP_DB_PASSWORD = env("OTS_BACKUP_DB_PASSWORD", default="")
+OTS_BACKUP_BASE_TIMEOUT_SECONDS = env.int("OTS_BACKUP_BASE_TIMEOUT_SECONDS", default=2 * 3600)

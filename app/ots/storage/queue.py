@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
 
 from ots.core import alerts, events
 from ots.core.clock import now as server_now
@@ -90,13 +91,22 @@ def _allowed(gate: QueueGate) -> tuple[list[str], bool]:
 def claim(allowed: list[str], clock: Clock = server_now) -> Op | None:
     """Take the next due operation (priority, then age) and mark it RUNNING. Safe with several workers."""
     t = clock()
+    # WAL goes up strictly in order: while an earlier segment is waiting for its retry, a later one must not
+    # pass it, or the recovery point would look fresh with a hole behind it (M04 section 2).
+    earlier_wal = Op.objects.filter(
+        kind=Op.Kind.SHIP_WAL,
+        state__in=[Op.State.PENDING, Op.State.RETRY_WAIT, Op.State.RUNNING],
+    ).filter(
+        Q(created_at__lt=OuterRef("created_at")) | Q(created_at=OuterRef("created_at"), pk__lt=OuterRef("pk"))
+    )
     with transaction.atomic():
         op = (
             Op.objects.select_for_update(skip_locked=True)
             .filter(
                 state__in=[Op.State.PENDING, Op.State.RETRY_WAIT], next_attempt_at__lte=t, kind__in=allowed
             )
-            .order_by("priority", "created_at")
+            .exclude(Q(kind=Op.Kind.SHIP_WAL) & Exists(earlier_wal))
+            .order_by("priority", "created_at", "pk")
             .first()
         )
         if op is None:

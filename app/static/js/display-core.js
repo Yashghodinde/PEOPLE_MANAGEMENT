@@ -58,7 +58,25 @@
     };
   }
 
-  var api = { create: create, QUIET_MS: QUIET_MS, POLL_MS: POLL_MS, RETRY_MS: RETRY_MS, FAILS: FAILS };
+  // Fit the board to whatever screen the TV reports (a 1080p TV at 150% reports 1280 x 720, a 4K one 3840 x 2160).
+  // Everything is measured in "design pixels" of a 1920 x 1080 screen and multiplied by `s`, so text and spacing grow
+  // and shrink with the screen; the number of columns follows the width, the number of rows the height. Cards that do
+  // not fit are counted ("+N more"), never cut in half.
+  var DESIGN_W = 1920, DESIGN_H = 1080;
+  var HEADER = 100, STRIP = 58, PADDING = 34, GAP = 10, CARD_W = 460, CARD_H = 100;
+  function plan(width, height, cards) {
+    var w = Number(width), h = Number(height), n = Math.max(0, Number(cards) || 0);
+    if (!(w > 0) || !(h > 0)) { w = DESIGN_W; h = DESIGN_H; }
+    var s = Math.min(w / DESIGN_W, h / DESIGN_H);
+    var cols = Math.max(1, Math.min(6, Math.round(w / (CARD_W * s))));
+    var avail = h - (HEADER + STRIP + PADDING) * s;
+    var rows = Math.max(1, Math.floor((avail + GAP * s) / ((CARD_H + GAP) * s)));
+    var capacity = cols * rows;
+    var visible = Math.min(n, capacity);
+    return { s: s, cols: cols, rows: rows, capacity: capacity, visible: visible, hidden: n - visible };
+  }
+
+  var api = { create: create, plan: plan, QUIET_MS: QUIET_MS, POLL_MS: POLL_MS, RETRY_MS: RETRY_MS, FAILS: FAILS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OtsDisplayCore = api;
 })(typeof self !== "undefined" ? self : this);

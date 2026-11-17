@@ -16,7 +16,7 @@ def test_hasher_parameters():
 
 def test_db_settings(settings):
     db = settings.DATABASES["default"]
-    assert db["CONN_MAX_AGE"] == 60 and db["CONN_HEALTH_CHECKS"] is True
+    assert db["CONN_MAX_AGE"] == 0 and db["CONN_HEALTH_CHECKS"] is True  # 0: see D-075 (ASGI threads)
     assert settings.USE_TZ and settings.TIME_ZONE == "Asia/Kolkata"
 
 

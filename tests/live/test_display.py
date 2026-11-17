@@ -311,3 +311,18 @@ def test_the_page_is_never_cached(team):
     assert (
         "no-store" in tv.get("/display")["Cache-Control"] or "no-cache" in tv.get("/display")["Cache-Control"]
     )
+
+
+def test_the_board_carries_the_company_name_by_default(team):
+    assert settings.OTS_OFFICE_NAME == "Trop Organic Office"
+    html = paired_tv(team)[0].get("/display").content.decode()
+    assert "<title>Trop Organic Office</title>" in html and ">Trop Organic Office</div>" in html
+    assert "Tropical" not in html
+
+
+def test_the_board_adapts_to_any_screen_instead_of_assuming_full_hd(team):
+    html = paired_tv(team)[0].get("/display").content.decode()
+    assert "var(--s)" in html and "var(--cols)" in html and "var(--rows)" in html  # sizes follow the screen
+    assert "1920px" not in html and "1080px" not in html and "100vw" not in html  # no fixed stage
+    assert "@media" not in html  # the script chooses columns and rows, not a width breakpoint
+    assert 'class="more" data-server=' in html  # where "+N more people" appears when they do not all fit

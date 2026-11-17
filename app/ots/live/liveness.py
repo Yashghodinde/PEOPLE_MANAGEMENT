@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from asgiref.sync import sync_to_async
-
 from ots.core.clock import now
+from ots.core.db import short_call
 
 
 def _set(session_key: str, connected: bool) -> int:
@@ -19,11 +18,11 @@ def _set(session_key: str, connected: bool) -> int:
 
 
 async def connected(session_key: str) -> int:
-    return await sync_to_async(_set)(session_key, True)
+    return await short_call(_set)(session_key, True)
 
 
 async def disconnected(session_key: str) -> int:
-    return await sync_to_async(_set)(session_key, False)
+    return await short_call(_set)(session_key, False)
 
 
 def _boot_reset() -> int:
@@ -34,4 +33,4 @@ def _boot_reset() -> int:
 
 async def boot_reset() -> int:
     """Once per app process, before its first connection is counted (F-AT-5)."""
-    return await sync_to_async(_boot_reset)()
+    return await short_call(_boot_reset)()
