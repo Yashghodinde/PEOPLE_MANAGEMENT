@@ -37,7 +37,7 @@ def test_wal_from_a_real_postgres_reaches_the_remote_in_order_and_decrypts(box, 
         box["root"] / "ots-wal-archive.sh"
     )  # the repo path has spaces; PostgreSQL splits the command on them
     shutil.copy(SCRIPT, script)
-    env = f"OTS_WAL_LOCAL={box['local']} OTS_WAL_SPOOL={box['spool']} OTS_AGE_PUB={box['pub']} OTS_DATA_DIR={box['root']}"
+    env = f"OTS_WAL_LOCAL={box['local']} OTS_WAL_SPOOL={box['spool']} OTS_AGE_PUB={box['pub']} OTS_DATA_DIR={box['root']} OTS_DISK_FREE_MIN_PERCENT=0"
     opts = f"-p {port} -k {box['root']} -c wal_level=replica -c archive_mode=on -c archive_timeout=0 -c 'archive_command=env {env} {script} %p %f'"
     subprocess.run(
         [tool("pg_ctl"), "-D", str(data), "-o", opts, "-w", "start", "-l", str(box["root"] / "pg.log")],

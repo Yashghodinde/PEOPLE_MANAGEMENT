@@ -51,7 +51,7 @@ def run(box, name=SEGMENT, src=None, **env_extra):
     env = {
         **os.environ,
         "OTS_WAL_LOCAL": str(box["local"]), "OTS_WAL_SPOOL": str(box["spool"]), "OTS_AGE_PUB": str(box["pub"]),
-        "OTS_DATA_DIR": str(box["root"]), **env_extra,
+        "OTS_DATA_DIR": str(box["root"]), "OTS_DISK_FREE_MIN_PERCENT": "0", **env_extra,
     }  # fmt: skip
     src = src if src is not None else f"pg_wal/{name}"
     return subprocess.run(
@@ -214,7 +214,7 @@ def test_real_postgres_archives_every_switched_segment(box):
     )
     env = {
         "OTS_WAL_LOCAL": str(box["local"]), "OTS_WAL_SPOOL": str(box["spool"]), "OTS_AGE_PUB": str(box["pub"]),
-        "OTS_DATA_DIR": str(box["root"]),
+        "OTS_DATA_DIR": str(box["root"]), "OTS_DISK_FREE_MIN_PERCENT": "0",
     }  # fmt: skip
     script = (
         box["root"] / "ots-wal-archive.sh"

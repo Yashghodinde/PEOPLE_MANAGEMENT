@@ -7,11 +7,11 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 
 from ots.core.clock import now
+from ots.core.db import short_call
 from ots.core.idempotency import idempotency_exempt
 
 from . import displays, liveness
@@ -30,7 +30,7 @@ async def stream(request: HttpRequest) -> HttpResponse:
     user = await request.auser()
     device = None
     if not user.is_authenticated:  # an office TV has no login: its pairing cookie is the credential
-        device = await sync_to_async(displays.authenticate)(request.COOKIES.get(displays.COOKIE))
+        device = await short_call(displays.authenticate)(request.COOKIES.get(displays.COOKIE))
         if device is None:
             return HttpResponse(status=401)
     if hub.full():

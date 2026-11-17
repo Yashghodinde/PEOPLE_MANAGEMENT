@@ -47,7 +47,7 @@ class BackupObject(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     run = models.ForeignKey(
-        BackupRun, null=True, blank=True, on_delete=models.PROTECT, related_name="objects"
+        BackupRun, null=True, blank=True, on_delete=models.PROTECT, related_name="stored_objects"
     )
     type = models.CharField(max_length=10, choices=Type.choices)
     name = models.CharField(max_length=200)

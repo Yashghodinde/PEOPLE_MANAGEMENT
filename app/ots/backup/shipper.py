@@ -93,3 +93,9 @@ def on_shipped(op: Op, ref: Any) -> None:
 def on_backup_uploaded(op: Op, ref: Any) -> None:
     """Completion handler for UPLOAD_BACKUP_OBJECT: the object the run queued is now confirmed."""
     BackupObject.objects.filter(remote_path=op.remote_path).update(confirmed_at=now(), sha256=op.sha256)
+    from . import base
+
+    for obj in BackupObject.objects.filter(
+        remote_path=op.remote_path, type=BackupObject.Type.BASE
+    ).select_related("run"):
+        base.on_uploaded(obj)  # a base backup is SUCCESS only once SharePoint holds it
