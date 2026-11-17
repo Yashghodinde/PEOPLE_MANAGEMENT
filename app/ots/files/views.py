@@ -128,6 +128,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         relation=str(data.get("relation") or "SUBMISSION"),
         original_filename=str(data.get("original_filename") or ""),
         display_name=str(data.get("display_name") or ""),
+        scope="personal" if data.get("scope") == "personal" else "",
         size=size,
         sha256=str(data.get("sha256") or ""),
         allow_blocked=data.get("allow_blocked") is True,
@@ -356,3 +357,119 @@ def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
     folder = request.POST.get("folder") or None
     library.move_file(request.user, file_id, folder, request)
     return redirect(f"/files/library?folder={folder}" if folder else "/files/library")
+
+
+# ---------------------------------------------------------------- personal storage (IMP-02)
+
+
+def _files_nav(request: HttpRequest, active: str) -> list[dict[str, Any]]:
+    from ots.accounts.models import Role
+
+    tabs = [("search", "Search", "/files/search"), ("mine", "My storage", "/files/mine"),
+            ("shared", "Shared with me", "/files/shared"), ("library", "Library", "/files/library")]  # fmt: skip
+    if request.user.role == Role.SUPER_ADMIN:
+        tabs.append(("deleted", "Deleted", "/files/deleted"))
+    return [{"key": k, "label": label, "url": url, "on": k == active} for k, label, url in tabs]
+
+
+def _personal_ctx(request: HttpRequest, active: str, **extra: Any) -> dict[str, Any]:
+    return {"files_nav": _files_nav(request, active), "max_mb": settings.OTS_UPLOAD_MAX_MB, **extra}
+
+
+@login_required
+@require_http_methods(["GET"])
+def mine(request: HttpRequest) -> HttpResponse:
+    from . import personal
+
+    permissions.require(request.user, "file.upload_personal")
+    try:
+        page = max(0, int(request.GET.get("page", "0")))
+    except ValueError:
+        page = 0
+    days, more = personal.date_folders(request.user, page)
+    return render(
+        request,
+        "files/mine.html",
+        _personal_ctx(
+            request, "mine", page_title="My storage", today=personal.todays_versions(request.user),
+            today_date=today_local(), days=days, more=more, page=page,
+        ),
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["GET"])
+def mine_day(request: HttpRequest, day: str) -> HttpResponse:
+    import datetime
+
+    from . import personal
+
+    permissions.require(request.user, "file.upload_personal")
+    try:
+        d = datetime.date.fromisoformat(day)
+    except ValueError:
+        raise NotFound("No such day.") from None
+    rows = personal.versions_on(request.user, d)
+    return render(
+        request,
+        "files/mine_day.html",
+        _personal_ctx(request, "mine", page_title=f"My files from {d:%d %b %Y}", rows=rows, day=d),
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def shared(request: HttpRequest) -> HttpResponse:
+    from . import personal
+
+    return render(
+        request,
+        "files/shared.html",
+        _personal_ctx(request, "shared", page_title="Shared with me", rows=personal.shared_with_me(request.user)),
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def deleted(request: HttpRequest) -> HttpResponse:
+    from . import personal
+
+    permissions.require(request.user, "file.restore")
+    return render(
+        request,
+        "files/deleted.html",
+        _personal_ctx(request, "deleted", page_title="Hidden personal files", files=personal.hidden_files()),
+    )
+
+
+def _personal_post(request: HttpRequest, run: Any, back: str) -> HttpResponse:
+    from django.shortcuts import redirect
+
+    run()
+    return redirect(request.POST.get("next") if (request.POST.get("next") or "").startswith("/files/") else back)
+
+
+@login_required
+@require_http_methods(["POST"])
+def personal_rename(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    from . import personal
+
+    return _personal_post(
+        request, lambda: personal.rename(request.user, file_id, request.POST.get("name", ""), request), "/files/mine"
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def personal_hide(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    from . import personal
+
+    return _personal_post(request, lambda: personal.hide(request.user, file_id, request), "/files/mine")
+
+
+@login_required
+@require_http_methods(["POST"])
+def personal_restore(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    from . import personal
+
+    return _personal_post(request, lambda: personal.restore(request.user, file_id, request), "/files/deleted")

@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Upload to My storage"
+           x-data="uploader" data-scope="personal" data-default-relation="REFERENCE">
+    <h2 class="text-sec font-semibold">My storage</h2>
+    <p class="text-cap text-ink-600">Only you and the Super Admin can see these files. Send a file to a colleague with "Send to…".</p>
+    <div class="border border-dashed rounded-md p-4 flex flex-col items-center gap-2 text-center" :class="dropClass" @dragover.prevent="dragOver" @dragleave="dragLeave" @drop.prevent="dropped">
+      {% icon "upload" "5" %}
+      <p class="text-body text-ink-900">Drop files here, or choose them</p>
+      <p class="text-cap text-ink-600">Up to {{ max_mb }} MB each. Give each file a meaningful name.</p>
+      <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
+      <button type="button" class="px-4 h-5 rounded-sm bg-accent text-canvas text-body font-medium" @click="choose">Choose files</button>
+    </div>
+    {% include "files/_queue.html" %}
+  </section>
+
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Today">
+    <h3 class="text-sec font-semibold">Today <span class="text-cap font-normal text-ink-600">{{ today_date|date:"l, d M Y" }}</span></h3>
+    {% if today %}<ul class="flex flex-col divide-y divide-line border-t border-line">{% for v in today %}{% include "files/_personal_row.html" with v=v mine_actions=True next="/files/mine" %}{% endfor %}</ul>
+    {% else %}<p class="text-body text-ink-600">Nothing uploaded today.</p>{% endif %}
+  </section>
+
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Earlier days">
+    <h3 class="text-sec font-semibold">Earlier</h3>
+    {% if days %}<ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+      {% for d, n in days %}<li><a class="flex items-center justify-between gap-2 border border-line rounded-sm p-3 text-body text-ink-900 hover:bg-line" href="/files/mine/{{ d|date:'Y-m-d' }}"><span class="flex items-center gap-2">{% icon "folder" %}{{ d|date:"d M Y" }}</span><span class="text-cap text-ink-600">{{ n }} file{{ n|pluralize }}</span></a></li>{% endfor %}
+    </ul>
+    <div class="flex gap-4 text-body">{% if page %}<a class="text-accent" href="?page={{ page|add:'-1' }}">Newer days</a>{% endif %}{% if more %}<a class="text-accent" href="?page={{ page|add:'1' }}">Older days</a>{% endif %}</div>
+    {% else %}<p class="text-body text-ink-600">No earlier files.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

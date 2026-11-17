@@ -59,7 +59,7 @@ document.addEventListener("alpine:init", function () {
       items: [], relation: "SUBMISSION", fileId: "", dragging: false, queue: null,
       init: function () {
         var self = this, d = this.$el.dataset;
-        this.taskId = d.taskId;
+        this.taskId = d.taskId; this.scope = d.scope || ""; // scope "personal" = into My storage, no task
         this.relation = d.defaultRelation || "SUBMISSION";
         this.queue = OtsUploadCore.create({
           fetch: window.fetch.bind(window), hashFile: hashFile, uuid: uuid, storage: storage(), csrf: csrf,
@@ -78,7 +78,7 @@ document.addEventListener("alpine:init", function () {
       get hasItems() { return this.items.length > 0; },
       get anyFinished() { return this.items.some(function (i) { return i.finished; }); },
       take: function (fileList) {
-        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId };
+        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope };
         for (var i = 0; i < fileList.length; i++) this.queue.add(fileList[i], meta);
         this.fileId = ""; this.relation = this.$el.dataset.defaultRelation || "SUBMISSION";
       },

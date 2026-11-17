@@ -61,10 +61,12 @@ def make_code(
     title: str,
     version: int,
     original_filename: str,
+    place: str | None = None,
 ) -> str:
     local = committed_at.astimezone(IST)
     emp = _SAFE.sub("", ascii_fold(employee_id))[:EMP_MAX] or "EMP"
-    where = _SAFE.sub("", ascii_fold(task_code))[:24] if task_code else "LIB"
+    # the task's code; PERS for a personal file (IMP-02); LIB for the library
+    where = _SAFE.sub("", ascii_fold(task_code))[:24] if task_code else (place or "LIB")
     slug = slugify(title) or "untitled"
     code = (
         f"{local:%Y%m%d-%H%M%S}_{emp}-{person_part(full_name)}_{where}-{slug}"

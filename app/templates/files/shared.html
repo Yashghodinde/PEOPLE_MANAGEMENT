@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Shared with me">
+    <h2 class="text-sec font-semibold">Shared with me</h2>
+    {% if rows %}<ul class="flex flex-col divide-y divide-line border-t border-line">{% for v in rows %}{% include "files/_personal_row.html" with v=v %}{% endfor %}</ul>
+    {% else %}{% include "components/empty_state.html" with icon="inbox" text="Nobody has sent you a file yet." %}{% endif %}
+  </section>
+</div>
+{% endblock %}

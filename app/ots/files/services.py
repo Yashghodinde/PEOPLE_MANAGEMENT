@@ -43,6 +43,7 @@ from .models import (
     File,
     FileRelation,
     FileState,
+    FileStatus,
     FileVersion,
     FileVisibility,
     TaskFile,
@@ -99,10 +100,30 @@ def _require_meaningful_name(name: str, task: Task | None) -> None:
         )
 
 
+PERSONAL = "personal"  # an upload into the sender's own private storage (IMP-02)
+
+
 def _resolve_target(
-    user: User, task: Task | None, file_id: uuid.UUID | None, assignment_id: uuid.UUID | None, relation: str
+    user: User,
+    task: Task | None,
+    file_id: uuid.UUID | None,
+    assignment_id: uuid.UUID | None,
+    relation: str,
+    personal: bool = False,
 ) -> tuple[File | None, TaskAssignment | None]:
     """Check the task, the existing file (for a new version) and the assignment the upload belongs to."""
+    if (
+        personal
+    ):  # one's own storage: every active person but HR; a new version only of one's own private file
+        require(user, "file.upload_personal")
+        existing = None
+        if file_id:
+            existing = File.objects.filter(
+                pk=file_id, owner=user, visibility=FileVisibility.PRIVATE, status=FileStatus.ACTIVE
+            ).first()
+            if existing is None:
+                raise ValidationFailed("That is not your personal file.", fields={"file_id": ["Invalid."]})
+        return existing, None
     if relation == FileRelation.VOICE:  # a recording is a message: whoever may write on the task may send one
         if task is None:
             raise ValidationFailed("A voice message belongs to a task.", fields={"task_id": ["Required."]})
@@ -150,6 +171,7 @@ def start_upload(
     allow_blocked: bool = False,
     display_name: str = "",
     purpose: str = "",
+    scope: str = "",
     request: Any = None,
 ) -> tuple[UploadSession, bool]:
     """Open (or find) the upload for this key: (session, created). The same key returns the same session."""
@@ -188,7 +210,10 @@ def start_upload(
                 fields={"original_filename": ["Blocked."]},
             )
         override = True
-    target, assignment = _resolve_target(user, task, file_id, assignment_id, relation)
+    personal = scope == PERSONAL
+    if personal and task is not None:
+        raise ValidationFailed("A personal file does not belong to a task.", fields={"scope": ["Invalid."]})
+    target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
     layout.admit(size)
     try:
         with transaction.atomic():
@@ -202,6 +227,7 @@ def start_upload(
                 expected_size=size,
                 expected_sha256=sha,
                 original_filename=name,
+                scope=scope if personal else "",
                 display_name=shown,
                 override_block=override,
             )
@@ -372,7 +398,11 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             company=user.company,
             display_name=s.display_name or s.original_filename,
             owner=user,
-            visibility=FileVisibility.TASK if task else FileVisibility.LIBRARY,
+            visibility=FileVisibility.PRIVATE
+            if s.scope == PERSONAL
+            else FileVisibility.TASK
+            if task
+            else FileVisibility.LIBRARY,
         )
     number = (file.versions.aggregate(m=Max("version_number"))["m"] or 0) + 1
     code = unique_code(
@@ -381,6 +411,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             employee_id=user.employee_id,
             full_name=user.full_name,
             task_code=task.task_code if task else None,
+            place="PERS" if s.scope == PERSONAL else None,
             title=task.title if task else file.display_name,
             version=number,
             original_filename=s.original_filename,
@@ -393,6 +424,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         file_code=code,
         original_filename=s.original_filename,
         display_name=s.display_name,
+        uploaded_on=at.astimezone(IST).date(),  # the Indian calendar day: "Today" and the date folders use it
         is_voice=s.relation == FileRelation.VOICE,
         blob=blob,
         mime_type=mimetypes.guess_type(s.original_filename)[0] or "application/octet-stream",

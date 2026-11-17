@@ -16,6 +16,18 @@ def _active(user: Any) -> bool:
     return bool(user) and getattr(user, "is_active", False) and user.role in Role.values
 
 
+@policy("file.upload_personal")
+def can_upload_personal(user: Any, obj: Any = None) -> bool:
+    """Everybody with a working account may keep private files of their own; HR has no file access at all."""
+    return _active(user) and user.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN, Role.EMPLOYEE)
+
+
+@policy("file.restore")
+def can_restore(user: Any, obj: Any = None) -> bool:
+    """Only the Super Admin brings a hidden personal file back."""
+    return _active(user) and user.role == Role.SUPER_ADMIN
+
+
 @policy("file.upload")
 def can_upload(user: Any, task: Task | None) -> bool:
     """Super Admin: any task. Sub-Admin: visible tasks. Employee: tasks with their own open assignment.

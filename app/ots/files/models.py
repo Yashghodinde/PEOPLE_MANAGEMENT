@@ -39,6 +39,11 @@ class FileRelation(models.TextChoices):
     VOICE = "VOICE"  # a recording in a task discussion (IMP-10); never listed in the Files panel
 
 
+class FileStatus(models.TextChoices):
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"  # hidden by its owner (personal files only); nothing is removed anywhere
+
+
 class FileVisibility(models.TextChoices):
     PRIVATE = "PRIVATE"
     TASK = "TASK"
@@ -105,10 +110,18 @@ class File(models.Model):
         "FileVersion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     created_at = models.DateTimeField(default=now)
+    status = models.CharField(max_length=8, choices=FileStatus.choices, default=FileStatus.ACTIVE)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.PROTECT, related_name="files_hidden"
+    )
 
     class Meta:
         db_table = "files"
-        indexes = [models.Index(fields=["owner", "created_at"], name="files_owner_idx")]
+        indexes = [
+            models.Index(fields=["owner", "created_at"], name="files_owner_idx"),
+            models.Index(fields=["owner", "status", "visibility"], name="files_owner_status_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.display_name
@@ -123,6 +136,7 @@ class FileVersion(models.Model):
     display_name = models.CharField(
         max_length=255, blank=True, default=""
     )  # blank on files from before IMP-01
+    uploaded_on = models.DateField()  # the Indian calendar date of `uploaded_at`; "Today" is built from it
     is_voice = models.BooleanField(
         default=False
     )  # a discussion voice note: only people who see the task hear it
@@ -144,6 +158,7 @@ class FileVersion(models.Model):
         indexes = [
             models.Index(fields=["uploaded_by", "uploaded_at"], name="fv_uploader_idx"),
             models.Index(fields=["state"], name="fv_state_idx"),
+            models.Index(fields=["uploaded_by", "uploaded_on"], name="fv_uploader_day_idx"),
         ]
 
     def __str__(self) -> str:
@@ -202,6 +217,7 @@ class UploadSession(models.Model):
     created_at = models.DateTimeField(default=now)
     last_piece_at = models.DateTimeField(default=now)
     state = models.CharField(max_length=20, choices=FileState.choices, default=FileState.RECEIVING)
+    scope = models.CharField(max_length=10, blank=True, default="")  # "" = a task or the library; "personal"
     override_block = models.BooleanField(default=False)  # a Super Admin allowed a blocked type, audited
 
     class Meta:

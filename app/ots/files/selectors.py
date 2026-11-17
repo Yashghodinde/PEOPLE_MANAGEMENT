@@ -7,7 +7,7 @@ from typing import Any
 
 from django.db.models import Exists, F, OuterRef, Q, QuerySet
 
-from ots.files.models import FileVersion, TaskFile
+from ots.files.models import FileStatus, FileVersion, TaskFile
 from ots.tasks.models import Task, TaskComment
 
 PANEL_LIMIT = 200  # files shown on one task page (CLAUDE.md: never an unbounded list)
@@ -48,14 +48,20 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     if viewer.role not in (Role.SUB_ADMIN, Role.EMPLOYEE):
         return FileVersion.objects.none()  # HR has no file access of any kind
     visible_tasks = Task.objects.visible_to(viewer).values("pk")
+    # A personal (PRIVATE) file belongs to its owner. Hiding it takes it out of the owner's own view; people
+    # it was handed to keep what they were given, and the Super Admin (who returned above) sees everything.
+    private = Q(file__visibility=FileVisibility.PRIVATE)
+    mine = Q(uploaded_by_id=viewer.pk) & ~(private & Q(file__status=FileStatus.DELETED))
     wanted = (
-        Q(uploaded_by_id=viewer.pk)
+        mine
         | Q(file__visibility=FileVisibility.LIBRARY)
         | Exists(TaskFile.objects.filter(version=OuterRef("pk"), task__in=visible_tasks))
         | Exists(FileHandoverRecipient.objects.filter(handover__version=OuterRef("pk"), to_user_id=viewer.pk))
     )
     if viewer.role == Role.SUB_ADMIN:
-        wanted |= Q(uploaded_by_id__in=accounts.subtree_ids(viewer.pk))
+        wanted |= (
+            Q(uploaded_by_id__in=accounts.subtree_ids(viewer.pk)) & ~private
+        )  # a team's private files stay private
     # A voice note is heard only by people who can see the task it was sent on: not by its sender's manager
     # through the team rule, not by the sender after losing the task. Every other rule above ignores voice.
     heard = Exists(TaskComment.objects.filter(voice_version=OuterRef("pk"), task__in=visible_tasks))
@@ -194,8 +200,9 @@ def search(
     """Versions matching every word of `q` (in the file name, file code, task title or uploader name),
     narrowed by the filters, newest first, only those `viewer` may open. At most `limit` (never over 200)."""
     qs = versions_visible_to(viewer).filter(
-        is_voice=False
-    )  # a voice note is a message, never a search result
+        is_voice=False, file__status=FileStatus.ACTIVE
+    )  # no voice, no hidden
+    # a voice note is a message, never a search result
     for term in q.split()[:MAX_TERMS]:
         like = _like(term)
         # one indexed branch per place a word can be, joined by UNION: an OR across tables cannot use an index

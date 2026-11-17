@@ -55,7 +55,7 @@
     }
 
     function fingerprint(it) {
-      return ["ots.up", it.taskId || "-", it.fileId || "new", it.relation, it.displayName, it.size, it.modified].join("|");
+      return ["ots.up", it.taskId || "-", it.fileId || "new", it.relation, it.scope || "", it.displayName, it.size, it.modified].join("|");
     }
     function keyFor(it, fresh) {
       var fp = fingerprint(it), key = fresh ? null : opts.storage.get(fp);
@@ -79,7 +79,7 @@
 
     function startBody(it, sha, key) {
       return JSON.stringify({
-        idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation,
+        idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation, scope: it.scope || "",
         original_filename: it.name, display_name: it.displayName, size: it.size, sha256: sha,
       });
     }
@@ -213,7 +213,7 @@
       add: function (file, meta) {
         var it = {
           id: nextId++, file: file, name: file.name, displayName: file.name, size: file.size, modified: file.lastModified || 0,
-          taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION",
+          taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION", scope: meta.scope || "",
           state: "queued", sent: 0, hashed: 0, started: false, cancelled: false,
         };
         if (!it.size) { it.state = "failed"; it.error = "This file is empty."; }

@@ -7,6 +7,7 @@ import itertools
 import uuid
 
 from ots.accounts.models import User
+from ots.core.clock import IST, now
 from ots.files.models import Blob, File, FileVersion
 
 from tests.accounts.factories import company
@@ -33,6 +34,7 @@ def make_file(owner: User, name: str = "report.xlsx") -> tuple[File, FileVersion
         size_bytes=blob.size_bytes,
         uploaded_by=owner,
         idempotency_key=uuid.uuid4(),
+        uploaded_on=now().astimezone(IST).date(),
     )
     f.current_version = v
     f.save(update_fields=["current_version"])
