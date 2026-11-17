@@ -19,7 +19,7 @@
   <p class="empty">Nothing is being worked on right now.</p>
   {% endfor %}
 </section>
-{% if hidden_cards %}<p class="more">+{{ hidden_cards }} more people not shown</p>{% endif %}
+<p class="more" data-server="{{ hidden_cards }}">{% if hidden_cards %}+{{ hidden_cards }} more people not shown{% endif %}</p>
 <footer class="strip" aria-label="Approved today">
   <span class="label">Approved today</span>
   {% for a in approvals %}<span class="done">{{ a.name }}: {{ a.title }}</span>{% empty %}<span class="none">None yet</span>{% endfor %}

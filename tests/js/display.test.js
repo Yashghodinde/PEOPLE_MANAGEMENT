@@ -80,3 +80,30 @@ test("a hello resets the failure count", () => {
   const r = rig(); r.core.start(); r.fail(); r.fail(); r.send("hello"); r.fail(); r.fail();
   assert.equal(r.core.mode(), "live");
 });
+
+test("the board adapts to the screen: text scale, columns and rows follow its size and shape", () => {
+  const full = Core.plan(1920, 1080, 10);
+  assert.equal(full.s, 1); assert.equal(full.cols, 4); assert.equal(full.rows, 8);
+  const hd = Core.plan(1280, 720, 10); // a 1080p TV at 150%: same picture, smaller pixels
+  assert.ok(Math.abs(hd.s - 2 / 3) < 1e-9); assert.equal(hd.cols, 4); assert.equal(hd.rows, 8);
+  const uhd = Core.plan(3840, 2160, 10); assert.equal(uhd.s, 2); assert.equal(uhd.cols, 4); assert.equal(uhd.rows, 8);
+  const wide = Core.plan(2560, 1080, 10); assert.equal(wide.s, 1); assert.equal(wide.cols, 6); // uses the width
+  const four3 = Core.plan(1024, 768, 10); assert.ok(four3.cols >= 3 && four3.rows >= 8); // uses the height
+  const tall = Core.plan(1080, 1920, 10); assert.ok(tall.rows > full.rows); // portrait: more rows, not a tiny strip
+});
+
+test("cards that do not fit are counted, never cut in half", () => {
+  assert.deepEqual([Core.plan(1920, 1080, 5).visible, Core.plan(1920, 1080, 5).hidden], [5, 0]);
+  const p = Core.plan(1920, 1080, 40);
+  assert.equal(p.capacity, 32); assert.equal(p.visible, 32); assert.equal(p.hidden, 8);
+  const small = Core.plan(1024, 768, 60);
+  assert.equal(small.visible + small.hidden, 60); assert.ok(small.visible === small.capacity);
+});
+
+test("a screen that cannot be measured falls back to full HD, and never to zero columns or rows", () => {
+  for (const bad of [[0, 0, 5], [NaN, 100, 5], [undefined, undefined, 5], [-5, 10, 5]]) {
+    const p = Core.plan(...bad); assert.equal(p.s, 1); assert.ok(p.cols >= 1 && p.rows >= 1);
+  }
+  const tiny = Core.plan(200, 120, 5); assert.ok(tiny.cols >= 1 && tiny.rows >= 1 && tiny.s > 0);
+  assert.equal(Core.plan(1920, 1080, 0).visible, 0);
+});
