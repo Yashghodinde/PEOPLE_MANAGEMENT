@@ -7,7 +7,7 @@
     <h3 class="text-sec font-semibold">{{ day.day|date:"l, d M Y" }}</h3>
     {% if day.people %}{% for pb in day.people %}
     <div class="flex flex-col gap-2 border-l-2 border-line pl-3">
-      <p class="text-body font-semibold text-ink-900">{% icon "user" %} {{ pb.name }}</p>
+      <p class="flex items-center gap-2 text-body font-semibold text-ink-900">{% icon "user" %}<span>{{ pb.name }}</span></p>
       {% for tb in pb.tasks %}
       <div class="flex flex-col gap-2">
         <p class="text-body"><a class="text-accent font-medium" href="/files/tasks/{{ tb.task.pk }}">{{ tb.task.task_code }} · {{ tb.task.title }}</a></p>
