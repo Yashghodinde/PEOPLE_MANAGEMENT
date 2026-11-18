@@ -10,22 +10,25 @@
     {% if archived %}<input type="hidden" name="status" value="ACTIVE">{% include "components/button.html" with label="Restore this File ID" type="submit" variant="secondary" %}
     {% else %}<input type="hidden" name="status" value="ARCHIVED">{% include "components/button.html" with label="Archive this File ID" type="submit" variant="ghost" %}{% endif %}</form>{% endif %}
 
-  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Members">
+  <section id="members" class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-2" aria-label="Members">
     <h3 class="text-sec font-semibold">Members</h3>
     <ul class="flex flex-col divide-y divide-line border-t border-line">
       {% for m in members %}
       <li class="py-2 flex items-center justify-between gap-2 flex-wrap">
         <span class="text-body text-ink-900">{{ m.user.full_name }} <span class="text-cap text-ink-600">· {{ m.get_role_display }}</span></span>
         {% if is_owner %}<span class="flex items-center gap-2 flex-wrap">
-          <form method="post" action="/files/ids/{{ ws.pk }}/members" class="flex items-center gap-2">{% csrf_token %}<input type="hidden" name="op" value="role"><input type="hidden" name="user" value="{{ m.user_id }}">
+          <form method="post" action="/files/ids/{{ ws.pk }}/members" data-once class="flex items-center gap-2">{% csrf_token %}<input type="hidden" name="op" value="role"><input type="hidden" name="user" value="{{ m.user_id }}">
             <select name="role" aria-label="Role of {{ m.user.full_name }}" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body">{% for v, l in roles %}<option value="{{ v }}"{% if v == m.role %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
             {% include "components/button.html" with label="Set role" type="submit" variant="ghost" %}</form>
-          <form method="post" action="/files/ids/{{ ws.pk }}/members">{% csrf_token %}<input type="hidden" name="op" value="remove"><input type="hidden" name="user" value="{{ m.user_id }}">{% include "components/button.html" with label="Remove" type="submit" variant="ghost" %}</form>
+          <details class="relative"><summary class="list-none cursor-pointer inline-flex items-center h-5 px-4 rounded-full text-body text-bad hover:bg-line">Remove</summary>
+            <form method="post" action="/files/ids/{{ ws.pk }}/members" data-once class="absolute right-0 z-20 mt-2 w-[260px] bg-canvas border border-line rounded-md shadow-card p-3 flex flex-col gap-2">{% csrf_token %}<input type="hidden" name="op" value="remove"><input type="hidden" name="user" value="{{ m.user_id }}">
+              <p class="text-cap text-ink-900">Remove {{ m.user.full_name }} from this File ID? They lose access at once. The files and history stay.</p>
+              {% include "components/button.html" with label="Yes, remove" type="submit" variant="danger" %}</form></details>
         </span>{% endif %}
       </li>{% endfor %}
     </ul>
     {% if is_owner and not archived %}
-    <form method="post" action="/files/ids/{{ ws.pk }}/members" class="flex items-end gap-2 flex-wrap pt-2">{% csrf_token %}<input type="hidden" name="op" value="add">
+    <form method="post" action="/files/ids/{{ ws.pk }}/members" data-once class="flex items-end gap-2 flex-wrap pt-2">{% csrf_token %}<input type="hidden" name="op" value="add">
       <label class="flex flex-col gap-1 text-cap text-ink-600">Add a person<select name="user" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body min-w-[200px]">{% for u in candidates %}<option value="{{ u.pk }}">{{ u.full_name }}</option>{% endfor %}</select></label>
       <label class="flex flex-col gap-1 text-cap text-ink-600">Role<select name="role" class="h-5 px-2 rounded-sm border border-line bg-canvas text-body">{% for v, l in roles %}{% if v != "OWNER" %}<option value="{{ v }}">{{ l }}</option>{% endif %}{% endfor %}</select></label>
       {% include "components/button.html" with label="Add" type="submit" %}

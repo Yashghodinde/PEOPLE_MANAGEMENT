@@ -1,14 +1,14 @@
 {% comment %}The Files area header: Quick Search (always visible) above the section strip. Needs `files_nav`, which the
 context processor supplies on every /files page. On a phone the strip scrolls inside its own row.{% endcomment %}
 {% if files_nav %}
-<div class="flex flex-col gap-3">
+<div class="flex flex-col gap-3 pb-2" data-files-header>
   <form method="get" action="/files/search" role="search" class="flex items-center gap-2" aria-label="Quick search">
     <input type="search" name="q" value="{{ q }}" placeholder="Search file names, tasks or people" aria-label="Quick search" maxlength="120"
            class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900 flex-1 min-w-0 max-w-[520px]">
     {% include "components/button.html" with label="Search" type="submit" icon="search" variant="secondary" %}
   </form>
-  <nav class="flex items-center gap-2 overflow-x-auto flex-nowrap whitespace-nowrap pb-1" aria-label="Files sections">
-    {% for t in files_nav %}<a href="{{ t.url }}"{% if t.on %} aria-current="page"{% endif %} class="shrink-0 inline-flex items-center h-5 px-4 rounded-full border text-body {% if t.on %}border-accent bg-accent text-canvas{% else %}border-line text-ink-600 hover:bg-line{% endif %}">{{ t.label }}</a>{% endfor %}
+  <nav class="flex items-center gap-2 overflow-x-auto flex-nowrap whitespace-nowrap pb-1 -mx-1 px-1" aria-label="Files sections">
+    {% for t in files_nav %}<a href="{{ t.url }}"{% if t.on %} aria-current="page"{% endif %} class="shrink-0 inline-flex items-center h-5 px-4 rounded-full border text-body {% if t.on %}border-accent bg-accent text-canvas font-medium{% else %}border-line text-ink-900 hover:bg-line{% endif %}">{{ t.label }}</a>{% endfor %}
   </nav>
 </div>
 {% endif %}

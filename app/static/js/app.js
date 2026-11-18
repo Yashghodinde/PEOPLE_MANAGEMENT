@@ -124,4 +124,27 @@
   }
   document.addEventListener("DOMContentLoaded", sweepAvatars);
   document.addEventListener("ots:page", sweepAvatars);  // after the shell swaps a page in
+
+  // A form marked data-once sends once: a second click while the first is in flight does nothing (IMP-16.1).
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (!f || !f.hasAttribute || !f.hasAttribute("data-once")) return;
+    if (f.dataset.sent) { e.preventDefault(); return; }
+    f.dataset.sent = "1";
+    setTimeout(function () { Array.prototype.forEach.call(f.querySelectorAll("button[type=submit],input[type=submit]"), function (b) { b.disabled = true; }); }, 0);
+  });
+  window.addEventListener("pageshow", function () {  // back button: the form is usable again
+    Array.prototype.forEach.call(document.querySelectorAll("form[data-once]"), function (f) {
+      delete f.dataset.sent;
+      Array.prototype.forEach.call(f.querySelectorAll("button[type=submit],input[type=submit]"), function (b) { b.disabled = false; });
+    });
+  });
+
+  // On a narrow screen the Files section strip scrolls inside its own row; keep the lit tab in view (IMP-16.2).
+  function showActiveFilesTab() {
+    var tab = document.querySelector('nav[aria-label="Files sections"] [aria-current="page"]');
+    if (tab && tab.scrollIntoView) tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+  document.addEventListener("DOMContentLoaded", showActiveFilesTab);
+  document.addEventListener("ots:page", showActiveFilesTab);
 })();

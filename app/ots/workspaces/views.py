@@ -44,6 +44,18 @@ def _back(ws: Any) -> HttpResponse:
     return redirect(f"/files/ids/{ws.pk}")
 
 
+def _members_back(request: HttpRequest, ws: Any, message: str = "") -> HttpResponse:
+    """After a members action the person stays on the Members tab of the same File ID. The one exception: if
+    the action took their own access away there is no page left to show, so they go to their File IDs."""
+    from django.contrib import messages
+
+    if message:
+        messages.success(request, message)
+    if effective_role(request.user, ws) is None:
+        return redirect("/files/ids")
+    return redirect(f"/files/ids/{ws.pk}?tab=members#members")
+
+
 def _fail(request: HttpRequest, ws: Any, exc: ValidationFailed) -> HttpResponse:
     return _page(request, ws, error=str(exc), status=422)
 
@@ -312,7 +324,7 @@ def ids_edit(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
         )  # fmt: skip
     except ValidationFailed as exc:
         return _fail(request, ws, exc)
-    return _back(ws)
+    return _members_back(request, ws, "The details were saved.")
 
 
 @login_required
@@ -325,17 +337,21 @@ def ids_member(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
         user = _person(p.get("user", ""))
         if op == "add":
             services.add_member(request.user, ws, user, p.get("role", ""), request=request)
+            done = f"{user.full_name} was added."
         elif op == "role":
             services.change_role(request.user, ws, user, p.get("role", ""), request=request)
+            done = f"The role of {user.full_name} was changed."
         elif op == "remove":
             services.remove_member(request.user, ws, user, request=request)
+            done = f"{user.full_name} was removed. Their access has stopped; the files and history stay."
         elif op == "transfer":
             services.transfer_ownership(request.user, ws, user, request=request)
+            done = f"{user.full_name} is now the owner."
         else:
             raise ValidationFailed("Choose an action.")
     except ValidationFailed as exc:
         return _fail(request, ws, exc)
-    return _back(ws)
+    return _members_back(request, ws, done)
 
 
 @login_required
@@ -360,4 +376,4 @@ def ids_status(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
     ws = _ws(request, ws_id)
     status = WorkspaceStatus.ARCHIVED if request.POST.get("status") == "ARCHIVED" else WorkspaceStatus.ACTIVE
     services.set_status(request.user, ws, status, request=request)
-    return _back(ws)
+    return _members_back(request, ws, "Archived." if status == WorkspaceStatus.ARCHIVED else "Restored.")
