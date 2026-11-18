@@ -52,9 +52,20 @@ class TaskBlock:
 
 
 @dataclass
+class PersonBlock:
+    """Team Storage (IMP-13.3): one employee's tasks on one day, for a manager or the boss."""
+
+    name: str
+    tasks: list[TaskBlock] = field(default_factory=list)
+
+
+@dataclass
 class DayBlock:
     day: datetime.date
-    tasks: list[TaskBlock] = field(default_factory=list)
+    tasks: list[TaskBlock] = field(default_factory=list)  # an employee's own view: date, task, document
+    people: list[PersonBlock] = field(
+        default_factory=list
+    )  # a manager's view: date, employee, task, document
 
 
 def action_label(version: FileVersion, link: TaskFile, task: Task, assignees: set[Any]) -> str:
@@ -78,6 +89,16 @@ def _visible_links(viewer: Any, task: Task | None = None) -> Any:
     return qs.filter(task=task) if task is not None else qs
 
 
+def _employee_of(link: TaskFile, assignees: set[Any]) -> str:
+    """Whose exchange a file belongs to: the assignee on its assignment, else the uploader if they work on
+    the task, else the task's own people ("Everyone on the task" for a creator's reference sheet)."""
+    if link.assignment_id and link.assignment.user_id:
+        return str(link.assignment.user.full_name)
+    if link.version.uploaded_by_id in assignees:
+        return str(link.version.uploaded_by.full_name)
+    return "Everyone on the task"
+
+
 def task_storage(
     viewer: Any, before: datetime.date | None = None
 ) -> tuple[list[DayBlock], datetime.date | None]:
@@ -86,6 +107,9 @@ def task_storage(
     A task whose files arrived on several days appears under each day; every row opens the same task and
     file (nothing is copied). Returns (days, the date to pass as `before` for the next page, or None).
     """
+    from ots.accounts.models import Role
+
+    team = viewer.role in (Role.SUB_ADMIN, Role.SUPER_ADMIN)
     links = _visible_links(viewer)
     if before is not None:
         links = links.filter(version__uploaded_on__lt=before)
@@ -101,7 +125,9 @@ def task_storage(
         return [], None
     rows = list(
         links.filter(version__uploaded_on__in=day_list)
-        .select_related("task", "file", "version", "version__uploaded_by", "version__blob")
+        .select_related(
+            "task", "file", "version", "version__uploaded_by", "version__blob", "assignment__user"
+        )
         .order_by("version__uploaded_on", "task__task_code", "file__created_at", "version__version_number")
     )
     task_ids = {r.task_id for r in rows}
@@ -111,10 +137,18 @@ def task_storage(
     days: dict[datetime.date, DayBlock] = {}
     for r in rows:
         day = days.setdefault(r.version.uploaded_on, DayBlock(r.version.uploaded_on))
-        tb = next((t for t in day.tasks if t.task.pk == r.task_id), None)
+        holder = day.tasks
+        if team:
+            who = _employee_of(r, assignees.get(r.task_id, set()))
+            pb = next((p for p in day.people if p.name == who), None)
+            if pb is None:
+                pb = PersonBlock(who)
+                day.people.append(pb)
+            holder = pb.tasks
+        tb = next((t for t in holder if t.task.pk == r.task_id), None)
         if tb is None:
             tb = TaskBlock(r.task)
-            day.tasks.append(tb)
+            holder.append(tb)
         doc = next((d for d in tb.documents if d.file.pk == r.file_id), None)
         if doc is None:
             doc = Document(r.file)
@@ -130,6 +164,8 @@ def task_storage(
             )  # fmt: skip
         )
     ordered = [days[d] for d in sorted(days, reverse=True)]
+    for d in ordered:
+        d.people.sort(key=lambda p: (p.name == "Everyone on the task", p.name.lower()))
     return ordered, (day_list[-1] if more else None)
 
 

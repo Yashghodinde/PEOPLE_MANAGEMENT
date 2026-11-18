@@ -88,3 +88,24 @@ def test_the_task_files_page_lists_only_my_exchange(world):
     assert "e1-work" in page and "e2-work" not in page
     panel = login("e2").get(f"/app/tasks/{w['task'].pk}/files").content.decode()
     assert "e2-work" in panel and "e1-work" not in panel
+
+
+def test_team_storage_groups_a_managers_view_by_day_then_employee_then_task(world):
+    w = world
+    submit(w, "e1", w["a1"], "e1-work.xlsx")
+    submit(w, "e2", w["a2"], "e2-work.xlsx")
+    page = login("mgr").get("/files/tasks").content.decode()
+    assert "e1-work" in page and "e2-work" in page
+    assert page.index(w["e1"].full_name) < page.index("e1-work") < page.index(w["e2"].full_name) or (
+        page.index(w["e2"].full_name) < page.index("e2-work") < page.index(w["e1"].full_name)
+    )
+    # an employee's own page stays date -> task -> document, with no other person's name or file
+    mine = login("e1").get("/files/tasks").content.decode()
+    assert "e1-work" in mine and "e2-work" not in mine and w["e2"].full_name not in mine
+
+
+def test_the_boss_sees_every_employee_and_a_stranger_manager_sees_none(world):
+    w = world
+    submit(w, "e1", w["a1"], "e1-work.xlsx")
+    assert "e1-work" in login("boss").get("/files/tasks").content.decode()
+    assert "e1-work" not in login("mgr2").get("/files/tasks").content.decode()
