@@ -122,7 +122,8 @@ def test_manager_dropdown_is_server_filtered(org):
     assert "Sub Admin" in emp_opts and "Boss Person" in emp_opts
     assert "Gone Manager" not in emp_opts and "Asha Employee" not in emp_opts  # inactive / lower rank
     sub_opts = c.get("/app/people/manager-options?role=SUB_ADMIN").content.decode()
-    assert "Boss Person" in sub_opts and "Sub Admin" not in sub_opts
+    assert "Boss Person" in sub_opts and "Sub Admin" in sub_opts  # D-095: Sub-Admin under Sub-Admin
+    assert "Asha Employee" not in sub_opts
     assert ghost.pk
     assert "Asha Employee" not in c.get("/app/people/new").content.decode()
 

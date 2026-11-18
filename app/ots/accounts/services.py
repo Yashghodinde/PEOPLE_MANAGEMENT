@@ -54,7 +54,8 @@ def _check_manager(role: str, manager: User | None, user_id: Any = None) -> None
         raise ValidationFailed("The chosen manager is not active.", fields={"reports_to": ["Inactive."]})
     if manager.role == Role.HR:
         raise ValidationFailed("An HR account cannot manage people.", fields={"reports_to": ["Not allowed."]})
-    if _rank(manager.role) <= _rank(role):
+    both_sub = manager.role == Role.SUB_ADMIN and role == Role.SUB_ADMIN  # D-095: Sub-Admin under Sub-Admin
+    if _rank(manager.role) <= _rank(role) and not both_sub:
         raise ValidationFailed(
             "The manager must have a higher role than the person.", fields={"reports_to": ["Rank too low."]}
         )

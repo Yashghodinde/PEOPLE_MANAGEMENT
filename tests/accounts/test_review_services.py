@@ -57,10 +57,9 @@ def test_last_super_admin_still_cannot_be_demoted(sa, sub):
 
 
 def test_promotion_takes_the_higher_manager_in_one_save(sa, sub, emp):
-    with pytest.raises(ValidationFailed):  # manager is now below the new rank
-        services.update_profile(sa, emp, role=Role.SUB_ADMIN)
     cur = services.update_profile(sa, emp, role=Role.SUB_ADMIN, reports_to=sa)
     assert cur.role == Role.SUB_ADMIN and cur.reports_to_id == sa.pk
+    # D-095: a Sub-Admin under a Sub-Admin is allowed now, so staying under `sub` is fine too
 
 
 # --- S2: creating under a manager uses the manager's real, locked state --------------------------

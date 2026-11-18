@@ -184,6 +184,8 @@ def _manager_choices(role: str, exclude: Any = None, actor: User | None = None) 
     if actor is not None and actor.role == Role.SUB_ADMIN:
         return [actor] if role == Role.EMPLOYEE else []
     higher = [r for r, k in ROLE_RANK.items() if k > ROLE_RANK[Role(role)] and r != Role.HR]
+    if role == Role.SUB_ADMIN:
+        higher.append(Role.SUB_ADMIN)  # D-095: a Sub-Admin may sit under another Sub-Admin
     qs = User.objects.filter(is_active=True, role__in=higher, is_break_glass=False).order_by("full_name")
     return list(qs.exclude(pk=exclude) if exclude else qs)
 
