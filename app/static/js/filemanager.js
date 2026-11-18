@@ -16,6 +16,13 @@ document.addEventListener("alpine:init", function () {
     type: function (a, b) { return a.dataset.type.localeCompare(b.dataset.type) || a.dataset.name.localeCompare(b.dataset.name); },
   };
 
+  // Space opens a folder from its card like Enter does (a link does not react to Space by itself).
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== " " || !e.target.classList || !e.target.classList.contains("fm-stretch")) return;
+    e.preventDefault();
+    e.target.click();
+  });
+
   Alpine.data("fileManager", function () {
     return {
       view: "list", sort: "name_asc", detailsOpen: false, details: [], selected: null,

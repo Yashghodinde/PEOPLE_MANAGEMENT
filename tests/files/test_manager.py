@@ -102,3 +102,32 @@ def test_someone_elses_folder_is_a_404_for_every_route(office):
 def test_hr_has_no_storage_pages(office):
     make_user(Role.HR, reports_to=office["sa"], login_id="hrz")
     assert login("hrz").get("/files/mine").status_code in (302, 403, 404)
+
+
+def test_a_folder_opens_from_anywhere_on_its_card_and_a_file_does_not(office):
+    """IMP-15.1: one stretched link per folder (no nested interactive elements); files keep their own actions."""
+    v = mine_upload("emp", name="2026-11-17_Work.txt")
+    fol = folders.create_personal(office["emp"], "Docs")
+    page = login("emp").get(today_url()).content.decode()
+    items = page.split('<li class="fm-item"')[1:]
+    folder_li = next(i for i in items if 'data-kind="folder"' in i.split(">", 1)[0])
+    file_li = next(i for i in items if 'data-kind="file"' in i.split(">", 1)[0])
+    assert folder_li.count("fm-stretch") == 1 and f"/files/mine/f/{fol.pk}" in folder_li
+    assert "fm-stretch" not in file_li and f"/files/v/{v.pk}/download" in file_li
+    # the stretched link has no interactive element inside it
+    link = folder_li.split('class="fm-link fm-stretch">', 1)[1].split("</a>", 1)[0]
+    assert "<" not in link
+    assert 'hx-boost="false"' in file_li  # a download is never swapped into the page
+
+
+def test_both_layouts_exist_with_the_labels_and_the_pinned_actions(office):
+    mine_upload("emp", name="2026-11-17_Work.txt")
+    page = login("emp").get(today_url()).content.decode()
+    for needle in (
+        'data-label="Modified"',
+        'data-label="Modified by"',
+        'data-label="Size"',
+        "fm-actions",
+        "fm-status",
+    ):
+        assert needle in page, needle

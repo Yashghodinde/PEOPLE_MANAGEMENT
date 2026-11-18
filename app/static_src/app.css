@@ -64,18 +64,56 @@
   .org-btn:hover { background: theme("colors.line"); }
 }
 
-/* File manager (IMP-14.3): one list that is either rows or tiles, switched by data-view on the list. */
+/* File manager (IMP-14.3, corrected IMP-15.1). One item, two layouts chosen by data-view on the list:
+   rows (a fixed column template, so a long name never moves another column) and tiles (a column: name,
+   grouped details, status, actions pinned to the bottom). Folders open from anywhere on the card (stretched link). */
+.fm-item { position: relative; min-width: 0; }
+.fm-name { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.fm-icon { margin-top: 2px; }
+.fm-title { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.fm-link { color: theme("colors.ink-900"); font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
+.fm-link:hover { text-decoration: underline; }
+.fm-sub, .fm-ver { font-size: 12px; color: theme("colors.ink-600"); }
+.fm-ver { flex: none; }
+.fm-meta { margin: 0; min-width: 0; font-size: 12px; color: theme("colors.ink-600"); }
+.fm-meta > div { min-width: 0; }
+.fm-meta dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-actions { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fm-stretch::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.fm-stretch:focus-visible { outline: none; }
+.fm-stretch:focus-visible::after { outline: 2px solid theme("colors.accent"); outline-offset: -2px; }
+.fm-item[data-kind="folder"] { cursor: pointer; }
+.fm-item[data-kind="folder"]:hover { background: theme("colors.line"); }
+.fm-item[aria-selected="true"] { background: theme("colors.line"); }
+.fm-menu { position: absolute; right: 0; z-index: 30; min-width: 180px; }
+
+/* rows */
 .fm-list[data-view="list"] { display: flex; flex-direction: column; }
-.fm-list[data-view="list"] > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 10px 12px; border-bottom: 1px solid theme("colors.line"); }
-.fm-list[data-view="list"] .fm-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.fm-list[data-view="list"] > .fm-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 10px 12px; border-bottom: 1px solid theme("colors.line"); min-height: 56px; }
+.fm-list[data-view="list"] .fm-name { align-items: center; }
+.fm-list[data-view="list"] .fm-icon { margin-top: 0; }
+.fm-list[data-view="list"] .fm-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.fm-list[data-view="list"] .fm-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.fm-list[data-view="list"] .fm-meta > div { display: flex; gap: 4px; }
+.fm-list[data-view="list"] .fm-meta > div::before { content: none; }
+.fm-list[data-view="list"] .fm-actions { justify-content: flex-end; flex-wrap: nowrap; }
 @media (min-width: 900px) {
-  .fm-list[data-view="list"] > li { grid-template-columns: minmax(0, 3fr) 130px 120px 80px 90px auto; }
+  .fm-list[data-view="list"] > .fm-item, .fm-list-head[data-view="list"] { grid-template-columns: minmax(0, 1fr) 150px 150px 90px 110px 190px; }
   .fm-list[data-view="list"] .fm-meta { display: contents; }
+  .fm-list[data-view="list"] .fm-meta > div { font-size: 13px; }
+  .fm-list[data-view="list"] .fm-size dd { flex: 1; text-align: right; }
+  .fm-list-head[data-view="list"] { display: grid; gap: 12px; padding: 8px 12px; align-items: center; }
+  .fm-list-head[data-view="list"] span:nth-child(4) { text-align: right; }
 }
-.fm-list[data-view="grid"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 12px; }
-.fm-list[data-view="grid"] > li { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid theme("colors.line"); border-radius: 13px; }
-.fm-list[data-view="grid"] .fm-meta { display: flex; flex-direction: column; gap: 2px; }
-.fm-head { display: none; }
-@media (min-width: 900px) { .fm-list-head[data-view="list"] { display: grid; grid-template-columns: minmax(0, 3fr) 130px 120px 80px 90px auto; gap: 12px; padding: 8px 12px; } }
-.fm-list > li[aria-selected="true"] { background: theme("colors.line"); }
-.fm-menu { position: absolute; right: 0; z-index: 30; min-width: 170px; }
+.fm-list-head { display: none; }
+
+/* tiles */
+.fm-list[data-view="grid"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; padding: 16px; align-items: stretch; }
+.fm-list[data-view="grid"] > .fm-item { display: flex; flex-direction: column; gap: 12px; min-height: 200px; padding: 16px; border: 1px solid theme("colors.line"); border-radius: 13px; box-sizing: border-box; }
+.fm-list[data-view="grid"] .fm-link { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fm-list[data-view="grid"] .fm-meta { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; }
+.fm-list[data-view="grid"] .fm-meta > div[data-label]::before { content: attr(data-label) ": "; color: theme("colors.ink-600"); }
+.fm-list[data-view="grid"] .fm-meta > div { display: flex; gap: 4px; }
+.fm-list[data-view="grid"] .fm-status { margin-top: 4px; }
+.fm-list[data-view="grid"] .fm-status:not([data-label]) dd { overflow: visible; }
+.fm-list[data-view="grid"] .fm-actions { margin-top: auto; }
