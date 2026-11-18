@@ -3,7 +3,7 @@
 <div class="flex flex-col gap-4">
   {% include "components/breadcrumb.html" with crumbs=crumbs %}
   <div class="flex items-center gap-3">
-    {% include "components/avatar.html" with name=other.full_name size="5" %}
+    {% include "components/avatar.html" with name=other.full_name size="5" photo=other|photo_url %}
     <div class="min-w-0"><h2 class="text-sec font-semibold truncate">{{ other.full_name }}</h2><p class="text-cap text-ink-600 truncate">{{ other.designation|default:other.get_role_display }}</p></div>
   </div>
   <form method="get" class="flex items-end gap-2 flex-wrap" aria-label="Search in this group">

@@ -129,6 +129,9 @@ class User(AbstractBaseUser):
     mobile = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     reference_photo_path = models.CharField(max_length=300, blank=True, default="")
+    profile_photo_path = models.CharField(
+        max_length=300, blank=True, default=""
+    )  # the person's own picture (D-104)
 
     is_active = models.BooleanField(default=True)
     is_break_glass = models.BooleanField(default=False)

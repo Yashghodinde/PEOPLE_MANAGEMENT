@@ -1,7 +1,7 @@
 {% load ots_ui %}{% comment %}person_card.html: params c (a PersonCard), href. A person with counts and unread marks; no attendance photo, initials only.{% endcomment %}
 <a href="{{ href }}" class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3 hover:border-accent focus-visible:border-accent" aria-label="{{ c.user.full_name }}: {{ c.active }} active, {{ c.completed }} completed, {{ c.overdue }} overdue, {{ c.total }} in all{% if c.unread_text %}, {{ c.unread_text }} unread message{{ c.unread_text|pluralize }}{% endif %}{% if c.unread_voice %}, {{ c.unread_voice }} unread voice note{{ c.unread_voice|pluralize }}{% endif %}">
   <div class="flex items-center gap-3 min-w-0">
-    {% include "components/avatar.html" with name=c.user.full_name %}
+    {% include "components/avatar.html" with name=c.user.full_name photo=c.user|photo_url %}
     <div class="min-w-0 flex-1">
       <p class="text-body font-medium text-ink-900 truncate">{{ c.user.full_name }}</p>
       <p class="text-cap text-ink-600 truncate">{{ c.user.designation|default:c.user.get_role_display }}</p>

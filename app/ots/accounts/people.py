@@ -454,8 +454,10 @@ def person_profile(request: HttpRequest, pk: Any) -> HttpResponse:
         "is_admin": permissions.can(request.user, "user.update", target),
         "is_self": target.pk == request.user.pk,
         "photo_url": f"/app/people/{target.pk}/photo?v={target.version}"
-        if target.reference_photo_path
+        if (target.profile_photo_path or target.reference_photo_path)
         else "",
+        "has_profile_photo": bool(target.profile_photo_path),
+        "can_set_profile_photo": request.user.pk == target.pk or request.user.role == Role.SUPER_ADMIN,
         "edit_url": f"/app/people/{target.pk}/edit",
         "deactivate_attrs": f'hx-post="/app/people/{target.pk}/deactivate" hx-swap="none" '
         f"hx-vals='{{\"version\": {target.version}}}'",
@@ -537,16 +539,38 @@ def person_photo_update(request: HttpRequest, pk: Any) -> HttpResponse:
     return _done(request, f"/app/people/{target.pk}")
 
 
+@idempotency_optional
+@login_required
+@require_http_methods(["POST"])
+def profile_photo_update(request: HttpRequest, pk: Any) -> HttpResponse:
+    """A person's own picture: upload (field `photo`) or remove (`remove`). Only they, or the Super Admin."""
+    target = _visible_or_404(request, pk)
+    if request.POST.get("remove"):
+        services.remove_profile_photo(request.user, target, request=request)
+    else:
+        if int(request.META.get("CONTENT_LENGTH") or 0) > photos.MAX_UPLOAD_BYTES + 512 * 1024:
+            raise ValidationFailed("The photo must be 2 MB or smaller.", fields={"photo": ["Too large."]})
+        upload = request.FILES.get("photo")
+        data = upload.read(photos.MAX_UPLOAD_BYTES + 1) if upload else b""
+        services.set_profile_photo(request.user, target, data, request=request)
+    return _done(request, f"/app/people/{target.pk}")
+
+
 @login_required
 @require_http_methods(["GET"])
 def person_photo(request: HttpRequest, pk: Any) -> HttpResponse:
-    """The picture, to anyone who may see that person's profile."""
+    """The picture, to anyone who may see the profile: their own photo, else the reference photo (D-104)."""
     target = _visible_or_404(request, pk)
-    path = photos.path_for(target.pk)
-    if not target.reference_photo_path or not path.is_file():
+    path = None
+    if target.profile_photo_path and photos.path_for(target.pk, "profile").is_file():
+        path = photos.path_for(target.pk, "profile")
+    elif target.reference_photo_path and photos.path_for(target.pk).is_file():
+        path = photos.path_for(target.pk)
+    if path is None:
         raise NotFound("No photo.")
     response = FileResponse(path.open("rb"), content_type="image/jpeg")
     response["Cache-Control"] = "private, max-age=300"
+    response["Vary"] = "Cookie"  # one person's picture is never served from another person's cache
     response["X-Content-Type-Options"] = "nosniff"
     return response
 
@@ -563,7 +587,9 @@ def _org_person(u: Any) -> dict[str, Any]:
         "full_name": u.full_name,
         "designation": u.designation or u.get_role_display(),
         "employee_id": u.employee_id,
-        "photo": f"/app/people/{u.pk}/photo?v={u.version}" if u.reference_photo_path else "",
+        "photo": f"/app/people/{u.pk}/photo?v={u.version}"
+        if (u.profile_photo_path or u.reference_photo_path)
+        else "",
         "kids": [],
     }
 
@@ -581,6 +607,7 @@ def build_org_tree(viewer: User) -> tuple[list[dict[str, Any]], list[dict[str, A
         for u in User.objects.filter(is_active=True, is_break_glass=False).only(
             "id", "full_name", "designation", "employee_id", "role", "reports_to_id", "version",
             "reference_photo_path",
+            "profile_photo_path",
         )
     }  # fmt: skip
     kids: dict[Any, list[Any]] = {}

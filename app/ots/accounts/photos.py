@@ -67,18 +67,20 @@ def process(data: bytes) -> bytes:
     return out.getvalue()
 
 
-def path_for(user_id: UUID | str) -> Path:
-    """Where a person's photo lives. Built from the id only, never from anything a user typed."""
-    return Path(settings.OTS_REFERENCE_PHOTO_DIR) / f"{UUID(str(user_id))}.jpg"
+def path_for(user_id: UUID | str, kind: str = "reference") -> Path:
+    """Where a person's photo lives. Built from the id only, never from anything a user typed. `kind` is the
+    attendance reference photo (Super Admin) or the person's own profile photo."""
+    base = settings.OTS_PROFILE_PHOTO_DIR if kind == "profile" else settings.OTS_REFERENCE_PHOTO_DIR
+    return Path(base) / f"{UUID(str(user_id))}.jpg"
 
 
-def stage(user_id: UUID | str, jpeg: bytes) -> Path:
+def stage(user_id: UUID | str, jpeg: bytes, kind: str = "reference") -> Path:
     """Phase 1, BEFORE the database commit: write the new picture next to the old one under a temporary name.
 
     Any problem here (no such folder, disk full, wrong permissions) raises while the request can still fail
     cleanly and roll the database back, so the database never claims a photo that was not saved.
     """
-    new = path_for(user_id).with_suffix(".jpg.new")
+    new = path_for(user_id, kind).with_suffix(".jpg.new")
     try:
         new.parent.mkdir(parents=True, exist_ok=True)
         new.write_bytes(jpeg)
@@ -91,18 +93,18 @@ def stage(user_id: UUID | str, jpeg: bytes) -> Path:
     return new
 
 
-def publish(user_id: UUID | str) -> None:
+def publish(user_id: UUID | str, kind: str = "reference") -> None:
     """Phase 2, after the commit: swap the staged picture in. A rename in one folder, so a reader sees the old
     picture or the new one, never half of one."""
-    final = path_for(user_id)
+    final = path_for(user_id, kind)
     try:
         os.replace(final.with_suffix(".jpg.new"), final)
     except OSError:
         log.exception("could not publish a reference photo", extra={"event": "photo.publish_failed"})
 
 
-def delete(user_id: UUID | str) -> None:
+def delete(user_id: UUID | str, kind: str = "reference") -> None:
     try:
-        path_for(user_id).unlink(missing_ok=True)
+        path_for(user_id, kind).unlink(missing_ok=True)
     except OSError:
         log.exception("could not delete a reference photo", extra={"event": "photo.delete_failed"})

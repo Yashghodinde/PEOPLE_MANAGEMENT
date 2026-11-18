@@ -9,7 +9,7 @@ from django.db import IntegrityError, transaction
 from ots.audit import api as audit
 from ots.core import events, permissions
 from ots.core.clock import now, today_local
-from ots.core.errors import Conflict, Locked, ValidationFailed
+from ots.core.errors import Conflict, Locked, PermissionDenied, ValidationFailed
 
 from . import auth, guards, passwords, photos, selectors
 from .models import ROLE_RANK, Company, Department, ReportingHistory, Role, User
@@ -467,4 +467,41 @@ def remove_reference_photo(
     events.publish("user.updated", cur, {"fields": ["reference_photo"]})
     user_id = cur.pk
     transaction.on_commit(lambda: photos.delete(user_id))
+    return cur
+
+
+@transaction.atomic
+def set_profile_photo(actor: User, user: User, data: bytes, *, request: Any = None) -> User:
+    """The person's own picture (D-104). Only they, or the Super Admin for recovery; never HR or a manager."""
+    if actor.pk != user.pk and getattr(actor, "role", None) != Role.SUPER_ADMIN:
+        raise PermissionDenied("Only you can change your own photo.", action="user.profile_photo")
+    jpeg = photos.process(data)  # the same checks and the same 480 x 480 JPEG as every other picture
+    cur = _locked(user, None)
+    photos.stage(
+        cur.pk, jpeg, "profile"
+    )  # before the commit: a write problem fails the request, nothing is saved
+    cur.profile_photo_path = f"profile/{cur.pk}.jpg"
+    cur.version += 1
+    cur.save()
+    audit.record("user.profile_photo_updated", actor, cur, {"bytes": len(jpeg)}, request)
+    events.publish("user.updated", cur, {"fields": ["profile_photo"]})
+    user_id = cur.pk
+    transaction.on_commit(lambda: photos.publish(user_id, "profile"))
+    return cur
+
+
+@transaction.atomic
+def remove_profile_photo(actor: User, user: User, *, request: Any = None) -> User:
+    if actor.pk != user.pk and getattr(actor, "role", None) != Role.SUPER_ADMIN:
+        raise PermissionDenied("Only you can change your own photo.", action="user.profile_photo")
+    cur = _locked(user, None)
+    if not cur.profile_photo_path:
+        return cur
+    cur.profile_photo_path = ""
+    cur.version += 1
+    cur.save()
+    audit.record("user.profile_photo_removed", actor, cur, {}, request)
+    events.publish("user.updated", cur, {"fields": ["profile_photo"]})
+    user_id = cur.pk
+    transaction.on_commit(lambda: photos.delete(user_id, "profile"))
     return cur

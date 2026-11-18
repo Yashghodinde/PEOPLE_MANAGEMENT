@@ -252,11 +252,13 @@ def test_the_profile_shows_the_picture_once_there_is_one(world, django_capture_o
     sa, _, emp = world
     admin = login("boss")
     assert f"/app/people/{emp.pk}/photo?v=" not in admin.get(f"/app/people/{emp.pk}").content.decode()
-    assert "Reference photo" in admin.get(f"/app/people/{emp.pk}").content.decode()
+    assert "Attendance reference photo" in admin.get(f"/app/people/{emp.pk}").content.decode()
     with django_capture_on_commit_callbacks(execute=True):
         upload(admin, emp, picture())
     assert f"/app/people/{emp.pk}/photo?v=" in admin.get(f"/app/people/{emp.pk}").content.decode()
-    assert "Reference photo" not in login("emp").get(f"/app/people/{emp.pk}").content.decode()  # admins only
+    assert (
+        "Attendance reference photo" not in login("emp").get(f"/app/people/{emp.pk}").content.decode()
+    )  # admins only
 
 
 def test_no_photo_is_a_404(world):

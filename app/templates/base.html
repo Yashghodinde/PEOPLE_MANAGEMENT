@@ -39,7 +39,7 @@
           {% include "components/bell.html" %}</div>
           <div x-data="dropdown" class="relative" @keydown.escape.window="close" @click.outside="close">
             <button type="button" @click="toggle" class="flex items-center gap-2 rounded-full hover:bg-line p-1" aria-haspopup="menu" aria-label="User menu">
-              {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" %}{% icon "chevron-down" "3" %}
+              {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" photo=request.user|photo_url %}{% icon "chevron-down" "3" %}
             </button>
             <div x-show="open" x-cloak class="absolute right-0 mt-2 w-[233px] bg-canvas border border-line rounded-md shadow-card p-2 z-40" role="menu">
               <div class="px-3 py-2 border-b border-line mb-1" aria-label="Signed in as">

@@ -147,4 +147,13 @@
   }
   document.addEventListener("DOMContentLoaded", showActiveFilesTab);
   document.addEventListener("ots:page", showActiveFilesTab);
+
+  // A chosen picture is shown before it is saved (IMP-16.6).
+  document.addEventListener("change", function (e) {
+    var input = e.target, sel = input && input.getAttribute && input.getAttribute("data-preview");
+    if (!sel || !input.files || !input.files[0]) return;
+    var img = document.querySelector(sel);
+    if (!img) return;
+    img.src = URL.createObjectURL(input.files[0]); img.hidden = false;
+  });
 })();

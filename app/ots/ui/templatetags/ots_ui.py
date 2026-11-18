@@ -100,6 +100,17 @@ def dot(dots: Any, task_id: Any) -> Any:
     )
 
 
+@register.filter
+def photo_url(user: Any) -> str:
+    """A person's picture URL (own photo, else the reference photo), or "" so initials show. The `?v=` is the
+    person's version: a new picture appears at once and an old one is never kept."""
+    if user is None or not getattr(user, "pk", None):
+        return ""
+    if getattr(user, "profile_photo_path", "") or getattr(user, "reference_photo_path", ""):
+        return f"/app/people/{user.pk}/photo?v={user.version}"
+    return ""
+
+
 @register.simple_tag(takes_context=True)
 def pagehead(context: Any) -> str:
     """The shared page header (IMP-14.1): breadcrumb and a visible Back, from the path and page_title."""
