@@ -71,6 +71,45 @@ class LibraryFolder(models.Model):
         return self.name
 
 
+class FolderContext(models.TextChoices):
+    PERSONAL = "PERSONAL"  # a person's own storage (IMP-14.2); the date level above the roots is virtual
+    WORKSPACE = "WORKSPACE"  # inside a File ID
+
+
+class Folder(models.Model):
+    """A logical folder, independent of any SharePoint path. A file sits in at most one folder per context;
+    the stored bytes never move. Personal roots belong to a date (`on_date`); deeper ones inherit it."""
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    context = models.CharField(max_length=10, choices=FolderContext.choices)
+    owner = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    workspace_id = models.UUIDField(null=True, blank=True)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
+    )
+    name = models.CharField(max_length=120)
+    name_key = models.CharField(max_length=120)  # lower-cased, so "GST" and "gst" are one name
+    on_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=8, choices=FileStatus.choices, default=FileStatus.ACTIVE)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(default=now)
+    updated_at = models.DateTimeField(default=now)
+
+    class Meta:
+        db_table = "folders"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["context", "owner", "workspace_id", "parent", "on_date", "name_key"],
+                name="folder_sibling_name_uq",
+                nulls_distinct=False,
+            ),
+        ]
+        indexes = [models.Index(fields=["context", "owner", "on_date"], name="folder_owner_day_ix")]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Blob(models.Model):
     """The bytes, keyed by SHA-256. `local_path` is empty once the cache evicted an ARCHIVED copy."""
 
@@ -104,6 +143,9 @@ class File(models.Model):
     display_name = models.CharField(max_length=255)
     owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="files_owned")
     visibility = models.CharField(max_length=10, choices=FileVisibility.choices, default=FileVisibility.TASK)
+    folder = models.ForeignKey(  # the personal folder a private file sits in (None = directly under its date)
+        "Folder", null=True, blank=True, on_delete=models.PROTECT, related_name="files"
+    )
     library_folder = models.ForeignKey(
         LibraryFolder, null=True, blank=True, on_delete=models.PROTECT, related_name="files"
     )
