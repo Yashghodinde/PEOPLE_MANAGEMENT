@@ -8,7 +8,7 @@ from typing import Any
 from django.db.models import Exists, F, OuterRef, Q, QuerySet
 
 from ots.files.models import FileStatus, FileVersion, TaskFile
-from ots.tasks.models import Task, TaskComment
+from ots.tasks.models import Task, TaskAssignment, TaskComment
 from ots.workspaces.models import FileIdDocument
 
 PANEL_LIMIT = 200  # files shown on one task page (CLAUDE.md: never an unbounded list)
@@ -21,7 +21,7 @@ def task_file_rows(viewer: Any, task: Task) -> list[TaskFile]:
     if not Task.objects.visible_to(viewer).filter(pk=task.pk).exists():
         return []
     return list(
-        TaskFile.objects.filter(task=task)
+        TaskFile.objects.filter(task=task, version__in=versions_visible_to(viewer).values("pk"))  # D-095 D1
         .select_related("file", "version", "version__uploaded_by", "assignment__user")
         .order_by("-linked_at", "-id")[:PANEL_LIMIT]
     )
@@ -29,6 +29,24 @@ def task_file_rows(viewer: Any, task: Task) -> list[TaskFile]:
 
 def anything_pending(rows: list[TaskFile]) -> bool:
     return any(r.version.state in PENDING_STATES for r in rows)
+
+
+def _exchange_links(viewer: Any, visible_tasks: Any, team: Any = ()) -> QuerySet[TaskFile]:
+    """The task links a viewer may open (D-095 D1). Seeing a task is not enough: a file belongs to an exchange
+    between the people who made it. Only they, their managers up the chain and the Super Admin may open it.
+    Participants: who linked it, the assignee it belongs to, who assigned it, the task's creator. A creator's
+    file with no assignee (a reference sheet) goes to every live assignee."""
+    people = [viewer.pk, *team]  # `team`: the viewer's reporting subtree, looked up once by the caller
+    broadcast = Q(assignment__isnull=True, linked_by_id=F("task__created_by_id")) & Exists(
+        TaskAssignment.objects.filter(task=OuterRef("task_id"), user_id=viewer.pk, removed_at__isnull=True)
+    )
+    return TaskFile.objects.filter(version=OuterRef("pk"), task__in=visible_tasks).filter(
+        Q(linked_by_id__in=people)
+        | Q(assignment__user_id__in=people)
+        | Q(assignment__assigned_by_id__in=people)
+        | Q(task__created_by_id__in=people)
+        | broadcast
+    )
 
 
 def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
@@ -58,15 +76,16 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
         & ~(private & Q(file__status=FileStatus.DELETED))
         & ~in_a_workspace  # a member removed from a File ID loses what they uploaded there (history stays)
     )
+    team = accounts.subtree_ids(viewer.pk) if viewer.role == Role.SUB_ADMIN else set()
     wanted = (
         mine
         | Q(file__visibility=FileVisibility.LIBRARY)
-        | Exists(TaskFile.objects.filter(version=OuterRef("pk"), task__in=visible_tasks))
+        | Exists(_exchange_links(viewer, visible_tasks, team))
         | Exists(FileHandoverRecipient.objects.filter(handover__version=OuterRef("pk"), to_user_id=viewer.pk))
     )
     if viewer.role == Role.SUB_ADMIN:
         wanted |= (
-            Q(uploaded_by_id__in=accounts.subtree_ids(viewer.pk)) & ~private & ~in_a_workspace
+            Q(uploaded_by_id__in=team) & ~private & ~in_a_workspace
         )  # a team's private and File ID files are not the manager's by the team rule
     # A voice note is heard only by people who can see the task it was sent on: not by its sender's manager
     # through the team rule, not by the sender after losing the task. Every other rule above ignores voice.
