@@ -36,7 +36,7 @@ def seeded(office):
 def urls(s):
     ws, emp = s["ws"], s["emp"]
     return [
-        "/files/mine", "/files/mine/2026-11-17", f"/files/mine/f/{s['fol'].pk}", "/files/tasks", "/files/shared",
+        "/files/mine", "/files/mine/organized", "/files/mine/personal", "/files/mine/2026-11-17", f"/files/mine/f/{s['fol'].pk}", "/files/tasks", "/files/shared",
         "/files/library", f"/files/library?folder={s['lib'].pk}", "/files/ids", "/files/ids/new", f"/files/ids/{ws.pk}",
         f"/files/ids/{ws.pk}?tab=members", f"/files/ids/{ws.pk}/f/{s['wf'].pk}", f"/files/ids/{ws.pk}/physical",
         f"/files/v/{s['v'].pk}/sharing", f"/files/{s['v'].file_id}/trail", f"/files/v/{s['v'].pk}/handover",

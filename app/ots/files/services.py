@@ -38,9 +38,11 @@ from . import cache, layout, naming
 from .blocklist import is_blocked
 from .codes import make_code, unique_code
 from .errors import HashMismatch, OffsetMismatch
+from .folders import area_of_id
 from .models import (
     Blob,
     File,
+    FileArea,
     FileRelation,
     FileState,
     FileStatus,
@@ -481,6 +483,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             display_name=s.display_name or s.original_filename,
             owner=user,
             folder_id=s.folder_id if s.scope == PERSONAL else None,
+            area=area_of_id(s.folder_id) if s.scope == PERSONAL else FileArea.ORGANIZED,
             library_folder_id=s.folder_id if s.scope == LIBRARY_SCOPE else None,
             library_state=(
                 LibraryState.PENDING

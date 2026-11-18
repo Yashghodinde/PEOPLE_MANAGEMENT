@@ -78,6 +78,14 @@ class LibraryFolder(models.Model):
         return self.name
 
 
+class FileArea(models.TextChoices):
+    ORGANIZED = (
+        "ORGANIZED",
+        "Organized storage",
+    )  # the date folders (and folders made under a date); the default
+    PERSONAL = "PERSONAL", "Personal storage"  # the person's own tree, outside the date logic
+
+
 class FolderContext(models.TextChoices):
     PERSONAL = "PERSONAL"  # a person's own storage (IMP-14.2); the date level above the roots is virtual
     WORKSPACE = "WORKSPACE"  # inside a File ID
@@ -97,6 +105,7 @@ class Folder(models.Model):
     name = models.CharField(max_length=120)
     name_key = models.CharField(max_length=120)  # lower-cased, so "GST" and "gst" are one name
     on_date = models.DateField(null=True, blank=True)
+    system_key = models.CharField(max_length=20, blank=True, default="")  # "PERSONAL_ROOT" for the fixed root
     status = models.CharField(max_length=8, choices=FileStatus.choices, default=FileStatus.ACTIVE)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(default=now)
@@ -164,6 +173,7 @@ class File(models.Model):
     library_state = models.CharField(
         max_length=10, choices=LibraryState.choices, default=LibraryState.APPROVED
     )
+    area = models.CharField(max_length=10, choices=FileArea.choices, default=FileArea.ORGANIZED)
     deleted_at = models.DateTimeField(null=True, blank=True)
     deleted_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.PROTECT, related_name="files_hidden"

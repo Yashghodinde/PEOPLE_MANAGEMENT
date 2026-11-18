@@ -38,7 +38,7 @@ def test_midnight_in_india_moves_a_file_from_today_to_yesterday_without_touching
         assert personal.todays_versions(office["emp"]) == []
         days, _ = personal.date_folders(office["emp"])
         assert days == [(datetime.date(2026, 11, 17), 1)]
-        page = login("emp").get("/files/mine").content.decode()
+        page = login("emp").get("/files/mine/organized").content.decode()
         assert "Today" in page and "18 November 2026" in page and "17 November 2026" in page
         assert "Notes" not in login("emp").get("/files/mine/2026-11-18").content.decode()  # Today is empty
         assert "2026-11-17_Notes.txt" in login("emp").get("/files/mine/2026-11-17").content.decode()

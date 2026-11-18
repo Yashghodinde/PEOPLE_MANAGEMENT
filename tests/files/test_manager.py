@@ -20,7 +20,9 @@ def today_url():
 
 def test_my_storage_is_a_folder_list_with_no_big_upload_card(office):
     page = login("emp").get("/files/mine").content.decode()
-    assert "Create or Upload" in page and "Today" in page
+    assert "Create or Upload" in page and "Organized storage" in page and "Personal storage" in page
+    assert "Today" not in page  # the date folders live one level down, inside Organized storage
+    assert "Today" in login("emp").get("/files/mine/organized").content.decode()
     assert "Drop files here, or choose them" not in page and "Choose files</button>" not in page
     assert "Earlier days" not in page and "No earlier files" not in page
     assert "Only you and the Super Admin can see these files" not in page  # no explanatory paragraph

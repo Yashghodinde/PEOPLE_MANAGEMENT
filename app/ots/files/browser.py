@@ -149,7 +149,12 @@ def personal_day(user: Any, day: datetime.date) -> dict[str, Any]:
         "can_upload": today,
         "can_create": today,
         "parent_id": "",
-        "crumbs": [("Files", "/files/mine"), ("My storage", "/files/mine"), (label, "")],
+        "crumbs": [
+            ("Files", "/files/mine"),
+            ("My storage", "/files/mine"),
+            ("Organized storage", "/files/mine/organized"),
+            (label, ""),
+        ],
         "empty": "This folder is empty." if today else "Nothing from this day.",
         "note": "" if today else "New files go to Today. Open a folder to add files to it.",
         "section": "mine",
@@ -162,14 +167,26 @@ def personal_day(user: Any, day: datetime.date) -> dict[str, Any]:
 
 def personal_folder(user: Any, folder: Folder) -> dict[str, Any]:
     chain = folder_svc.ancestors(folder)
-    day = chain[0].on_date or today_local()
-    crumbs = [
-        ("Files", "/files/mine"),
-        ("My storage", "/files/mine"),
-        (long_day(day), f"/files/mine/{day:%Y-%m-%d}"),
-    ]
-    crumbs += [(c.name, f"/files/mine/f/{c.pk}") for c in chain[:-1]] + [(chain[-1].name, "")]
-    location = " > ".join(["My storage", long_day(day), *[c.name for c in chain]])
+    in_personal = bool(chain[0].system_key)
+    if in_personal:  # Files > My storage > Personal storage > folders...
+        day = today_local()
+        crumbs = [("Files", "/files/mine"), ("My storage", "/files/mine")]
+        if chain[-1].pk == chain[0].pk:
+            crumbs.append((chain[0].name, ""))
+        else:
+            crumbs.append((chain[0].name, "/files/mine/personal"))
+            crumbs += [(c.name, f"/files/mine/f/{c.pk}") for c in chain[1:-1]] + [(chain[-1].name, "")]
+        location = " > ".join(["My storage", *[c.name for c in chain]])
+    else:  # Files > My storage > Organized storage > date > folders...
+        day = chain[0].on_date or today_local()
+        crumbs = [
+            ("Files", "/files/mine"),
+            ("My storage", "/files/mine"),
+            ("Organized storage", "/files/mine/organized"),
+            (long_day(day), f"/files/mine/{day:%Y-%m-%d}"),
+        ]
+        crumbs += [(c.name, f"/files/mine/f/{c.pk}") for c in chain[:-1]] + [(chain[-1].name, "")]
+        location = " > ".join(["My storage", "Organized storage", long_day(day), *[c.name for c in chain]])
     fs = _children(user, folder, None)
     counts = _folder_counts([f.pk for f in fs])
     items = [
@@ -198,8 +215,49 @@ def personal_folder(user: Any, folder: Folder) -> dict[str, Any]:
     }  # fmt: skip
 
 
-def personal_root(user: Any, page: int = 0) -> dict[str, Any]:
-    """Today first, then earlier dates newest first (each a folder)."""
+def my_storage_root(user: Any) -> dict[str, Any]:
+    """My storage opens on exactly two folders: the date-based Organized storage and the person's own Personal
+    storage (IMP-16.3). Nothing else sits at this level."""
+    from .models import File, FileArea, Folder, FolderContext
+
+    today = today_local()
+    root = Folder.objects.filter(
+        context=FolderContext.PERSONAL,
+        owner=user,
+        system_key=folder_svc.PERSONAL_ROOT,
+        status=FileStatus.ACTIVE,
+    ).first()
+    n_personal = 0
+    if root is not None:
+        n_personal = (
+            Folder.objects.filter(parent=root, status=FileStatus.ACTIVE).count()
+            + File.objects.filter(folder=root, status=FileStatus.ACTIVE, area=FileArea.PERSONAL).count()
+        )
+    days, _more = personal.date_folders(user, 0)
+    cards = [
+        ("Organized storage", "Daily date-based working documents", "/files/mine/organized", len(days) + 1),
+        ("Personal storage", "Your own folders and files, as you like", "/files/mine/personal", n_personal),
+    ]  # fmt: skip
+    items = [
+        {
+            "kind": "folder", "id": f"area-{url.rsplit('/', 1)[1]}", "name": name, "sub": blurb,
+            "type": "Folder",
+            "url": url, "modified": None, "by": "", "size": None, "status": "", "versions": None, "items": n,
+            "location": "My storage", "access": ACCESS_PERSONAL, "can_rename": False, "can_move": False,
+            "rename_url": "", "hide_url": "",
+            "details": json.dumps({"Name": name, "Purpose": blurb, "Access": ACCESS_PERSONAL}),
+        }
+        for name, blurb, url, n in cards
+    ]  # fmt: skip
+    return {
+        "title": "My storage", "items": items, "can_upload": False, "can_create": False, "parent_id": "",
+        "crumbs": [], "empty": "", "note": "", "section": "mine", "show_disabled_create": True,
+        "move_day": today, **PERSONAL_BASE,
+    }  # fmt: skip
+
+
+def organized_root(user: Any, page: int = 0) -> dict[str, Any]:
+    """Today first, then earlier dates newest first (each a folder): the date logic, unchanged."""
     today = today_local()
     days, more = personal.date_folders(user, page)
     items: list[dict[str, Any]] = []
@@ -208,9 +266,11 @@ def personal_root(user: Any, page: int = 0) -> dict[str, Any]:
         items.append(_day_item(today, f"Today — {today:%A}, {long_day(today)}", None, now_dt))
     items += [_day_item(d, long_day(d), n, now_dt) for d, n in days]
     return {
-        "title": "My storage", "items": items, "can_upload": False, "can_create": False, "parent_id": "",
-        "crumbs": [], "empty": "", "note": "", "section": "mine", "more": more, "page": page,
-        "dates": True, "show_disabled_create": True, **PERSONAL_BASE,
+        "title": "Organized storage", "items": items, "can_upload": False, "can_create": False,
+        "parent_id": "", "empty": "", "note": "", "section": "mine", "more": more, "page": page,
+        "dates": True,
+        "crumbs": [("Files", "/files/mine"), ("My storage", "/files/mine"), ("Organized storage", "")],
+        "show_disabled_create": True, **PERSONAL_BASE,
     }  # fmt: skip
 
 

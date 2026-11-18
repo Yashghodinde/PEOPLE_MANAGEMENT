@@ -18,10 +18,12 @@ from ots.core.clock import now, today_local
 from ots.core.errors import Conflict, NotFound, ValidationFailed
 from ots.core.permissions import require
 
-from .models import File, FileStatus, FileVisibility, Folder, FolderContext
+from .models import File, FileArea, FileStatus, FileVisibility, Folder, FolderContext
 
 NAME_MAX = 120
 MAX_DEPTH = 8
+PERSONAL_ROOT = "PERSONAL_ROOT"
+PERSONAL_ROOT_NAME = "Personal storage"
 
 
 def clean_name(raw: str) -> str:
@@ -121,6 +123,8 @@ def rename_personal(user: Any, folder_id: Any, name: str, request: HttpRequest |
     folder = Folder.objects.select_for_update().filter(pk=folder_id, owner=user).first()
     if folder is None or folder.context != FolderContext.PERSONAL or folder.status != FileStatus.ACTIVE:
         raise NotFound("Folder not found.")
+    if folder.system_key:
+        raise ValidationFailed("This folder is fixed and cannot be renamed.", fields={"name": ["Fixed."]})
     name = clean_name(name)
     if name.lower() == folder.name_key and name == folder.name:
         return folder
@@ -139,7 +143,12 @@ def rename_personal(user: Any, folder_id: Any, name: str, request: HttpRequest |
 def move_personal(user: Any, folder_id: Any, to_parent_id: Any, request: HttpRequest | None = None) -> Folder:
     """Move a folder into another of the person's own folders, or to a root (empty, under today)."""
     folder = my_folder(user, folder_id)
+    if folder.system_key:
+        raise ValidationFailed("This folder is fixed and cannot be moved.", fields={"to": ["Fixed."]})
+    here = area_of(folder)
     parent = my_folder(user, to_parent_id) if to_parent_id else None
+    if parent is None and here == FileArea.PERSONAL:
+        parent = personal_root(user)  # "the top" of Personal storage is its root, not a date
     if parent is not None:
         if folder.pk in {a.pk for a in ancestors(parent)}:
             raise ValidationFailed("A folder cannot go inside itself.", fields={"to": ["Invalid."]})
@@ -150,13 +159,16 @@ def move_personal(user: Any, folder_id: Any, to_parent_id: Any, request: HttpReq
             )
     old = str(folder.parent_id or "")
     folder.parent = parent
-    folder.on_date = None if parent is not None else today_local()
+    folder.on_date = None if (parent is not None) else today_local()
     folder.updated_at = now()
     try:
         with transaction.atomic():
             folder.save(update_fields=["parent", "on_date", "updated_at"])
     except IntegrityError:
         raise Conflict("A folder with that name already exists there.") from None
+    new_area = area_of(folder)
+    if new_area != here:
+        _set_area(folder, new_area)
     audit.record("folder.moved", user, folder, {"from": old, "to": str(to_parent_id or "")}, request)
     return folder
 
@@ -173,10 +185,63 @@ def place_personal_file(user: Any, file_id: Any, folder_id: Any, request: HttpRe
     if f is None or f.owner_id != user.pk or f.status != FileStatus.ACTIVE:
         raise NotFound("File not found.")
     target = my_folder(user, folder_id) if folder_id else None
+    if target is None and f.area == FileArea.PERSONAL:
+        target = personal_root(user)  # the top of Personal storage is its root
     if f.folder_id == (target.pk if target else None):
         return f
     old = str(f.folder_id or "")
     f.folder = target
-    f.save(update_fields=["folder"])
+    f.area = area_of(target)
+    f.save(update_fields=["folder", "area"])
     audit.record("file.moved", user, f, {"from": old, "to": str(folder_id or "")}, request)
     return f
+
+
+# ---------------------------------------------------------------- the two areas of My storage (IMP-16.3)
+
+
+def personal_root(user: Any) -> Folder:
+    """The fixed root of a person's Personal storage, made the first time it is needed (never by someone
+    else's visit). One per person: the folder table's unique constraint refuses a second."""
+    root = Folder.objects.filter(
+        context=FolderContext.PERSONAL, owner=user, system_key=PERSONAL_ROOT, status=FileStatus.ACTIVE
+    ).first()
+    if root is not None:
+        return root
+    try:
+        with transaction.atomic():
+            return Folder.objects.create(
+                context=FolderContext.PERSONAL, owner=user, parent=None, name=PERSONAL_ROOT_NAME,
+                name_key=PERSONAL_ROOT_NAME.lower(), on_date=None, system_key=PERSONAL_ROOT, created_by=user,
+            )  # fmt: skip
+    except IntegrityError:  # two requests at once: the other one made it
+        return Folder.objects.get(
+            context=FolderContext.PERSONAL, owner=user, system_key=PERSONAL_ROOT, status=FileStatus.ACTIVE
+        )
+
+
+def area_of(folder: Folder | None) -> str:
+    """PERSONAL inside Personal storage, ORGANIZED otherwise (no folder = loose under its date)."""
+    if folder is None:
+        return FileArea.ORGANIZED
+    return FileArea.PERSONAL if ancestors(folder)[0].system_key == PERSONAL_ROOT else FileArea.ORGANIZED
+
+
+def area_of_id(folder_id: Any) -> str:
+    f = Folder.objects.filter(pk=folder_id).first() if folder_id else None
+    return area_of(f)
+
+
+def subtree_ids(folder: Folder) -> list[Any]:
+    """The folder and every folder below it."""
+    found, frontier = [folder.pk], [folder.pk]
+    while frontier and len(found) < 5000:
+        kids = list(Folder.objects.filter(parent_id__in=frontier).values_list("pk", flat=True))
+        found += kids
+        frontier = kids
+    return found
+
+
+def _set_area(folder: Folder, area: str) -> None:
+    """Files inside a moved folder follow it into the other area (nothing is copied)."""
+    File.objects.filter(folder_id__in=subtree_ids(folder)).exclude(area=area).update(area=area)

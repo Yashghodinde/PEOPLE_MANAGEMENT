@@ -111,7 +111,7 @@ def test_today_lists_todays_files_and_earlier_days_are_folders_newest_first(offi
     with freeze_time("2026-11-17 06:00:00"):
         mine_upload("emp", name="2026-11-17_Fresh-notes.txt", data=DATA + b"d")
         c = login("emp")
-        root = c.get("/files/mine").content.decode()
+        root = c.get("/files/mine/organized").content.decode()
         assert "Today" in root and "17 November 2026" in root  # Today is a folder at the top
         assert root.index("16 November 2026") < root.index("15 November 2026")  # earlier dates, newest first
         assert "2 items" in root and "1 item" in root  # each date shows how many files it holds

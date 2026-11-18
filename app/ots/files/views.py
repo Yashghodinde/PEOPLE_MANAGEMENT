@@ -468,6 +468,15 @@ def person_storage(request: HttpRequest, user_id: uuid.UUID) -> HttpResponse:
     if day is None:
         day = today_local() if today_rows else (days[0][0] if days else today_local())
     rows = personal.versions_on(target, day)
+    from .models import File, FileArea, FileVisibility
+
+    personal_rows = list(
+        File.objects.filter(
+            owner=target, visibility=FileVisibility.PRIVATE, area=FileArea.PERSONAL, status="ACTIVE"
+        )
+        .select_related("current_version", "folder")
+        .order_by("folder__name", "display_name")[:200]
+    )  # Personal storage, read-only, no folder is created by looking
     with transaction.atomic():  # the audit row is written with the visit, or the visit does not happen
         audit.record(
             "storage.browsed", request.user, target, {"day": day.isoformat(), "files": len(rows)}, request
@@ -477,6 +486,7 @@ def person_storage(request: HttpRequest, user_id: uuid.UUID) -> HttpResponse:
         "files/person_storage.html",
         {
             "page_title": f"{target.full_name}: personal storage", "target": target, "day": day, "rows": rows,
+            "personal_rows": personal_rows,
             "days": [(today_local(), len(today_rows)), *days] if today_rows else days,
             "crumbs": [
                 ("Files", "/files/mine"), ("People's storage", "/files/people"), (target.full_name, ""),
@@ -575,6 +585,16 @@ def _personal_ctx(request: HttpRequest, active: str, **extra: Any) -> dict[str, 
 @login_required
 @require_http_methods(["GET"])
 def mine(request: HttpRequest) -> HttpResponse:
+    """My storage: two folders, Organized storage and Personal storage."""
+    from . import browser
+
+    permissions.require(request.user, "file.upload_personal")
+    return manager_response(request, browser.my_storage_root(request.user))
+
+
+@login_required
+@require_http_methods(["GET"])
+def mine_organized(request: HttpRequest) -> HttpResponse:
     from . import browser
 
     permissions.require(request.user, "file.upload_personal")
@@ -582,7 +602,18 @@ def mine(request: HttpRequest) -> HttpResponse:
         page = max(0, int(request.GET.get("page", "0")))
     except ValueError:
         page = 0
-    return manager_response(request, browser.personal_root(request.user, page))
+    return manager_response(request, browser.organized_root(request.user, page))
+
+
+@login_required
+@require_http_methods(["GET"])
+def mine_personal(request: HttpRequest) -> HttpResponse:
+    """Personal storage: the person's own folders. Its root is made here, the first time it is opened."""
+    from . import browser, folders
+
+    permissions.require(request.user, "file.upload_personal")
+    root = folders.personal_root(request.user)
+    return manager_response(request, browser.personal_folder(request.user, root))
 
 
 @login_required

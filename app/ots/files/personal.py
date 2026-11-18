@@ -23,7 +23,7 @@ from ots.core.clock import now, today_local
 from ots.core.errors import NotFound, PermissionDenied, ValidationFailed
 
 from . import naming
-from .models import File, FileHandoverRecipient, FileStatus, FileVersion, FileVisibility
+from .models import File, FileArea, FileHandoverRecipient, FileStatus, FileVersion, FileVisibility
 
 DAYS_PER_PAGE = 30
 
@@ -34,6 +34,7 @@ def _mine(user: Any) -> QuerySet[FileVersion]:
         uploaded_by=user,
         file__visibility=FileVisibility.PRIVATE,
         file__status=FileStatus.ACTIVE,
+        file__area=FileArea.ORGANIZED,  # Personal storage has no dates and no Today
         is_voice=False,
     ).select_related("file", "blob", "uploaded_by")
 
