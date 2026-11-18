@@ -52,7 +52,7 @@ def selfie_view(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
         return render(request, "attendance/selfie.html", {"person": user})
     if request.POST.get("camera") == "unavailable":
-        services.selfie_unavailable(request, user)
+        services.selfie_unavailable(request, user, request.POST.get("reason", "error"))
         return JsonResponse(
             {
                 "error": "camera_required",

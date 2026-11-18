@@ -1,17 +1,24 @@
 {% extends "base_plain.html" %}{% load static %}
+{% comment %}The selfie step of login (IMP-16.5). One state at a time, chosen by selfie.js: asking, live, captured,
+sending, failed, denied, nocamera, busy, insecure. Elements say in which states they show (data-show).{% endcomment %}
 {% block title %}Take your picture · OTS{% endblock %}
 {% block body %}
 <main class="min-h-screen flex items-center justify-center p-5">
-  <div id="selfie-root" data-url="/login/selfie" data-csrf="{{ csrf_token }}" class="w-full max-w-[520px] bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3">
+  <div id="selfie-root" data-url="/login/selfie" data-csrf="{{ csrf_token }}" data-state="asking" class="w-full max-w-[520px] bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3">
     <h1 class="text-title font-semibold">Hello, {{ person.full_name }}</h1>
     <p class="text-body text-ink-600">Take a quick picture to start your day. Look at the camera.</p>
-    <p id="selfie-msg" role="alert" class="text-body text-bad"></p>
-    <div class="relative">
-      <video id="selfie-video" autoplay playsinline muted class="w-full rounded-sm bg-ink-900 aspect-[4/3]"></video>
+    <p id="selfie-msg" role="status" aria-live="polite" class="text-body text-ink-900"></p>
+    <div class="relative rounded-sm overflow-hidden bg-ink-900 aspect-[4/3]">
+      <video id="selfie-video" autoplay playsinline muted data-show="live" class="w-full h-full object-cover"></video>
+      <img id="selfie-still" alt="Your picture, ready to send" data-show="captured sending failed" hidden class="w-full h-full object-cover">
       <canvas id="selfie-canvas" width="480" height="360" class="hidden"></canvas>
     </div>
-    <div class="flex gap-3">
-      <button id="selfie-capture" type="button" disabled class="inline-flex items-center justify-center h-5 px-4 rounded-full text-body font-medium bg-accent text-canvas disabled:opacity-50">Capture and continue</button>
+    <div class="flex gap-3 flex-wrap">
+      <button id="selfie-capture" type="button" data-show="live" class="inline-flex items-center justify-center h-5 px-5 rounded-full text-body font-medium bg-accent text-canvas">Take picture</button>
+      <button id="selfie-confirm" type="button" data-show="captured" class="inline-flex items-center justify-center h-5 px-5 rounded-full text-body font-medium bg-accent text-canvas">Use this picture and continue</button>
+      <button id="selfie-retake" type="button" data-show="captured failed" class="inline-flex items-center justify-center h-5 px-5 rounded-full text-body font-medium border border-accent text-accent hover:bg-line">Retake</button>
+      <button id="selfie-retry" type="button" data-show="failed" class="inline-flex items-center justify-center h-5 px-5 rounded-full text-body font-medium bg-accent text-canvas">Send again</button>
+      <button id="selfie-again" type="button" data-show="denied nocamera busy" class="inline-flex items-center justify-center h-5 px-5 rounded-full text-body font-medium bg-accent text-canvas">Try again</button>
       <a href="/login" class="inline-flex items-center justify-center h-5 px-4 rounded-full text-body text-ink-600 hover:bg-line">Cancel</a>
     </div>
     <noscript><p class="text-body text-bad">This step needs JavaScript and a camera.</p></noscript>

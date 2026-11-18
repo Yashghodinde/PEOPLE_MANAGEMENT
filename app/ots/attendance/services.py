@@ -90,10 +90,14 @@ def start_session(
     return ws
 
 
-def selfie_unavailable(request: Any, user: Any) -> None:
-    """The browser could not use the camera (F-AT-3): no login, and it is written down."""
+CAMERA_REASONS = ("denied", "nocamera", "busy", "insecure", "error")
+
+
+def selfie_unavailable(request: Any, user: Any, reason: str = "error") -> None:
+    """The browser could not use the camera (F-AT-3): no login, and it is written down with the reason."""
+    reason = reason if reason in CAMERA_REASONS else "error"
     with transaction.atomic():
-        audit.record("auth.selfie_unavailable", user, user, {}, request)
+        audit.record("auth.selfie_unavailable", user, user, {"reason": reason}, request)
 
 
 def existing_for_key(user: Any, key: Any) -> WorkSession | None:

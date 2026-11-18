@@ -144,3 +144,57 @@ def test_the_selfie_page_actually_shows_the_camera_and_button(emp):
     stage_one(c)
     body = c.get("/login/selfie").content.decode()
     assert 'id="selfie-video"' in body and 'id="selfie-capture"' in body and "js/selfie.js" in body
+
+
+# ---- IMP-16.5: the selfie page is a small state machine, and the server records why there was no picture ----
+
+
+def test_the_page_offers_preview_retake_confirm_and_a_specific_message_per_problem(emp):
+    c = Client()
+    stage_one(c)
+    page = c.get("/login/selfie").content.decode()
+    for needle in ('id="selfie-capture"', 'id="selfie-confirm"', 'id="selfie-retake"', 'id="selfie-retry"',
+                   'id="selfie-again"', 'id="selfie-still"', 'data-state="asking"'):  # fmt: skip
+        assert needle in page, needle
+    import pathlib
+
+    js = (pathlib.Path(__file__).resolve().parents[2] / "app/static/js/selfie.js").read_text()
+    for state in ("denied", "nocamera", "busy", "insecure", "failed", "captured", "sending"):
+        assert state in js, state
+    assert "isSecureContext" in js and "NotAllowedError" in js and "NotReadableError" in js
+
+
+@pytest.mark.parametrize("reason", ["denied", "nocamera", "busy", "insecure"])
+def test_the_reason_the_camera_failed_is_written_down_and_nobody_is_let_in(emp, reason):
+    c = Client()
+    stage_one(c)
+    r = c.post(
+        "/login/selfie", {"camera": "unavailable", "reason": reason}, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4())
+    )
+    assert r.status_code == 403
+    row = AuditLog.objects.get(action="auth.selfie_unavailable")
+    assert row.payload.get("reason") == reason
+    assert WorkSession.objects.count() == 0 and c.get("/app/dashboard").status_code == 302
+
+
+def test_an_unknown_reason_is_recorded_as_error_not_trusted(emp):
+    c = Client()
+    stage_one(c)
+    c.post(
+        "/login/selfie",
+        {"camera": "unavailable", "reason": "<script>"},
+        HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+    )
+    assert AuditLog.objects.filter(action="auth.selfie_unavailable").count() == 1
+    from ots.attendance import services
+
+    assert "denied" in services.CAMERA_REASONS and "<script>" not in services.CAMERA_REASONS
+
+
+def test_a_retried_picture_with_the_same_key_still_makes_one_session(emp):
+    c = Client()
+    stage_one(c)
+    key = str(uuid.uuid4())
+    assert send(c, key=key).status_code == 200
+    assert send(c, key=key).status_code == 200  # the first answer again; the response had been lost
+    assert WorkSession.objects.count() == 1
