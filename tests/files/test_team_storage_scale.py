@@ -44,10 +44,14 @@ def add_people(mgr, start: int, reports: int, per_person: int):
             )
 
 
+def day_url() -> str:
+    return f"/files/tasks/d/{FileVersion.objects.order_by('-uploaded_on').first().uploaded_on:%Y-%m-%d}"
+
+
 def queries(who: str) -> int:
     c = login(who)
     with CaptureQueriesContext(connection) as q:
-        assert c.get("/files/tasks").status_code == 200
+        assert c.get(day_url()).status_code == 200
     return len(q)
 
 
@@ -59,7 +63,7 @@ def test_the_query_count_does_not_grow_with_the_team():
     assert FileVersion.objects.count() >= 484
     big = queries("mgr")
     assert big <= small + 2, f"{small} queries for 2 reports, {big} for 50"
-    page = login("mgr").get("/files/tasks").content.decode()
+    page = login("mgr").get(day_url()).content.decode()
     assert "Person 000" in page and "Person 049" in page
     assert queries("boss") <= small + 4
-    assert "Person 0" not in login("mgr2").get("/files/tasks").content.decode()
+    assert "Person 0" not in login("mgr2").get(day_url()).content.decode()

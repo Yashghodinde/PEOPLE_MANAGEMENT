@@ -4,7 +4,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
 {% block content %}
 <div class="flex flex-col gap-4 max-w-page">
   {% include "files/_nav.html" %}
-  <div x-data="uploader" data-scope="personal" data-default-relation="REFERENCE" data-folder-id="{{ m.parent_id }}" data-refresh="1"{% if not m.can_upload %} data-locked="1"{% endif %}
+  <div x-data="uploader" data-scope="{{ m.scope }}" data-workspace-id="{{ m.workspace_id }}" data-default-relation="REFERENCE" data-folder-id="{{ m.parent_id }}" data-refresh="1"{% if not m.can_upload %} data-locked="1"{% endif %}
        @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped" class="relative">
     <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
     <input type="file" multiple webkitdirectory class="sr-only" x-ref="dir" @change="pickedDir" aria-label="Choose a folder to upload">
@@ -13,18 +13,19 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
              class="bg-canvas border border-line rounded-md shadow-card flex flex-col min-h-[420px]" :class="dropClass" aria-label="{{ m.title }}" @keydown.escape.window="closeAll">
       <div class="flex items-center justify-between gap-3 flex-wrap p-3 border-b border-line">
         <div class="flex items-center gap-3 flex-wrap">
+          {% for label, url in m.actions %}<a href="{{ url }}" class="inline-flex items-center gap-2 h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium hover:bg-ink-900">{{ label }}</a>{% endfor %}
           {% if m.can_create %}
           <div x-data="dropdown" class="relative" @click.outside="close">
             <button type="button" @click="toggle" aria-haspopup="menu" class="inline-flex items-center gap-2 h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium hover:bg-ink-900">{% icon "plus" %}Create or Upload{% icon "chevron-down" "3" %}</button>
             <div x-show="open" x-cloak @click="close" role="menu" class="fm-menu left-0 right-auto mt-2 w-[240px] bg-canvas border border-line rounded-md shadow-card p-2">
-              <p class="px-3 pt-1 pb-1 text-cap font-medium text-ink-600">Create</p>
-              <button type="button" role="menuitem" @click="openNew" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder-plus" %}New folder</button>
+              {% if m.create_url %}<p class="px-3 pt-1 pb-1 text-cap font-medium text-ink-600">Create</p>
+              <button type="button" role="menuitem" @click="openNew" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder-plus" %}New folder</button>{% endif %}
               <p class="px-3 pt-2 pb-1 text-cap font-medium text-ink-600">Upload</p>
               <button type="button" role="menuitem" @click="choose" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "upload" %}Upload files</button>
               <button type="button" role="menuitem" @click="chooseDir" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder" %}Upload folder</button>
             </div>
           </div>
-          {% else %}
+          {% elif m.show_disabled_create %}
           <button type="button" disabled title="{{ m.note|default:'Open a date or a folder to add files.' }}" class="inline-flex items-center gap-2 h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium opacity-50 cursor-not-allowed">{% icon "plus" %}Create or Upload{% icon "chevron-down" "3" %}</button>
           {% endif %}
           {% if m.note %}<p class="text-cap text-ink-600">{{ m.note }}</p>{% endif %}
@@ -48,12 +49,12 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
       <div class="flex flex-1 min-h-0">
         <div class="flex-1 min-w-0 flex flex-col">
           <div class="fm-list-head fm-head text-cap font-medium text-ink-600 border-b border-line" :data-view="view">
-            <span>Name</span><span>Modified</span><span>Modified by</span><span>Size</span><span>Status</span><span></span>
+            <span>Name</span><span>Modified</span><span>{{ m.column_by|default:"Modified by" }}</span><span>Size</span><span>Status</span><span></span>
           </div>
           {% if m.items %}
           <ul x-ref="list" class="fm-list" :data-view="view" data-view="list" aria-label="Files and folders">
             {% for it in m.items %}
-            <li data-item data-kind="{{ it.kind }}" data-id="{{ it.id }}" data-title="{{ it.name }}" data-name="{{ it.name|lower }}" data-mod="{{ it.modified|date:'U' }}" data-size="{{ it.size|default_if_none:0 }}" data-type="{{ it.type|lower }}" data-details="{{ it.details }}" @click="select" aria-selected="false">
+            <li data-item data-kind="{{ it.kind }}" data-id="{{ it.id }}" data-title="{{ it.name }}" data-name="{{ it.name|lower }}" data-mod="{{ it.modified|date:'U' }}" data-size="{{ it.size|default_if_none:0 }}" data-type="{{ it.type|lower }}" data-details="{{ it.details }}" data-rename="{{ it.rename_url }}" data-hide="{{ it.hide_url }}" @click="select" aria-selected="false">
               <div class="flex items-center gap-3 min-w-0">
                 {% if it.kind == "folder" %}{% icon "folder" "5" "text-accent" %}<a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>
                 {% else %}{% icon "file-text" "5" "text-ink-600" %}<a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>{% if it.versions and it.versions > 1 %}<span class="text-cap text-ink-600 shrink-0">v{{ it.versions }}</span>{% endif %}{% endif %}
@@ -84,7 +85,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
           </ul>
           {% endif %}
           <div class="flex-1 flex items-center justify-center p-5 text-body text-ink-600 text-center min-h-[160px]">{% if not m.items %}{{ m.empty }}{% endif %}</div>
-          {% if m.more or m.page %}<div class="flex gap-4 text-body p-3 border-t border-line">{% if m.page %}<a class="text-accent" href="?page={{ m.page|add:'-1' }}">Newer days</a>{% endif %}{% if m.more %}<a class="text-accent" href="?page={{ m.page|add:'1' }}">Older days</a>{% endif %}</div>{% endif %}
+          {% if m.more or m.page %}<div class="flex gap-4 text-body p-3 border-t border-line">{% if m.page %}<a class="text-accent" href="?page={{ m.page|add:'-1' }}">Newer days</a>{% endif %}{% if m.more and m.next_before %}<a class="text-accent" href="?before={{ m.next_before|date:'Y-m-d' }}">Older days</a>{% elif m.more %}<a class="text-accent" href="?page={{ m.page|add:'1' }}">Older days</a>{% endif %}</div>{% endif %}
         </div>
 
         <aside x-show="detailsOpen" x-cloak class="w-[300px] max-w-[45%] shrink-0 border-l border-line p-4 flex flex-col gap-3" aria-label="Details">
@@ -99,9 +100,9 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
 
       {# dialogs #}
       <div x-show="newOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="New folder">
-        <form method="post" action="/files/mine/folders" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
+        <form method="post" action="{{ m.create_url }}" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
           <h2 class="text-sec font-semibold">New folder</h2>
-          <input type="hidden" name="parent" value="{{ m.parent_id }}"><input type="hidden" name="next" value="{{ request.path }}">
+          <input type="hidden" name="parent" value="{{ m.parent_id }}">{% for k, v in m.create_hidden %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}<input type="hidden" name="next" value="{{ m.next }}">
           <label class="text-cap text-ink-600" for="nf-name">Folder name</label>
           <input id="nf-name" x-ref="newName" name="name" maxlength="120" required autocomplete="off" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
           <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Create folder</button></div>
@@ -109,15 +110,15 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
       </div>
       <div x-show="renameOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Rename">
         <form method="post" :action="renameAction" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
-          <h2 class="text-sec font-semibold">Rename</h2><input type="hidden" name="next" value="{{ request.path }}">
+          <h2 class="text-sec font-semibold">Rename</h2><input type="hidden" name="next" value="{{ m.next }}">
           <label class="text-cap text-ink-600" for="rn-name">New name</label>
           <input id="rn-name" name="name" x-model="renameName" maxlength="255" required autocomplete="off" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
           <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Rename</button></div>
         </form>
       </div>
       <div x-show="moveOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Move">
-        <form method="post" action="/files/mine/move" class="bg-canvas rounded-md shadow-card p-5 w-[420px] max-w-full flex flex-col gap-3">{% csrf_token %}
-          <h2 class="text-sec font-semibold">Move to</h2><input type="hidden" name="next" value="{{ request.path }}">
+        <form method="post" action="{{ m.move_url }}" class="bg-canvas rounded-md shadow-card p-5 w-[420px] max-w-full flex flex-col gap-3">{% csrf_token %}
+          <h2 class="text-sec font-semibold">Move to</h2><input type="hidden" name="next" value="{{ m.next }}">
           <input type="hidden" name="kind" :value="moveKind"><input type="hidden" name="id" :value="moveId">
           <label class="text-cap text-ink-600" for="mv-to">Destination folder</label>
           <select id="mv-to" name="to" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><option value="">Directly under its date</option>{% for fid, label in move_targets %}<option value="{{ fid }}">{{ label }}</option>{% endfor %}</select>
@@ -126,7 +127,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
       </div>
       <div x-show="hideOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-label="Delete">
         <form method="post" :action="hideAction" class="bg-canvas rounded-md shadow-card p-5 w-[400px] max-w-full flex flex-col gap-3">{% csrf_token %}
-          <h2 class="text-sec font-semibold">Delete this file?</h2><input type="hidden" name="next" value="{{ request.path }}">
+          <h2 class="text-sec font-semibold">Delete this file?</h2><input type="hidden" name="next" value="{{ m.next }}">
           <p class="text-body text-ink-900 break-words" x-text="hideName"></p>
           <p class="text-cap text-ink-600">It leaves your storage. Nothing is erased, and anyone you already sent it to keeps their copy.</p>
           <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-bad text-canvas text-body font-medium">Delete</button></div>
@@ -134,6 +135,14 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
       </div>
     </section>
 
+    {% if timeline %}
+    <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3 mt-4" aria-label="Exchange timeline">
+      <h2 class="text-sec font-semibold text-ink-900">Exchange timeline</h2>
+      <ol class="flex flex-col divide-y divide-line">{% for e in timeline %}
+        <li class="py-2 flex flex-col gap-1"><p class="text-body text-ink-900">{{ e.title }}</p><p class="text-cap text-ink-600">{{ e.at|date:"d M Y, H:i" }}{% if e.note %} · {{ e.note }}{% endif %}</p></li>{% endfor %}
+      </ol>
+    </section>
+    {% endif %}
     {# the upload tray: compact, bottom right, never blocks the page #}
     <aside x-show="hasItems" x-cloak class="fixed bottom-4 right-4 z-30 w-[360px] max-w-[calc(100vw-32px)] bg-canvas border border-line rounded-md shadow-card p-3 flex flex-col gap-2" aria-label="Uploads">
       <div class="flex items-center justify-between"><h2 class="text-body font-semibold">Uploads</h2><button type="button" @click="toggleTray" class="text-cap text-accent" x-text="trayLabel"></button></div>

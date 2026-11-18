@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime
 import json
 from typing import Any
+from urllib.parse import quote, urlencode
 
 from django.db.models import Count
 
@@ -26,7 +27,9 @@ def _ext(name: str) -> str:
     return name.rsplit(".", 1)[-1].upper() if "." in name else "FILE"
 
 
-def folder_item(f: Folder, counts: tuple[int, int], url: str, location: str, access: str) -> dict[str, Any]:
+def folder_item(
+    f: Folder, counts: tuple[int, int], url: str, location: str, access: str, rename_url: str = ""
+) -> dict[str, Any]:
     n_folders, n_files = counts
     count = n_folders + n_files
     d = {
@@ -34,7 +37,8 @@ def folder_item(f: Folder, counts: tuple[int, int], url: str, location: str, acc
         "modified": f.updated_at, "by": f.created_by.full_name, "size": None,
         "status": "", "versions": None, "items": count, "location": location, "access": access,
         "created": f.created_at, "folder_id": str(f.pk),
-        "can_rename": True, "can_move": True,
+        "can_rename": bool(rename_url), "can_move": bool(rename_url),
+        "rename_url": rename_url, "hide_url": "",
     }  # fmt: skip
     d["details"] = json.dumps(
         {
@@ -64,6 +68,7 @@ def version_item(
         "size": v.size_bytes, "status": v.state, "versions": v.version_number, "items": None,
         "location": location, "access": access, "sent_by": sent_by,
         "can_rename": mine, "can_move": mine, "can_hide": mine, "can_send": mine,
+        "rename_url": f"/files/{f.pk}/rename", "hide_url": f"/files/{f.pk}/hide",
     }  # fmt: skip
     d["details"] = json.dumps(
         {
@@ -105,12 +110,33 @@ def _children(user: Any, parent: Folder | None, day: datetime.date | None) -> li
     return list(qs.order_by("name_key")[:500])
 
 
+PERSONAL_BASE: dict[str, Any] = {
+    "scope": "personal",
+    "workspace_id": "",
+    "create_url": "/files/mine/folders",
+    "create_hidden": [],
+    "move_url": "/files/mine/move",
+    "actions": [],
+    "next": "",
+}
+
+
 def personal_day(user: Any, day: datetime.date) -> dict[str, Any]:
     """A date: its root folders, then files uploaded that day that are not in a folder."""
     label = long_day(day)
     fs = _children(user, None, day)
     counts = _folder_counts([f.pk for f in fs])
-    items = [folder_item(f, counts[f.pk], f"/files/mine/f/{f.pk}", label, ACCESS_PERSONAL) for f in fs]
+    items = [
+        folder_item(
+            f,
+            counts[f.pk],
+            f"/files/mine/f/{f.pk}",
+            label,
+            ACCESS_PERSONAL,
+            f"/files/mine/folders/{f.pk}/rename",
+        )
+        for f in fs
+    ]
     versions = personal.versions_on(user, day)
     items += [
         version_item(v, label, ACCESS_PERSONAL, mine=True) for v in versions if v.file.folder_id is None
@@ -127,6 +153,9 @@ def personal_day(user: Any, day: datetime.date) -> dict[str, Any]:
         "note": "" if today else "New files go to Today. Open a folder to add files to it.",
         "section": "mine",
         "move_day": day,
+        "show_disabled_create": not today,
+        **PERSONAL_BASE,
+        "create_hidden": [("day", f"{day:%Y-%m-%d}")],
     }
 
 
@@ -142,7 +171,17 @@ def personal_folder(user: Any, folder: Folder) -> dict[str, Any]:
     location = " > ".join(["My storage", long_day(day), *[c.name for c in chain]])
     fs = _children(user, folder, None)
     counts = _folder_counts([f.pk for f in fs])
-    items = [folder_item(f, counts[f.pk], f"/files/mine/f/{f.pk}", location, ACCESS_PERSONAL) for f in fs]
+    items = [
+        folder_item(
+            f,
+            counts[f.pk],
+            f"/files/mine/f/{f.pk}",
+            location,
+            ACCESS_PERSONAL,
+            f"/files/mine/folders/{f.pk}/rename",
+        )
+        for f in fs
+    ]
     versions = [
         f.current_version
         for f in File.objects.filter(folder=folder, owner=user, status=FileStatus.ACTIVE)
@@ -154,7 +193,7 @@ def personal_folder(user: Any, folder: Folder) -> dict[str, Any]:
     return {
         "title": folder.name, "items": items, "can_upload": True, "can_create": True,
         "parent_id": str(folder.pk), "crumbs": crumbs, "empty": "This folder is empty.", "note": "",
-        "section": "mine", "move_day": day,
+        "section": "mine", "move_day": day, **PERSONAL_BASE,
     }  # fmt: skip
 
 
@@ -170,7 +209,7 @@ def personal_root(user: Any, page: int = 0) -> dict[str, Any]:
     return {
         "title": "My storage", "items": items, "can_upload": False, "can_create": False, "parent_id": "",
         "crumbs": [], "empty": "", "note": "", "section": "mine", "more": more, "page": page,
-        "dates": True,
+        "dates": True, "show_disabled_create": True, **PERSONAL_BASE,
     }  # fmt: skip
 
 
@@ -181,6 +220,7 @@ def _day_item(d: datetime.date, name: str, n: int | None, now_dt: datetime.datet
         "url": f"/files/mine/{d:%Y-%m-%d}",
         "modified": stamp, "by": "", "size": None, "status": "", "versions": None, "items": n,
         "location": "My storage", "access": ACCESS_PERSONAL, "can_rename": False, "can_move": False,
+        "rename_url": "", "hide_url": "",
         "details": json.dumps({"Name": name, "Location": "My storage", "Access": ACCESS_PERSONAL}),
     }  # fmt: skip
 
@@ -207,4 +247,159 @@ def move_targets(user: Any, limit: int = 300) -> list[tuple[str, str]]:
     return sorted(out, key=lambda t: t[1])
 
 
-__all__ = ["personal_day", "personal_folder", "personal_root", "move_targets"]
+# ---------------------------------------------------------------- shared with me, task files (IMP-14.5)
+
+NO_WRITE: dict[str, Any] = {
+    "scope": "",
+    "workspace_id": "",
+    "create_url": "",
+    "create_hidden": [],
+    "move_url": "",
+    "actions": [],
+    "next": "",
+    "can_upload": False,
+    "can_create": False,
+    "parent_id": "",
+    "show_disabled_create": False,
+    "note": "",
+    "crumbs": [],
+}
+
+
+def shared_with_me(user: Any) -> dict[str, Any]:
+    items = []
+    for v in personal.shared_with_me(user):
+        who = v.sent_by.full_name  # type: ignore[attr-defined]
+        d = version_item(
+            v, f"Sent to you by {who}", "Shared with you; you may open and download it", mine=False
+        )
+        d["by"], d["modified"] = who, v.sent_at  # type: ignore[attr-defined]
+        d["can_send"] = True  # passing it on is a new hand-over, which the server checks again
+        d["details"] = json.dumps(
+            {
+                **json.loads(d["details"]),
+                "Shared by": who,
+                "Shared on": f"{v.sent_at.astimezone(IST):%d %b %Y, %H:%M}",  # type: ignore[attr-defined]
+                "Permission": "View and download",
+            }
+        )
+        items.append(d)
+    return {
+        "title": "Shared with me", "items": items, "empty": "Nothing has been shared with you.",
+        "section": "shared", "column_by": "Shared by", **NO_WRITE,
+    }  # fmt: skip
+
+
+def _task_name(t: Any) -> str:
+    return f"{t.task_code}: {t.title}"
+
+
+def _tq(day: datetime.date, person: str = "") -> str:
+    return "?" + urlencode({"day": f"{day:%Y-%m-%d}", **({"p": person} if person else {})})
+
+
+def _doc_count(tasks: list[Any]) -> int:
+    return sum(len(t.documents) for t in tasks)
+
+
+def _newest(tasks: list[Any]) -> Any:
+    return max((r.version.uploaded_at for t in tasks for d in t.documents for r in d.rows), default=None)
+
+
+def _task_folder(day: datetime.date, tb: Any, person: str = "") -> dict[str, Any]:
+    name = _task_name(tb.task)
+    return {
+        "kind": "folder", "id": f"task-{tb.task.pk}", "name": name, "type": "Task",
+        "url": f"/files/tasks/{tb.task.pk}{_tq(day, person)}", "modified": _newest([tb]), "by": "",
+        "size": None, "status": "", "versions": None, "items": len(tb.documents), "can_rename": False,
+        "can_move": False, "rename_url": "", "hide_url": "",
+        "details": json.dumps({"Task": name, "Documents": str(len(tb.documents)), "Day": long_day(day)}),
+    }  # fmt: skip
+
+
+def task_root(viewer: Any, before: datetime.date | None) -> dict[str, Any]:
+    from . import taskstorage
+
+    days, next_before = taskstorage.task_storage(viewer, before)
+    items = []
+    for blk in days:
+        tasks = blk.tasks + [t for p in blk.people for t in p.tasks]
+        name = long_day(blk.day)
+        items.append({
+            "kind": "folder", "id": f"day-{blk.day}", "name": name, "type": "Folder",
+            "url": f"/files/tasks/d/{blk.day:%Y-%m-%d}", "modified": _newest(tasks), "by": "", "size": None,
+            "status": "", "versions": None, "items": _doc_count(tasks), "can_rename": False,
+            "can_move": False,
+            "rename_url": "", "hide_url": "",
+            "details": json.dumps({"Name": name, "Documents": str(_doc_count(tasks))}),
+        })  # fmt: skip
+    return {
+        "title": "Task files", "items": items, "section": "tasks", "dates": True,
+        "empty": "No task files yet.", "more": next_before is not None, "next_before": next_before,
+        **NO_WRITE,
+    }  # fmt: skip
+
+
+def _day_block(viewer: Any, day: datetime.date) -> Any:
+    from . import taskstorage
+
+    days, _ = taskstorage.task_storage(viewer, day + datetime.timedelta(days=1))
+    return days[0] if days and days[0].day == day else None
+
+
+def task_day(viewer: Any, day: datetime.date, person: str = "") -> dict[str, Any]:
+    """A date: a manager sees employees, an employee sees tasks. With `person`: that employee's tasks."""
+    blk = _day_block(viewer, day)
+    label = long_day(day)
+    crumbs = [
+        ("Files", "/files/mine"),
+        ("Task files", "/files/tasks"),
+        (label, f"/files/tasks/d/{day:%Y-%m-%d}" if person else ""),
+    ]
+    items: list[dict[str, Any]] = []
+    if blk is not None:
+        if person:
+            crumbs.append((person, ""))
+            pb = next((p for p in blk.people if p.name == person), None)
+            items = [_task_folder(day, tb, person) for tb in (pb.tasks if pb else [])]
+        elif blk.people:
+            for pb in blk.people:
+                items.append({
+                    "kind": "folder", "id": f"p-{pb.name}", "name": pb.name, "type": "Employee",
+                    "url": f"/files/tasks/d/{day:%Y-%m-%d}?p={quote(pb.name)}",
+                    "modified": _newest(pb.tasks), "by": "", "size": None, "status": "", "versions": None,
+                    "items": _doc_count(pb.tasks), "can_rename": False, "can_move": False, "rename_url": "",
+                    "hide_url": "", "details": json.dumps({"Employee": pb.name, "Tasks": str(len(pb.tasks))}),
+                })  # fmt: skip
+        else:
+            items = [_task_folder(day, tb) for tb in blk.tasks]
+    return {
+        "title": person or label, "items": items, "section": "tasks", "crumbs": crumbs,
+        "empty": "No files on this day.", **{k: v for k, v in NO_WRITE.items() if k != "crumbs"},
+    }  # fmt: skip
+
+
+def task_exchange(viewer: Any, task: Any, day: datetime.date | None, person: str) -> dict[str, Any]:
+    from . import taskstorage
+
+    crumbs = [("Files", "/files/mine"), ("Task files", "/files/tasks")]
+    if day:
+        crumbs.append((long_day(day), f"/files/tasks/d/{day:%Y-%m-%d}"))
+        if person:
+            crumbs.append((person, f"/files/tasks/d/{day:%Y-%m-%d}?p={quote(person)}"))
+    name = _task_name(task)
+    crumbs.append((name, ""))
+    items = []
+    for doc in taskstorage.document_groups(viewer, task):
+        last = doc.rows[-1]
+        d = version_item(last.version, name, "People on this task, their managers and the boss", mine=False)
+        d["by"] = f"{last.version.uploaded_by.full_name} ({last.uploader_label})"
+        d["details"] = json.dumps(
+            {**json.loads(d["details"]), "Action": last.action, "Note": last.version.note or "None"}
+        )
+        items.append(d)
+    return {
+        "title": name, "items": items, "section": "tasks", "crumbs": crumbs,
+        "empty": "No files you may see on this task.", "actions": [("Open task", f"/app/tasks/{task.pk}")],
+        **{k: v for k, v in NO_WRITE.items() if k not in ("crumbs", "actions")},
+    }  # fmt: skip

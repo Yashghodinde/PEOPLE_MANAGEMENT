@@ -228,7 +228,7 @@ def test_shared_with_me_lists_what_others_sent_newest_first(office):
     handover.send(office["sa"], b.pk, [office["emp"].pk])
     page = login("emp").get("/files/shared").content.decode()
     assert page.index("Second-notes") < page.index("First-notes")
-    assert "from Boss Person" in page and "from Sub Admin" in page
+    assert "Boss Person" in page and "Sub Admin" in page and "Shared by" in page
 
 
 def test_my_storage_pages_have_a_flat_query_count(office):

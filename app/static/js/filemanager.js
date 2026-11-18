@@ -74,7 +74,7 @@ document.addEventListener("alpine:init", function () {
       openRename: function (e) {
         var li = e.currentTarget.closest("[data-item]");
         this.renameKind = li.dataset.kind;
-        this.renameAction = li.dataset.kind === "folder" ? "/files/mine/folders/" + li.dataset.id + "/rename" : "/files/" + li.dataset.id + "/rename";
+        this.renameAction = li.dataset.rename;
         this.renameName = li.dataset.title; this.renameOpen = true;
         e.currentTarget.closest("details").removeAttribute("open");
       },
@@ -85,7 +85,7 @@ document.addEventListener("alpine:init", function () {
       },
       openHide: function (e) {
         var li = e.currentTarget.closest("[data-item]");
-        this.hideAction = "/files/" + li.dataset.id + "/hide"; this.hideName = li.dataset.title; this.hideOpen = true;
+        this.hideAction = li.dataset.hide; this.hideName = li.dataset.title; this.hideOpen = true;
         e.currentTarget.closest("details").removeAttribute("open");
       },
       closeAll: function () { this.newOpen = this.renameOpen = this.moveOpen = this.hideOpen = false; },

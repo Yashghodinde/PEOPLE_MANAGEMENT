@@ -90,22 +90,43 @@ def test_the_task_files_page_lists_only_my_exchange(world):
     assert "e2-work" in panel and "e1-work" not in panel
 
 
-def test_team_storage_groups_a_managers_view_by_day_then_employee_then_task(world):
+def _day(c):
+    """The date folder holding today's files."""
+    from ots.core.clock import today_local
+
+    return f"/files/tasks/d/{today_local():%Y-%m-%d}"
+
+
+def test_team_storage_goes_day_then_employee_then_task_then_document(world):
+    from urllib.parse import quote
+
     w = world
     submit(w, "e1", w["a1"], "e1-work.xlsx")
     submit(w, "e2", w["a2"], "e2-work.xlsx")
-    page = login("mgr").get("/files/tasks").content.decode()
-    assert "e1-work" in page and "e2-work" in page
-    assert page.index(w["e1"].full_name) < page.index("e1-work") < page.index(w["e2"].full_name) or (
-        page.index(w["e2"].full_name) < page.index("e2-work") < page.index(w["e1"].full_name)
-    )
+    c = login("mgr")
+    assert "Task files" in c.get("/files/tasks").content.decode()
+    day = c.get(_day(c)).content.decode()
+    assert (
+        w["e1"].full_name in day and w["e2"].full_name in day and "e1-work" not in day
+    )  # employees, not files
+    person = c.get(f"{_day(c)}?p={quote(w['e1'].full_name)}").content.decode()
+    assert w["task"].task_code in person and "e2-work" not in person
+    task = c.get(f"/files/tasks/{w['task'].pk}").content.decode()
+    assert "e1-work" in task and "e2-work" in task
     # an employee's own page stays date -> task -> document, with no other person's name or file
-    mine = login("e1").get("/files/tasks").content.decode()
-    assert "e1-work" in mine and "e2-work" not in mine and w["e2"].full_name not in mine
+    e1 = login("e1")
+    mine_day = e1.get(_day(e1)).content.decode()
+    assert w["task"].task_code in mine_day and w["e2"].full_name not in mine_day
+    mine = e1.get(f"/files/tasks/{w['task'].pk}").content.decode()
+    assert "e1-work" in mine and "e2-work" not in mine
 
 
 def test_the_boss_sees_every_employee_and_a_stranger_manager_sees_none(world):
     w = world
     submit(w, "e1", w["a1"], "e1-work.xlsx")
-    assert "e1-work" in login("boss").get("/files/tasks").content.decode()
-    assert "e1-work" not in login("mgr2").get("/files/tasks").content.decode()
+    boss = login("boss")
+    assert w["e1"].full_name in boss.get(_day(boss)).content.decode()
+    assert "e1-work" in boss.get(f"/files/tasks/{w['task'].pk}").content.decode()
+    other = login("mgr2")
+    assert w["e1"].full_name not in other.get(_day(other)).content.decode()
+    assert other.get(f"/files/tasks/{w['task'].pk}").status_code == 404

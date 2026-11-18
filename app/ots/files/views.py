@@ -450,13 +450,15 @@ def mine_folder(request: HttpRequest, folder_id: uuid.UUID) -> HttpResponse:
     return _manager(request, browser.personal_folder(request.user, folder))
 
 
-def _manager(request: HttpRequest, m: dict[str, Any]) -> HttpResponse:
+def _manager(request: HttpRequest, m: dict[str, Any], **extra: Any) -> HttpResponse:
     """Every file section renders through this one page (IMP-14.3)."""
     from . import browser
 
+    m["next"] = request.get_full_path()
     ctx = {
         "m": m, "page_title": m["title"], "crumbs": m["crumbs"], "max_mb": settings.OTS_UPLOAD_MAX_MB,
         "move_targets": browser.move_targets(request.user) if m.get("section") == "mine" else [],
+        **extra,
     }  # fmt: skip
     return render(request, "files/manager.html", ctx)
 
@@ -524,24 +526,18 @@ def mine_move(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def shared(request: HttpRequest) -> HttpResponse:
-    from . import personal
+    from . import browser
 
-    return render(
-        request,
-        "files/shared.html",
-        _personal_ctx(
-            request, "shared", page_title="Shared with me", rows=personal.shared_with_me(request.user)
-        ),
-    )
+    return _manager(request, browser.shared_with_me(request.user))
 
 
 @login_required
 @require_http_methods(["GET"])
 def task_storage_page(request: HttpRequest) -> HttpResponse:
-    """/files/tasks: date, then task, then document, newest day first, a week at a time."""
+    """/files/tasks: the dates, newest first, a week at a time; each opens to its employees or tasks."""
     import datetime
 
-    from . import taskstorage
+    from . import browser
 
     try:
         before = (
@@ -549,32 +545,42 @@ def task_storage_page(request: HttpRequest) -> HttpResponse:
         )
     except ValueError:
         before = None
-    days, next_before = taskstorage.task_storage(request.user, before)
-    return render(
-        request,
-        "files/task_storage.html",
-        _personal_ctx(request, "tasks", page_title="Task files", days=days, next_before=next_before),
-    )
+    m = browser.task_root(request.user, before)
+    m["page_param"] = "before"
+    return _manager(request, m)
+
+
+@login_required
+@require_http_methods(["GET"])
+def task_day_page(request: HttpRequest, day: str) -> HttpResponse:
+    import datetime
+
+    from . import browser
+
+    try:
+        d = datetime.date.fromisoformat(day)
+    except ValueError:
+        raise NotFound("No such day.") from None
+    return _manager(request, browser.task_day(request.user, d, request.GET.get("p", "")[:120]))
 
 
 @login_required
 @require_http_methods(["GET"])
 def task_exchange_page(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
-    """/files/tasks/<id>: one task's documents with every version, and the exchange timeline."""
-    from . import taskstorage
+    """/files/tasks/<id>: one task's documents, and the exchange timeline."""
+    import datetime
+
+    from . import browser, taskstorage
 
     task = Task.objects.visible_to(request.user).filter(pk=task_id).first()
     if task is None:
         raise NotFound("Task not found.")
-    return render(
-        request,
-        "files/task_exchange.html",
-        _personal_ctx(
-            request, "tasks", page_title=f"Files of {task.task_code}", task=task,
-            documents=taskstorage.document_groups(request.user, task),
-            timeline=taskstorage.task_timeline(request.user, task),
-        ),
-    )  # fmt: skip
+    try:
+        day = datetime.date.fromisoformat(request.GET.get("day", "")) if request.GET.get("day") else None
+    except ValueError:
+        day = None
+    m = browser.task_exchange(request.user, task, day, request.GET.get("p", "")[:120])
+    return _manager(request, m, timeline=taskstorage.task_timeline(request.user, task))
 
 
 @login_required

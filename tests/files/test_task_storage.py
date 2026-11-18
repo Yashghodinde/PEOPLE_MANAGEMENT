@@ -71,8 +71,11 @@ def test_each_row_shows_who_when_the_names_note_state_and_badge(office):
     office["emp"].designation = "Accounts Executive"
     office["emp"].save(update_fields=["designation"])
     page = login("sub").get(f"/files/tasks/{office['task'].pk}").content.decode()
-    assert "Rahul Sharma (Employee, Accounts Executive)" in page and "Sub Admin (Sub-Admin)" in page
-    assert "Version 1" in page and "Version 3" in page and v1.file_code in page
+    assert "Sub Admin (Sub-Admin)" in page  # the newest version's sender, with their role
+    assert "Rahul Sharma" in page  # the exchange timeline names who did what
+    assert "v3" in page  # the folder shows the newest version; the history page lists every one
+    assert "_v3." in page  # the details carry the newest version's file code
+    assert login("sub").get(f"/files/{v1.file_id}/trail").status_code == 200
     assert "Not yet off-site" in page or "Off-site" in page
 
 
@@ -233,5 +236,5 @@ def test_the_note_is_stored_with_the_version_and_shown(office):
     )
     v = FileVersion.objects.get()
     assert v.note == "Totals fixed"
-    assert "Note: Totals fixed" in login("sub").get(f"/files/tasks/{t.pk}").content.decode()
+    assert "Totals fixed" in login("sub").get(f"/files/tasks/{t.pk}").content.decode()
     assert "Totals fixed" in [e["note"] for e in taskstorage.task_timeline(office["sub"], t)]

@@ -11,6 +11,7 @@ urlpatterns = [
     path("files/v/<uuid:version_id>/preview", views.preview, name="file-preview"),
     path("files/search", views.search, name="file-search"),
     path("files/tasks", views.task_storage_page, name="file-tasks"),
+    path("files/tasks/d/<str:day>", views.task_day_page, name="file-tasks-day"),
     path("files/tasks/<uuid:task_id>", views.task_exchange_page, name="file-task-exchange"),
     path("files/mine", views.mine, name="file-mine"),
     path("files/mine/f/<uuid:folder_id>", views.mine_folder, name="file-mine-folder"),
