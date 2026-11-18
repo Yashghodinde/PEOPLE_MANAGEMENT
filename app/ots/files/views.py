@@ -149,7 +149,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         size = int(data.get("size"))
     except (TypeError, ValueError):
         raise ValidationFailed("The size is not valid.", fields={"size": ["Invalid."]}) from None
-    scope_in = data.get("scope") if data.get("scope") in ("personal", "workspace") else ""
+    scope_in = data.get("scope") if data.get("scope") in ("personal", "workspace", "library") else ""
     ws = None
     if (
         scope_in == "workspace"
@@ -172,8 +172,8 @@ def uploads(request: HttpRequest) -> JsonResponse:
         display_name=str(data.get("display_name") or ""),
         scope=scope_in,
         workspace=ws,
-        folder_id=_uuid(data.get("folder_id"), "folder_id") if scope_in == "personal" else None,
-        relative_dirs=rel if scope_in == "personal" else None,
+        folder_id=_uuid(data.get("folder_id"), "folder_id") if scope_in in ("personal", "library") else None,
+        relative_dirs=rel if scope_in in ("personal", "library") else None,
         note=str(data.get("note") or "")[:200],
         size=size,
         sha256=str(data.get("sha256") or ""),
@@ -372,37 +372,66 @@ def attach(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def library_page(request: HttpRequest) -> HttpResponse:
+    from . import browser
+
     raw = request.GET.get("folder", "")
-    view = selectors.library_view(raw if _is_uuid(raw) else None)
-    if not view:
+    m = browser.library(request.user, raw if _is_uuid(raw) else None)
+    if not m:
         raise NotFound("No such folder.")
-    view["can_manage"] = permissions.can(request.user, "library.manage", None)
-    view["page_title"] = "Library"
-    return render(request, "files/library.html", view)
+    return _manager(request, m, move_targets=browser.library_move_targets() if m["can_create"] else [])
+
+
+def _back_to_library(folder: Any) -> str:
+    return f"/files/library?folder={folder}" if folder else "/files/library"
 
 
 @login_required
 @require_http_methods(["POST"])
 def library_folder(request: HttpRequest) -> HttpResponse:
-    from django.shortcuts import redirect
-
     from . import library
 
     parent = request.POST.get("parent") or None
-    library.create_folder(request.user, request.POST.get("name", ""), parent, request)
-    return redirect(f"/files/library?folder={parent}" if parent else "/files/library")
+    return _folder_post(
+        request, lambda: library.create_folder(request.user, request.POST.get("name", ""), parent, request),
+        _back_to_library(parent),
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["POST"])
+def library_folder_rename(request: HttpRequest, folder_id: uuid.UUID) -> HttpResponse:
+    from . import library
+
+    name = request.POST.get("name", "")
+    return _folder_post(
+        request,
+        lambda: library.rename_folder(request.user, folder_id, name, request),
+        _back_to_library(folder_id),
+    )
 
 
 @login_required
 @require_http_methods(["POST"])
 def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
-    from django.shortcuts import redirect
-
     from . import library
 
     folder = request.POST.get("folder") or None
-    library.move_file(request.user, file_id, folder, request)
-    return redirect(f"/files/library?folder={folder}" if folder else "/files/library")
+    return _folder_post(
+        request, lambda: library.move_file(request.user, file_id, folder, request), _back_to_library(folder)
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def library_move_item(request: HttpRequest) -> HttpResponse:
+    """The file manager's Move dialog: kind, id, to."""
+    from . import library
+
+    to = request.POST.get("to") or None
+    fid = _uuid(request.POST.get("id", ""), "id", True)
+    return _folder_post(
+        request, lambda: library.move_file(request.user, fid, to, request), _back_to_library(to)
+    )
 
 
 # ---------------------------------------------------------------- personal storage (IMP-02)

@@ -26,6 +26,12 @@ urlpatterns = [
     path("files/<uuid:file_id>/restore", views.personal_restore, name="file-restore"),
     path("files/library", views.library_page, name="file-library"),
     path("files/library/folders", views.library_folder, name="file-library-folder"),
+    path(
+        "files/library/folders/<uuid:folder_id>/rename",
+        views.library_folder_rename,
+        name="file-library-rename",
+    ),
+    path("files/library/move", views.library_move_item, name="file-library-move-item"),
     path("files/library/files/<uuid:file_id>/move", views.library_move, name="file-library-move"),
     path("files/attach/<uuid:task_id>", views.attach, name="file-attach"),
     path("files/<uuid:file_id>/trail", views.file_trail, name="file-trail"),

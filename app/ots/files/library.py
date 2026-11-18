@@ -48,6 +48,18 @@ def create_folder(
     return folder
 
 
+def ensure_path(user: Any, parts: list[str], parent_id: Any = None) -> LibraryFolder | None:
+    """Create (or reuse) each folder of `parts` under `parent_id` (a folder upload). Returns the last."""
+    require(user, "library.manage", None)
+    cur_id, last = parent_id, None
+    for raw in parts:
+        name = _name(raw)
+        existing = LibraryFolder.objects.filter(parent_id=cur_id, name=name).first()
+        last = existing or create_folder(user, name, cur_id)
+        cur_id = last.pk
+    return last
+
+
 def rename_folder(user: Any, folder_id: Any, name: str, request: HttpRequest | None = None) -> LibraryFolder:
     require(user, "library.manage", None)
     name = _name(name)

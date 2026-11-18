@@ -14,7 +14,7 @@ from ots.core.clock import IST, today_local
 
 from . import folders as folder_svc
 from . import personal
-from .models import File, FileStatus, FileVersion, Folder, FolderContext
+from .models import File, FileStatus, FileVersion, FileVisibility, Folder, FolderContext
 
 ACCESS_PERSONAL = "Only you and the Super Admin"
 
@@ -403,3 +403,96 @@ def task_exchange(viewer: Any, task: Any, day: datetime.date | None, person: str
         "empty": "No files you may see on this task.", "actions": [("Open task", f"/app/tasks/{task.pk}")],
         **{k: v for k, v in NO_WRITE.items() if k not in ("crumbs", "actions")},
     }  # fmt: skip
+
+
+# ---------------------------------------------------------------- the library (IMP-14.8, layout)
+
+ACCESS_LIBRARY = "Everyone in the company may open and download it"
+
+
+def _lib_path(folder: Any) -> list[Any]:
+    out, cur = [], folder
+    while cur is not None and len(out) < 20:
+        out.append(cur)
+        cur = cur.parent
+    return out[::-1]
+
+
+def library(user: Any, folder_id: Any = None) -> dict[str, Any]:
+    """One level of the Library. Everyone may read it; the Super Admin organises and uploads."""
+    from ots.core.permissions import can
+
+    from .models import LibraryFolder
+
+    folder = LibraryFolder.objects.filter(pk=folder_id).first() if folder_id else None
+    if folder_id and folder is None:
+        return {}
+    manage = can(user, "library.manage", None)
+    chain = _lib_path(folder)
+    where = " > ".join(["Library", *[c.name for c in chain]])
+    crumbs = [("Files", "/files/mine"), ("Library", "/files/library" if chain else "")]
+    crumbs += [(c.name, f"/files/library?folder={c.pk}") for c in chain[:-1]]
+    if chain:
+        crumbs.append((chain[-1].name, ""))
+    subs = list(LibraryFolder.objects.filter(parent=folder).order_by("name")[:500])
+    nfold = dict(
+        LibraryFolder.objects.filter(parent_id__in=[f.pk for f in subs])
+        .values_list("parent_id")
+        .annotate(n=Count("pk"))
+    )
+    nfile = dict(
+        File.objects.filter(visibility=FileVisibility.LIBRARY, library_folder_id__in=[f.pk for f in subs])
+        .values_list("library_folder_id")
+        .annotate(n=Count("pk"))
+    )
+    items = []
+    for f in subs:
+        n = nfold.get(f.pk, 0) + nfile.get(f.pk, 0)
+        items.append(
+            {
+                "kind": "folder", "id": str(f.pk), "name": f.name, "type": "Folder",
+                "url": f"/files/library?folder={f.pk}", "modified": None, "by": "", "size": None,
+                "status": "", "versions": None, "items": n, "can_rename": manage, "can_move": False,
+                "rename_url": f"/files/library/folders/{f.pk}/rename", "hide_url": "",
+                "details": json.dumps(
+                    {"Name": f.name, "Parent": where, "Items": str(n), "Access": ACCESS_LIBRARY}
+                ),
+            }
+        )  # fmt: skip
+    files = (
+        File.objects.filter(
+            visibility=FileVisibility.LIBRARY, library_folder=folder, status=FileStatus.ACTIVE
+        )
+        .select_related("current_version__file", "current_version__uploaded_by")
+        .order_by("display_name")[:500]
+    )
+    for f in files:
+        v = f.current_version
+        if v is None:
+            continue
+        d = version_item(v, where, ACCESS_LIBRARY, mine=False)
+        d["can_move"] = manage
+        items.append(d)
+    return {
+        "title": folder.name if folder else "Library", "items": items, "section": "library",
+        "crumbs": crumbs if chain else [], "scope": "library", "workspace_id": "",
+        "can_upload": manage, "can_create": manage, "create_url": "/files/library/folders" if manage else "",
+        "create_hidden": [], "move_url": "/files/library/move", "actions": [], "next": "",
+        "parent_id": str(folder.pk) if folder else "", "show_disabled_create": False,
+        "empty": "This folder is empty.", "note": "",
+    }  # fmt: skip
+
+
+def library_move_targets() -> list[tuple[str, str]]:
+    from .models import LibraryFolder
+
+    rows = {f["pk"]: f for f in LibraryFolder.objects.values("pk", "parent_id", "name")[:500]}
+    out = []
+    for r in rows.values():
+        parts, cur, guard = [], r, 0
+        while cur is not None and guard < 20:
+            parts.append(cur["name"])
+            cur = rows.get(cur["parent_id"])
+            guard += 1
+        out.append((str(r["pk"]), "Library > " + " > ".join(reversed(parts))))
+    return sorted(out, key=lambda t: t[1])

@@ -99,6 +99,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
       <div x-show="dragging" x-cloak class="absolute inset-0 z-20 rounded-md border-2 border-dashed border-accent bg-canvas/80 flex items-center justify-center pointer-events-none"><p class="text-sec font-semibold text-accent">Drop to upload here</p></div>
 
       {# dialogs #}
+      {% if m.create_url %}
       <div x-show="newOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="New folder">
         <form method="post" action="{{ m.create_url }}" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
           <h2 class="text-sec font-semibold">New folder</h2>
@@ -108,6 +109,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
           <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Create folder</button></div>
         </form>
       </div>
+      {% endif %}
       <div x-show="renameOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Rename">
         <form method="post" :action="renameAction" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
           <h2 class="text-sec font-semibold">Rename</h2><input type="hidden" name="next" value="{{ m.next }}">

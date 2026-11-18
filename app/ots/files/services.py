@@ -111,6 +111,7 @@ def _require_meaningful_name(name: str, task: Task | None) -> None:
 
 PERSONAL = "personal"  # an upload into the sender's own private storage (IMP-02)
 WORKSPACE_SCOPE = "workspace"  # an upload into a File ID workspace (IMP-04)
+LIBRARY_SCOPE = "library"  # an upload into a Library folder (IMP-14); who may is the usual library rule
 
 
 def _resolve_workspace_target(user: User, workspace: Any, file_id: uuid.UUID | None) -> File | None:
@@ -243,7 +244,8 @@ def start_upload(
         override = True
     personal = scope == PERSONAL
     in_workspace = scope == WORKSPACE_SCOPE
-    if (personal or in_workspace) and task is not None:
+    in_library = scope == LIBRARY_SCOPE
+    if (personal or in_workspace or in_library) and task is not None:
         raise ValidationFailed("That upload does not belong to a task.", fields={"scope": ["Invalid."]})
     if in_workspace and workspace is None:
         raise NotFound("Not found.")
@@ -251,7 +253,17 @@ def start_upload(
         target, assignment = _resolve_workspace_target(user, workspace, file_id), None
     else:
         target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
-    folder = None
+    folder: Any = None
+    if in_library and (folder_id or relative_dirs) and target is None:
+        from .models import LibraryFolder
+
+        folder = LibraryFolder.objects.filter(pk=folder_id).first() if folder_id else None
+        if folder_id and folder is None:
+            raise NotFound("No such folder.")
+        if relative_dirs:
+            from .library import ensure_path as library_path
+
+            folder = library_path(user, relative_dirs, folder_id)
     if (
         personal and (folder_id or relative_dirs) and target is None
     ):  # into a folder; the missing ones are made
@@ -275,7 +287,7 @@ def start_upload(
                 expected_size=size,
                 expected_sha256=sha,
                 original_filename=name,
-                scope=scope if (personal or in_workspace) else "",
+                scope=scope if (personal or in_workspace or in_library) else "",
                 workspace_id=workspace.pk if in_workspace else None,
                 folder_id=folder.pk if folder else None,
                 note=" ".join((note or "").split())[:200],
@@ -450,6 +462,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             display_name=s.display_name or s.original_filename,
             owner=user,
             folder_id=s.folder_id if s.scope == PERSONAL else None,
+            library_folder_id=s.folder_id if s.scope == LIBRARY_SCOPE else None,
             visibility=FileVisibility.PRIVATE
             if s.scope == PERSONAL
             else FileVisibility.WORKSPACE
