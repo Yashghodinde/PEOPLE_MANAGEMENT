@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="People">
+    <h2 class="text-sec font-semibold">People's personal storage</h2>
+    <p class="text-cap text-ink-600">Only you, as Super Admin, can open this. Every visit is recorded in the audit log, and so is every download.</p>
+    <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      {% for p in people %}<li><a href="/files/people/{{ p.pk }}" class="flex flex-col gap-1 border border-line rounded-sm p-3 hover:bg-line h-full"><strong class="text-body text-ink-900">{{ p.full_name }}</strong><span class="text-cap text-ink-600">{{ p.get_role_display }} · {{ p.n }} file{{ p.n|pluralize }}</span></a></li>
+      {% empty %}<li class="text-body text-ink-600">Nobody has personal files yet.</li>{% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

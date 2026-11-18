@@ -42,5 +42,9 @@ urlpatterns = [
     path("files/library/files/<uuid:file_id>/move", views.library_move, name="file-library-move"),
     path("files/attach/<uuid:task_id>", views.attach, name="file-attach"),
     path("files/<uuid:file_id>/trail", views.file_trail, name="file-trail"),
+    path("files/people", views.people_storage, name="file-people"),
+    path("files/people/<uuid:user_id>", views.person_storage, name="file-person"),
+    path("files/v/<uuid:version_id>/sharing", views.sharing, name="file-sharing"),
+    path("files/sharing/<uuid:row_id>/stop", views.sharing_stop, name="file-sharing-stop"),
     path("files/v/<uuid:version_id>/handover", views.handover, name="file-handover"),
 ]

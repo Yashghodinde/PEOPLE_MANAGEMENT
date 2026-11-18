@@ -81,7 +81,11 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
         mine
         | Q(file__visibility=FileVisibility.LIBRARY, file__library_state=LibraryState.APPROVED)
         | Exists(_exchange_links(viewer, visible_tasks, team))
-        | Exists(FileHandoverRecipient.objects.filter(handover__version=OuterRef("pk"), to_user_id=viewer.pk))
+        | Exists(
+            FileHandoverRecipient.objects.filter(
+                handover__version=OuterRef("pk"), to_user_id=viewer.pk, revoked_at__isnull=True
+            )
+        )
     )
     if viewer.role == Role.SUB_ADMIN:
         wanted |= (
@@ -177,6 +181,8 @@ def trail(viewer: Any, file_id: Any) -> list[dict[str, Any]] | None:
         for r in h.recipients.all():
             if r.first_opened_at is not None:
                 add(r.first_opened_at, "opened", f"{r.to_user.full_name} opened it for the first time", v)
+            if r.revoked_at is not None:
+                add(r.revoked_at, "revoked", f"Sharing with {r.to_user.full_name} was stopped", v)
     links = TaskFile.objects.filter(
         version_id__in=ids, task__in=Task.objects.visible_to(viewer).values("pk")
     ).select_related("task", "linked_by")

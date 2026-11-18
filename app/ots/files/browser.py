@@ -69,6 +69,7 @@ def version_item(
         "location": location, "access": access, "sent_by": sent_by,
         "can_rename": mine, "can_move": mine, "can_hide": mine, "can_send": mine,
         "rename_url": f"/files/{f.pk}/rename", "hide_url": f"/files/{f.pk}/hide",
+        "share_url": f"/files/v/{v.pk}/sharing" if mine else "",
     }  # fmt: skip
     d["details"] = json.dumps(
         {

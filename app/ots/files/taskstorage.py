@@ -222,6 +222,15 @@ def task_timeline(viewer: Any, task: Task) -> list[dict[str, Any]]:
             }
         )  # fmt: skip
         for r in h.recipients.all():
+            if r.revoked_at:
+                out.append(
+                    {
+                        "at": r.revoked_at, "kind": "revoked", "label": "Stopped", "note": "",
+                        "title": f"Sharing {v.file.display_name if v else 'the file'} "
+                        f"with {r.to_user.full_name} was stopped",
+                        "who": r.revoked_by.full_name if r.revoked_by else "",
+                    }
+                )  # fmt: skip
             if r.first_opened_at:
                 out.append(
                     {

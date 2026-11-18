@@ -22,6 +22,12 @@ def can_upload_personal(user: Any, obj: Any = None) -> bool:
     return _active(user) and user.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN, Role.EMPLOYEE)
 
 
+@policy("file.browse_personal")
+def can_browse_personal(user: Any, obj: Any = None) -> bool:
+    """Only the Super Admin may open a person's personal storage, and every visit is recorded."""
+    return _active(user) and user.role == Role.SUPER_ADMIN
+
+
 @policy("file.restore")
 def can_restore(user: Any, obj: Any = None) -> bool:
     """Only the Super Admin brings a hidden personal file back."""

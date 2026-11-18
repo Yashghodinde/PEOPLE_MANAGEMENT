@@ -426,6 +426,100 @@ def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
 
 
 @login_required
+@require_http_methods(["GET"])
+def people_storage(request: HttpRequest) -> HttpResponse:
+    """The Super Admin's list of people with personal files. Opening one is recorded."""
+    from django.db.models import Count, Q
+
+    from ots.accounts.models import User
+
+    permissions.require(request.user, "file.browse_personal")
+    people = (
+        User.objects.filter(files_owned__visibility="PRIVATE", files_owned__status="ACTIVE")
+        .annotate(
+            n=Count("files_owned", filter=Q(files_owned__visibility="PRIVATE", files_owned__status="ACTIVE"))
+        )
+        .order_by("full_name")[:300]
+    )
+    return render(request, "files/people.html", {"page_title": "People's storage", "people": list(people)})
+
+
+@login_required
+@require_http_methods(["GET"])
+def person_storage(request: HttpRequest, user_id: uuid.UUID) -> HttpResponse:
+    import datetime
+
+    from ots.accounts.models import User
+    from ots.audit import api as audit
+
+    from . import personal
+
+    permissions.require(request.user, "file.browse_personal")
+    target = User.objects.filter(pk=user_id).first()
+    if target is None:
+        raise NotFound("No such person.")
+    days, _more = personal.date_folders(target, 0)
+    today_rows = personal.todays_versions(target)
+    try:
+        day = datetime.date.fromisoformat(request.GET.get("day", "")) if request.GET.get("day") else None
+    except ValueError:
+        day = None
+    if day is None:
+        day = today_local() if today_rows else (days[0][0] if days else today_local())
+    rows = personal.versions_on(target, day)
+    audit.record(
+        "storage.browsed", request.user, target, {"day": day.isoformat(), "files": len(rows)}, request
+    )
+    return render(
+        request,
+        "files/person_storage.html",
+        {
+            "page_title": f"{target.full_name}: personal storage", "target": target, "day": day, "rows": rows,
+            "days": [(today_local(), len(today_rows)), *days] if today_rows else days,
+            "crumbs": [
+                ("Files", "/files/mine"), ("People's storage", "/files/people"), (target.full_name, ""),
+            ],
+        },
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["GET"])
+def sharing(request: HttpRequest, version_id: uuid.UUID) -> HttpResponse:
+    """Who this file was sent to, with Stop sharing. The sender and the Super Admin only; others get a 404."""
+    from . import handover
+
+    version = selectors.versions_visible_to(request.user).filter(pk=version_id).select_related("file").first()
+    rows = handover.shared_with(request.user, version_id) if version else []
+    if version is None or not rows:
+        raise NotFound("Not found.")
+    return render(
+        request,
+        "files/sharing.html",
+        {
+            "page_title": "Shared with", "version": version, "rows": rows,
+            "crumbs": [
+                ("Files", "/files/mine"), ("My storage", "/files/mine"),
+                (version.file.display_name, ""), ("Shared with", ""),
+            ],
+        },
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["POST"])
+def sharing_stop(request: HttpRequest, row_id: uuid.UUID) -> HttpResponse:
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from . import handover
+
+    r = handover.revoke(request.user, row_id, request)
+    messages.success(request, f"Stopped sharing with {r.to_user.full_name}.")
+    return redirect(f"/files/v/{r.handover.version_id}/sharing")
+
+
+@login_required
 @require_http_methods(["POST"])
 def library_approve(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
     from . import library

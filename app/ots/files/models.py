@@ -336,6 +336,10 @@ class FileHandoverRecipient(models.Model):
     handover = models.ForeignKey(FileHandover, on_delete=models.PROTECT, related_name="recipients")
     to_user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="handovers_received")
     first_opened_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(
+        null=True, blank=True
+    )  # the sender (or the Super Admin) stopped sharing
+    revoked_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
 
     class Meta:
         db_table = "file_handover_recipients"

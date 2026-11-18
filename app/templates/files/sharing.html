@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-3" aria-label="Shared with">
+    <div class="flex flex-col gap-1">
+      <h2 class="text-sec font-semibold text-ink-900 break-words">{{ version.file.display_name }}</h2>
+      <p class="text-cap text-ink-600">Version {{ version.version_number }}. Stopping sharing takes the file out of that person's "Shared with me" and closes their download. The record that it was shared stays.</p>
+    </div>
+    <ul class="flex flex-col divide-y divide-line border-t border-line">
+      {% for r in rows %}
+      <li class="py-3 flex items-center justify-between gap-3 flex-wrap" data-row="{{ r.pk }}">
+        <div class="min-w-0">
+          <p class="text-body font-medium text-ink-900">{{ r.to_user.full_name }}</p>
+          <p class="text-cap text-ink-600">Sent by {{ r.handover.from_user.full_name }} on {{ r.handover.sent_at|date:"d M Y, H:i" }}{% if r.first_opened_at %} · opened {{ r.first_opened_at|date:"d M Y, H:i" }}{% else %} · not opened yet{% endif %}{% if r.handover.note %} · "{{ r.handover.note }}"{% endif %}</p>
+          {% if r.revoked_at %}<p class="text-cap text-bad">Sharing stopped on {{ r.revoked_at|date:"d M Y, H:i" }} by {{ r.revoked_by.full_name }}</p>{% endif %}
+        </div>
+        {% if not r.revoked_at %}
+        <form method="post" action="/files/sharing/{{ r.pk }}/stop">{% csrf_token %}{% include "components/button.html" with label="Stop sharing" type="submit" variant="danger" %}</form>
+        {% else %}<span class="inline-flex items-center h-4 px-3 rounded-full border border-line text-cap text-ink-600">Stopped</span>{% endif %}
+      </li>{% endfor %}
+    </ul>
+    <div>{% include "components/button.html" with label="Send to someone else" href="/files/v/"|add:version.pk|stringformat:"s"|add:"/handover" variant="secondary" %}</div>
+  </section>
+</div>
+{% endblock %}

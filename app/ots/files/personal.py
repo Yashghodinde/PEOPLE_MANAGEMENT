@@ -63,7 +63,7 @@ def shared_with_me(user: Any, limit: int = 100) -> list[FileVersion]:
     """Versions other people sent to this person, newest hand-over first (each once)."""
     seen: dict[Any, FileVersion] = {}
     qs = (
-        FileHandoverRecipient.objects.filter(to_user=user)
+        FileHandoverRecipient.objects.filter(to_user=user, revoked_at__isnull=True)
         .select_related("handover__version__file", "handover__version__blob", "handover__from_user")
         .order_by("-handover__sent_at", "-pk")[: limit * 3]
     )

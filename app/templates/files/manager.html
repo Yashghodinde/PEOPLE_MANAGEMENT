@@ -80,6 +80,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
                     {% if it.can_rename %}<button type="button" @click="openRename" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Rename</button>{% endif %}
                     {% if it.can_move %}<button type="button" @click="openMove" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Move to...</button>{% endif %}
                     {% if it.kind == "file" %}<a href="{{ it.history }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Version history</a>{% endif %}
+                    {% if it.share_url %}<a href="{{ it.share_url }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Shared with...</a>{% endif %}
                     {% if it.can_send %}<a href="{{ it.send }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Send to...</a>{% endif %}
                     {% if it.can_review %}<button type="button" @click="openReject" class="text-left h-5 px-3 rounded-sm text-body text-bad hover:bg-line">Do not approve...</button>{% endif %}
                     {% if it.toggle_url %}<form method="post" action="{{ it.toggle_url }}">{% csrf_token %}<input type="hidden" name="allow" value="{{ it.toggle_value }}"><input type="hidden" name="next" value="{{ m.next }}"><button type="submit" class="text-left h-5 w-full px-3 rounded-sm text-body hover:bg-line">{{ it.toggle_label }}</button></form>{% endif %}

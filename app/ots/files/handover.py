@@ -100,7 +100,7 @@ def send(
 def record_open(user: Any, version: FileVersion, request: HttpRequest | None = None) -> bool:
     """First download or preview by a recipient sets `first_opened_at` once. Returns True when it did."""
     waiting = FileHandoverRecipient.objects.filter(
-        to_user=user, handover__version=version, first_opened_at__isnull=True
+        to_user=user, handover__version=version, first_opened_at__isnull=True, revoked_at__isnull=True
     )
     if not waiting.exists():  # nearly every download: one cheap read, no lock, no savepoint
         return False
@@ -108,7 +108,9 @@ def record_open(user: Any, version: FileVersion, request: HttpRequest | None = N
     with transaction.atomic():
         rows = list(
             FileHandoverRecipient.objects.select_for_update()
-            .filter(to_user=user, handover__version=version, first_opened_at__isnull=True)
+            .filter(
+                to_user=user, handover__version=version, first_opened_at__isnull=True, revoked_at__isnull=True
+            )
             .select_related("handover")
         )
         at = now()
@@ -125,3 +127,44 @@ def record_open(user: Any, version: FileVersion, request: HttpRequest | None = N
             events.publish("file.handover_opened", ("file_version", str(version.pk)), body)
             opened = True
     return opened
+
+
+def shared_with(user: Any, version_id: Any) -> list[FileHandoverRecipient]:
+    """Everyone this version was handed to by `user` (the Super Admin: by anyone), newest first, revoked ones
+    included so the history stays readable. Anyone else gets nothing, and so cannot learn it was shared."""
+    from ots.accounts.models import Role
+
+    qs = FileHandoverRecipient.objects.filter(handover__version_id=version_id).select_related(
+        "to_user", "handover__from_user", "revoked_by"
+    )
+    if getattr(user, "role", None) != Role.SUPER_ADMIN:
+        qs = qs.filter(handover__from_user=user)
+    return list(qs.order_by("-handover__sent_at", "to_user__full_name"))
+
+
+def revoke(user: Any, recipient_row_id: Any, request: HttpRequest | None = None) -> FileHandoverRecipient:
+    """Stop sharing with one person. The sender or the Super Admin; audited; the row stays, marked revoked."""
+    from ots.accounts.models import Role
+
+    with transaction.atomic():
+        r = (
+            FileHandoverRecipient.objects.select_for_update(of=("self",))
+            .select_related("handover__version", "handover__from_user", "to_user")
+            .filter(pk=recipient_row_id)
+            .first()
+        )
+        allowed = r is not None and (user.role == Role.SUPER_ADMIN or r.handover.from_user_id == user.pk)
+        if r is None or not allowed:
+            raise NotFound("Not found.")  # someone else's share and a missing one look the same
+        if r.revoked_at is not None:
+            return r
+        r.revoked_at, r.revoked_by = now(), user
+        r.save(update_fields=["revoked_at", "revoked_by"])
+        body = {
+            "handover_id": str(r.handover_id),
+            "to": str(r.to_user_id),
+            "file_code": r.handover.version.file_code,
+        }
+        audit.record("file.handover_revoked", user, r.handover.version, body, request)
+        events.publish("file.handover_revoked", ("file_version", str(r.handover.version_id)), body)
+    return r

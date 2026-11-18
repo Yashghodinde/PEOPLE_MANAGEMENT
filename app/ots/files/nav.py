@@ -15,7 +15,7 @@ SECTIONS = [
 
 
 def active_section(path: str) -> str:
-    for key, _label, url in [*SECTIONS, ("deleted", "", "/files/deleted")]:
+    for key, _label, url in [*SECTIONS, ("deleted", "", "/files/deleted"), ("people", "", "/files/people")]:
         if path == url or path.startswith(url + "/"):
             return key
     return ""
@@ -34,5 +34,6 @@ def files_strip(user: Any, path: str) -> list[dict[str, Any]] | None:
     on = active_section(path)
     tabs = list(SECTIONS)
     if user.role == Role.SUPER_ADMIN:
+        tabs.append(("people", "People's storage", "/files/people"))
         tabs.append(("deleted", "Deleted", "/files/deleted"))
     return [{"key": k, "label": label, "url": url, "on": k == on} for k, label, url in tabs]
