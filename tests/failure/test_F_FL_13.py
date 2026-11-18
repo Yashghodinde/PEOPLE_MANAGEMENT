@@ -4,11 +4,11 @@ their managers up the chain and the Super Admin. Two employees on one task never
 import uuid
 
 import pytest
-
 from ots.accounts.models import Role
 from ots.files import selectors
 from ots.files.models import FileVersion
 from ots.tasks.models import TaskAssignment
+
 from tests.accounts.factories import make_user
 from tests.files.conftest import login, upload_all
 from tests.tasks.factories import make_task
