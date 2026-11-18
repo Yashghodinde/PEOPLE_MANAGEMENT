@@ -1,5 +1,7 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+{% include "files/_nav.html" %}
 <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-page" aria-label="Search files">
   {% if attach %}<p class="text-body text-ink-900">Choose a file to attach to <strong>{{ attach.title }}</strong>. It is linked as a reference, nothing is copied.</p>{% endif %}
   <form method="get" class="grid grid-cols-2 md:grid-cols-6 gap-x-3 items-start">
@@ -39,4 +41,5 @@
   {% include "components/empty_state.html" with icon="search" text="No files match. Try fewer words." %}
   {% endif %}
 </section>
+</div>
 {% endblock %}

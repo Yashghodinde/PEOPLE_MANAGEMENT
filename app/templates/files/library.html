@@ -1,5 +1,7 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+{% include "files/_nav.html" %}
 <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-page" aria-label="Library">
   <nav class="text-body text-ink-600 flex items-center gap-1 flex-wrap" aria-label="Folder path"><a class="text-accent" href="/files/library">Library</a>{% for f in path %}<span aria-hidden="true">/</span>{% if forloop.last %}<span class="text-ink-900">{{ f.name }}</span>{% else %}<a class="text-accent" href="/files/library?folder={{ f.pk }}">{{ f.name }}</a>{% endif %}{% endfor %}</nav>
   {% if folders %}
@@ -37,4 +39,5 @@
   </form>
   {% endif %}
 </section>
+</div>
 {% endblock %}

@@ -23,7 +23,7 @@ def test_the_files_item_is_highlighted_on_every_files_page(office):
     c = login("boss")
     for path in ("/files/search", "/files/library"):
         html = c.get(path).content.decode()
-        assert re.search(r'href="/files/search"[^>]*aria-current="page"', html), path
+        assert re.search(r'href="/files/mine"[^>]*aria-current="page"', html), path
 
 
 def test_every_files_page_has_a_title_and_a_heading(office):

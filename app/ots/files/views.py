@@ -405,24 +405,8 @@ def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
 # ---------------------------------------------------------------- personal storage (IMP-02)
 
 
-def _files_nav(request: HttpRequest, active: str) -> list[dict[str, Any]]:
-    from ots.accounts.models import Role
-
-    tabs = [
-        ("search", "Search", "/files/search"),
-        ("tasks", "Task files", "/files/tasks"),
-        ("mine", "My storage", "/files/mine"),
-        ("shared", "Shared with me", "/files/shared"),
-        ("ids", "File IDs", "/files/ids"),
-        ("library", "Library", "/files/library"),
-    ]
-    if request.user.role == Role.SUPER_ADMIN:
-        tabs.append(("deleted", "Deleted", "/files/deleted"))
-    return [{"key": k, "label": label, "url": url, "on": k == active} for k, label, url in tabs]
-
-
 def _personal_ctx(request: HttpRequest, active: str, **extra: Any) -> dict[str, Any]:
-    return {"files_nav": _files_nav(request, active), "max_mb": settings.OTS_UPLOAD_MAX_MB, **extra}
+    return {"max_mb": settings.OTS_UPLOAD_MAX_MB, **extra}
 
 
 @login_required

@@ -1,5 +1,7 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+{% include "files/_nav.html" %}
 <section class="bg-canvas border border-line rounded-md shadow-card p-5 flex flex-col gap-4 max-w-[610px]" aria-label="File history">
   <strong class="text-body text-ink-900 break-all">{{ file.display_name }}</strong>
   <ol class="flex flex-col border-l-2 border-line ml-1">
@@ -13,4 +15,5 @@
   </ol>
   <div>{% include "components/button.html" with label="Back" href=back variant="secondary" %}</div>
 </section>
+</div>
 {% endblock %}

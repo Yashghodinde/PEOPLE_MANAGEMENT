@@ -1,5 +1,6 @@
 from django.http import HttpRequest
 
+from ots.files.nav import files_strip
 from ots.notifications.selectors import unread_count
 
 from .nav import items_for
@@ -13,4 +14,5 @@ def ui(request: HttpRequest) -> dict[str, object]:
             {"item": i, "active": request.path.startswith(i.match or i.path)} for i in items_for(role)
         ],
         "unread_count": unread_count(user),
+        "files_nav": files_strip(user, request.path) if role else None,
     }
