@@ -1,0 +1,9 @@
+{% comment %}pagehead.html: params crumbs [(label, url)], back (the parent's url). Rendered by the {% pagehead %} tag.{% endcomment %}{% load ots_ui %}
+<div class="flex items-center gap-3 flex-wrap mb-4" data-pagehead>
+  <a href="{{ back }}" data-back class="inline-flex items-center gap-2 h-5 px-4 rounded-full border border-accent text-accent bg-canvas text-body font-medium hover:bg-line">{% icon "arrow-left" %}Back</a>
+  <nav aria-label="Breadcrumb" class="min-w-0">
+    <ol class="flex items-center gap-2 flex-wrap text-body">
+      {% for label, url in crumbs %}<li class="flex items-center gap-2">{% if url %}<a class="text-accent hover:text-ink-900 hover:underline" href="{{ url }}">{{ label }}</a>{% icon "chevron-right" "3" "text-ink-600" %}{% else %}<span aria-current="page" class="font-semibold text-ink-900">{{ label }}</span>{% endif %}</li>{% endfor %}
+    </ol>
+  </nav>
+</div>

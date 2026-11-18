@@ -35,4 +35,13 @@
     try { msg = JSON.parse(e.detail.xhr.responseText).message || msg; } catch (_) {}
     window.dispatchEvent(new CustomEvent("ots-toast", { detail: { kind: "error", message: msg } }));
   });
+
+  // Back: the browser's own history when the person came from inside the app (keeps scroll and filters), else the parent page.
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("[data-back]");
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    var ref = document.referrer, same = false;
+    try { same = !!ref && new URL(ref).origin === location.origin; } catch (_) {}
+    if (same && history.length > 1) { e.preventDefault(); history.back(); }
+  });
 })();

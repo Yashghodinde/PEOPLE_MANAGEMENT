@@ -98,3 +98,18 @@ def dot(dots: Any, task_id: Any) -> Any:
     return format_html(
         '<span class="ots-dot ots-dot-{}" title="{}" role="img" aria-label="{}"></span>', kind, label, label
     )
+
+
+@register.simple_tag(takes_context=True)
+def pagehead(context: Any) -> str:
+    """The shared page header (IMP-14.1): breadcrumb and a visible Back, from the path and page_title."""
+    from ots.ui.crumbs import trail
+
+    request = context.get("request")
+    if request is None:
+        return ""
+    crumbs = trail(request.path, str(context.get("page_title") or ""))
+    if not crumbs:
+        return ""
+    back = str(context.get("back_url") or "") or next((u for _l, u in reversed(crumbs[:-1]) if u), "")
+    return render_to_string("components/pagehead.html", {"crumbs": crumbs, "back": back})
