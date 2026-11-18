@@ -266,6 +266,7 @@ class UploadSession(models.Model):
     workspace_id = models.UUIDField(
         null=True, blank=True
     )  # the File ID workspace this goes into (scope "workspace")
+    folder_id = models.UUIDField(null=True, blank=True)  # the personal folder the new file goes in (IMP-14.4)
     scope = models.CharField(max_length=10, blank=True, default="")  # "" = a task or the library; "personal"
     override_block = models.BooleanField(default=False)  # a Super Admin allowed a blocked type, audited
 

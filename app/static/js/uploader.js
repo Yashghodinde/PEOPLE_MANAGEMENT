@@ -52,14 +52,33 @@ document.addEventListener("alpine:init", function () {
     }).then(function (r) { if (!r.ok) throw new Error("check failed"); return r.json(); });
   }
 
+  // Read dropped files and folders (directory entries, depth first) into [{file, path}] with each file's relative path.
+  function walk(entries) {
+    var out = [];
+    function readAll(reader) {
+      return new Promise(function (resolve, reject) {
+        var all = [];
+        (function more() { reader.readEntries(function (batch) { if (!batch.length) resolve(all); else { all = all.concat(Array.prototype.slice.call(batch)); more(); } }, reject); })();
+      });
+    }
+    function visit(en, prefix) {
+      if (en.isFile) return new Promise(function (resolve) { en.file(function (f) { out.push({ file: f, path: prefix + f.name }); resolve(); }, function () { resolve(); }); });
+      if (!en.isDirectory) return Promise.resolve();
+      return readAll(en.createReader()).then(function (kids) {
+        return Promise.all(kids.map(function (k) { return visit(k, prefix + en.name + "/"); }));
+      });
+    }
+    return Promise.all(entries.map(function (en) { return visit(en, ""); })).then(function () { return out; });
+  }
+
   window.OtsUploadEnv = { csrf: csrf, storage: storage, uuid: uuid, hashFile: hashFile }; // voice.js reuses these
 
   Alpine.data("uploader", function () {
     return {
-      items: [], relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
+      items: [], minimised: false, relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
       init: function () {
         var self = this, d = this.$el.dataset;
-        this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; // scope "personal" = into My storage, no task
+        this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; this.folderId = d.folderId || ""; this.locked = d.locked === "1"; // scope "personal" = into My storage, no task
         this.relation = d.defaultRelation || "SUBMISSION";
         this.queue = OtsUploadCore.create({
           fetch: window.fetch.bind(window), hashFile: hashFile, uuid: uuid, storage: storage(), csrf: csrf,
@@ -68,6 +87,11 @@ document.addEventListener("alpine:init", function () {
             self.items = list;
             // the page must not swap itself under a running upload (live.js looks at the hold counter)
             var busy = list.some(function (i) { return i.active; });
+            // a folder view shows what just arrived once everything finished well (a failure stays on screen to be read)
+            if (self.refresh && !self.reloading && list.length && list.every(function (i) { return i.finished; }) &&
+                list.some(function (i) { return i.ok; }) && !list.some(function (i) { return i.failed; })) {
+              self.reloading = true; setTimeout(function () { location.reload(); }, 900);
+            }
             if (busy && !self.hold && window.OtsLiveHold) self.hold = window.OtsLiveHold.acquire("uploading");
             else if (!busy && self.hold && window.OtsLiveHold) { window.OtsLiveHold.release(self.hold); self.hold = 0; }
           },
@@ -77,17 +101,37 @@ document.addEventListener("alpine:init", function () {
       get dropClass() { return this.dragging ? "border-accent bg-line" : "border-line"; },
       get hasItems() { return this.items.length > 0; },
       get anyFinished() { return this.items.some(function (i) { return i.finished; }); },
-      take: function (fileList) {
-        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope, workspaceId: this.workspaceId, note: this.note };
-        for (var i = 0; i < fileList.length; i++) this.queue.add(fileList[i], meta);
+      take: function (fileList, paths) {
+        if (this.locked) { if (window.otsToast) window.otsToast("warning", "Files can only be added to Today, or inside a folder."); return; }
+        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope, workspaceId: this.workspaceId, folderId: this.folderId, note: this.note };
+        for (var i = 0; i < fileList.length; i++) {
+          var f = fileList[i], rel = paths ? paths[i] : (f.webkitRelativePath || "");
+          this.queue.add(f, Object.assign({}, meta, { relPath: rel }));
+        }
+        this.refresh = this.$el.dataset.refresh === "1";
         this.fileId = ""; this.note = ""; this.relation = this.$el.dataset.defaultRelation || "SUBMISSION";
       },
       picked: function (e) { this.take(e.target.files); e.target.value = ""; },
       dropped: function (e) {
         this.dragging = false;
         this.fileId = ""; // dropped files are new files, even if "Upload a new version" was clicked and then cancelled
-        if (e.dataTransfer) this.take(e.dataTransfer.files);
+        if (!e.dataTransfer) return;
+        var self = this, items = e.dataTransfer.items, entries = [];
+        if (items && items.length && items[0].webkitGetAsEntry) {  // folders keep their tree
+          for (var i = 0; i < items.length; i++) { var en = items[i].webkitGetAsEntry(); if (en) entries.push(en); }
+          if (!entries.length) { this.take(e.dataTransfer.files); return; }
+          walk(entries).then(function (found) { self.take(found.map(function (x) { return x.file; }), found.map(function (x) { return x.path; })); });
+        } else this.take(e.dataTransfer.files);
       },
+      pickedDir: function (e) { this.take(e.target.files); e.target.value = ""; },
+      chooseDir: function () {
+        var probe = document.createElement("input");
+        if (!("webkitdirectory" in probe)) { if (window.otsToast) window.otsToast("warning", "This browser cannot upload a whole folder. Choose files instead."); return; }
+        this.fileId = ""; this.$refs.dir.click();
+      },
+      get trayClass() { return this.minimised ? "hidden" : "flex flex-col gap-2"; },
+      get trayLabel() { return this.minimised ? "Show uploads" : "Minimise"; },
+      toggleTray: function () { this.minimised = !this.minimised; },
       dragOver: function () { this.dragging = true; },
       dragLeave: function () { this.dragging = false; },
       choose: function () { this.fileId = ""; this.$refs.input.click(); }, // a cancelled "new version" must not stick

@@ -1,0 +1,144 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% comment %}The shared file manager (IMP-14.3). Params: m (from ots/files/browser.py), move_targets, max_mb.
+Every folder-based section renders through this one page: toolbar, Create or Upload, list or grid, details, drop surface.{% endcomment %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  <div x-data="uploader" data-scope="personal" data-default-relation="REFERENCE" data-folder-id="{{ m.parent_id }}" data-refresh="1"{% if not m.can_upload %} data-locked="1"{% endif %}
+       @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped" class="relative">
+    <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
+    <input type="file" multiple webkitdirectory class="sr-only" x-ref="dir" @change="pickedDir" aria-label="Choose a folder to upload">
+
+    <section x-data="fileManager" data-key="{{ m.section }}" data-default-sort="{% if m.dates %}mod_desc{% else %}name_asc{% endif %}"
+             class="bg-canvas border border-line rounded-md shadow-card flex flex-col min-h-[420px]" :class="dropClass" aria-label="{{ m.title }}" @keydown.escape.window="closeAll">
+      <div class="flex items-center justify-between gap-3 flex-wrap p-3 border-b border-line">
+        <div class="flex items-center gap-3 flex-wrap">
+          {% if m.can_create %}
+          <div x-data="dropdown" class="relative" @click.outside="close">
+            <button type="button" @click="toggle" aria-haspopup="menu" class="inline-flex items-center gap-2 h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium hover:bg-ink-900">{% icon "plus" %}Create or Upload{% icon "chevron-down" "3" %}</button>
+            <div x-show="open" x-cloak @click="close" role="menu" class="fm-menu left-0 right-auto mt-2 w-[240px] bg-canvas border border-line rounded-md shadow-card p-2">
+              <p class="px-3 pt-1 pb-1 text-cap font-medium text-ink-600">Create</p>
+              <button type="button" role="menuitem" @click="openNew" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder-plus" %}New folder</button>
+              <p class="px-3 pt-2 pb-1 text-cap font-medium text-ink-600">Upload</p>
+              <button type="button" role="menuitem" @click="choose" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "upload" %}Upload files</button>
+              <button type="button" role="menuitem" @click="chooseDir" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder" %}Upload folder</button>
+            </div>
+          </div>
+          {% else %}
+          <button type="button" disabled title="{{ m.note|default:'Open a date or a folder to add files.' }}" class="inline-flex items-center gap-2 h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium opacity-50 cursor-not-allowed">{% icon "plus" %}Create or Upload{% icon "chevron-down" "3" %}</button>
+          {% endif %}
+          {% if m.note %}<p class="text-cap text-ink-600">{{ m.note }}</p>{% endif %}
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="sr-only" for="fm-sort">Sort</label>
+          <select id="fm-sort" @change="onSort" :value="sort" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900">
+            <option value="name_asc">Name A to Z</option><option value="name_desc">Name Z to A</option>
+            <option value="mod_desc">Newest first</option><option value="mod_asc">Oldest first</option>
+            <option value="size_desc">Largest first</option><option value="size_asc">Smallest first</option>
+            <option value="type">File type</option>
+          </select>
+          <div class="inline-flex rounded-full border border-line overflow-hidden" role="group" aria-label="View">
+            <button type="button" @click="setList" :aria-pressed="isList" class="h-5 px-3 text-body hover:bg-line" :class="listBtn">List</button>
+            <button type="button" @click="setGrid" :aria-pressed="isGrid" class="h-5 px-3 text-body hover:bg-line" :class="gridBtn">Grid</button>
+          </div>
+          <button type="button" @click="toggleDetails" :aria-expanded="detailsOpen" class="inline-flex items-center gap-2 h-5 px-4 rounded-full border border-accent text-accent text-body font-medium hover:bg-line">{% icon "info" %}Details</button>
+        </div>
+      </div>
+
+      <div class="flex flex-1 min-h-0">
+        <div class="flex-1 min-w-0 flex flex-col">
+          <div class="fm-list-head fm-head text-cap font-medium text-ink-600 border-b border-line" :data-view="view">
+            <span>Name</span><span>Modified</span><span>Modified by</span><span>Size</span><span>Status</span><span></span>
+          </div>
+          {% if m.items %}
+          <ul x-ref="list" class="fm-list" :data-view="view" data-view="list" aria-label="Files and folders">
+            {% for it in m.items %}
+            <li data-item data-kind="{{ it.kind }}" data-id="{{ it.id }}" data-title="{{ it.name }}" data-name="{{ it.name|lower }}" data-mod="{{ it.modified|date:'U' }}" data-size="{{ it.size|default_if_none:0 }}" data-type="{{ it.type|lower }}" data-details="{{ it.details }}" @click="select" aria-selected="false">
+              <div class="flex items-center gap-3 min-w-0">
+                {% if it.kind == "folder" %}{% icon "folder" "5" "text-accent" %}<a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>
+                {% else %}{% icon "file-text" "5" "text-ink-600" %}<a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>{% if it.versions and it.versions > 1 %}<span class="text-cap text-ink-600 shrink-0">v{{ it.versions }}</span>{% endif %}{% endif %}
+              </div>
+              <div class="fm-meta text-cap text-ink-600">
+                <span>{% if it.modified %}{{ it.modified|date:"d M Y, H:i" }}{% endif %}</span>
+                <span>{{ it.by }}</span>
+                <span>{% if it.kind == "file" %}{{ it.size|filesizeformat }}{% elif it.items is not None %}{{ it.items }} item{{ it.items|pluralize }}{% endif %}</span>
+                <span>{% if it.kind == "file" %}{% include "components/offsite_badge.html" with state=it.status %}{% endif %}</span>
+              </div>
+              <div class="flex items-center gap-2 justify-end">
+                {% if it.kind == "file" %}<a href="{{ it.download }}" class="inline-flex items-center gap-1 h-5 px-3 rounded-full border border-accent text-accent text-cap font-medium hover:bg-line">{% icon "download" %}Download</a>{% endif %}
+                {% if it.can_rename or it.kind == "file" %}
+                <details class="relative"><summary class="list-none cursor-pointer inline-flex items-center justify-center h-5 px-3 rounded-full text-cap text-ink-600 hover:bg-line" aria-label="More actions for {{ it.name }}">{% icon "more-horizontal" %}<span class="ml-1">More</span></summary>
+                  <div class="fm-menu mt-2 bg-canvas border border-line rounded-md shadow-card p-2 flex flex-col">
+                    <button type="button" @click="openDetails" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Details</button>
+                    {% if it.can_rename %}<button type="button" @click="openRename" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Rename</button>{% endif %}
+                    {% if it.can_move %}<button type="button" @click="openMove" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Move to...</button>{% endif %}
+                    {% if it.kind == "file" %}<a href="{{ it.history }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Version history</a>{% endif %}
+                    {% if it.can_send %}<a href="{{ it.send }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Send to...</a>{% endif %}
+                    {% if it.can_hide %}<button type="button" @click="openHide" class="text-left h-5 px-3 rounded-sm text-body text-bad hover:bg-line">Delete</button>{% endif %}
+                  </div>
+                </details>
+                {% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <div class="flex-1 flex items-center justify-center p-5 text-body text-ink-600 text-center min-h-[160px]">{% if not m.items %}{{ m.empty }}{% endif %}</div>
+          {% if m.more or m.page %}<div class="flex gap-4 text-body p-3 border-t border-line">{% if m.page %}<a class="text-accent" href="?page={{ m.page|add:'-1' }}">Newer days</a>{% endif %}{% if m.more %}<a class="text-accent" href="?page={{ m.page|add:'1' }}">Older days</a>{% endif %}</div>{% endif %}
+        </div>
+
+        <aside x-show="detailsOpen" x-cloak class="w-[300px] max-w-[45%] shrink-0 border-l border-line p-4 flex flex-col gap-3" aria-label="Details">
+          <div class="flex items-center justify-between"><h2 class="text-sec font-semibold text-ink-900">Details</h2><button type="button" @click="closeDetails" class="text-cap text-accent">Close</button></div>
+          <p class="text-body text-ink-600" x-show="noSelection">Select a file or folder.</p>
+          <dl class="flex flex-col gap-2"><template x-for="row in details" :key="row.k"><div><dt class="text-cap text-ink-600" x-text="row.k"></dt><dd class="text-body text-ink-900 break-words" x-text="row.v"></dd></div></template></dl>
+        </aside>
+      </div>
+
+      {# dragging over the page shows where the files will go #}
+      <div x-show="dragging" x-cloak class="absolute inset-0 z-20 rounded-md border-2 border-dashed border-accent bg-canvas/80 flex items-center justify-center pointer-events-none"><p class="text-sec font-semibold text-accent">Drop to upload here</p></div>
+
+      {# dialogs #}
+      <div x-show="newOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="New folder">
+        <form method="post" action="/files/mine/folders" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
+          <h2 class="text-sec font-semibold">New folder</h2>
+          <input type="hidden" name="parent" value="{{ m.parent_id }}"><input type="hidden" name="next" value="{{ request.path }}">
+          <label class="text-cap text-ink-600" for="nf-name">Folder name</label>
+          <input id="nf-name" x-ref="newName" name="name" maxlength="120" required autocomplete="off" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Create folder</button></div>
+        </form>
+      </div>
+      <div x-show="renameOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Rename">
+        <form method="post" :action="renameAction" class="bg-canvas rounded-md shadow-card p-5 w-[380px] max-w-full flex flex-col gap-3">{% csrf_token %}
+          <h2 class="text-sec font-semibold">Rename</h2><input type="hidden" name="next" value="{{ request.path }}">
+          <label class="text-cap text-ink-600" for="rn-name">New name</label>
+          <input id="rn-name" name="name" x-model="renameName" maxlength="255" required autocomplete="off" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Rename</button></div>
+        </form>
+      </div>
+      <div x-show="moveOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Move">
+        <form method="post" action="/files/mine/move" class="bg-canvas rounded-md shadow-card p-5 w-[420px] max-w-full flex flex-col gap-3">{% csrf_token %}
+          <h2 class="text-sec font-semibold">Move to</h2><input type="hidden" name="next" value="{{ request.path }}">
+          <input type="hidden" name="kind" :value="moveKind"><input type="hidden" name="id" :value="moveId">
+          <label class="text-cap text-ink-600" for="mv-to">Destination folder</label>
+          <select id="mv-to" name="to" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><option value="">Directly under its date</option>{% for fid, label in move_targets %}<option value="{{ fid }}">{{ label }}</option>{% endfor %}</select>
+          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Move</button></div>
+        </form>
+      </div>
+      <div x-show="hideOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-label="Delete">
+        <form method="post" :action="hideAction" class="bg-canvas rounded-md shadow-card p-5 w-[400px] max-w-full flex flex-col gap-3">{% csrf_token %}
+          <h2 class="text-sec font-semibold">Delete this file?</h2><input type="hidden" name="next" value="{{ request.path }}">
+          <p class="text-body text-ink-900 break-words" x-text="hideName"></p>
+          <p class="text-cap text-ink-600">It leaves your storage. Nothing is erased, and anyone you already sent it to keeps their copy.</p>
+          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-bad text-canvas text-body font-medium">Delete</button></div>
+        </form>
+      </div>
+    </section>
+
+    {# the upload tray: compact, bottom right, never blocks the page #}
+    <aside x-show="hasItems" x-cloak class="fixed bottom-4 right-4 z-30 w-[360px] max-w-[calc(100vw-32px)] bg-canvas border border-line rounded-md shadow-card p-3 flex flex-col gap-2" aria-label="Uploads">
+      <div class="flex items-center justify-between"><h2 class="text-body font-semibold">Uploads</h2><button type="button" @click="toggleTray" class="text-cap text-accent" x-text="trayLabel"></button></div>
+      <div :class="trayClass" class="max-h-[50vh] overflow-y-auto">{% include "files/_queue.html" %}</div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

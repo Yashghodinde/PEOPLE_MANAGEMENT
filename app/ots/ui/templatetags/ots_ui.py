@@ -108,7 +108,7 @@ def pagehead(context: Any) -> str:
     request = context.get("request")
     if request is None:
         return ""
-    crumbs = trail(request.path, str(context.get("page_title") or ""))
+    crumbs = context.get("crumbs") or trail(request.path, str(context.get("page_title") or ""))
     if not crumbs:
         return ""
     back = str(context.get("back_url") or "") or next((u for _l, u in reversed(crumbs[:-1]) if u), "")

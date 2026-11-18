@@ -21,7 +21,7 @@ from django.views.decorators.http import require_http_methods
 
 from ots.core import permissions
 from ots.core.clock import today_local
-from ots.core.errors import NotFound, ValidationFailed
+from ots.core.errors import Conflict, NotFound, ValidationFailed
 from ots.tasks.models import Task
 
 from . import download as download_mod
@@ -160,6 +160,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         ws = workspaces_visible_to(request.user).filter(pk=wid).first() if wid else None
         if ws is None:
             raise NotFound("Not found.")
+    rel = [p for p in str(data.get("relative_path") or "").replace("\\", "/").split("/") if p][:-1]
     session, created = services.start_upload(
         request.user,  # type: ignore[arg-type]
         key=_uuid(data.get("idempotency_key"), "idempotency_key", required=True),  # type: ignore[arg-type]
@@ -171,6 +172,8 @@ def uploads(request: HttpRequest) -> JsonResponse:
         display_name=str(data.get("display_name") or ""),
         scope=scope_in,
         workspace=ws,
+        folder_id=_uuid(data.get("folder_id"), "folder_id") if scope_in == "personal" else None,
+        relative_dirs=rel if scope_in == "personal" else None,
         note=str(data.get("note") or "")[:200],
         size=size,
         sha256=str(data.get("sha256") or ""),
@@ -412,22 +415,14 @@ def _personal_ctx(request: HttpRequest, active: str, **extra: Any) -> dict[str, 
 @login_required
 @require_http_methods(["GET"])
 def mine(request: HttpRequest) -> HttpResponse:
-    from . import personal
+    from . import browser
 
     permissions.require(request.user, "file.upload_personal")
     try:
         page = max(0, int(request.GET.get("page", "0")))
     except ValueError:
         page = 0
-    days, more = personal.date_folders(request.user, page)
-    return render(
-        request,
-        "files/mine.html",
-        _personal_ctx(
-            request, "mine", page_title="My storage", today=personal.todays_versions(request.user),
-            today_date=today_local(), days=days, more=more, page=page,
-        ),
-    )  # fmt: skip
+    return _manager(request, browser.personal_root(request.user, page))
 
 
 @login_required
@@ -435,19 +430,95 @@ def mine(request: HttpRequest) -> HttpResponse:
 def mine_day(request: HttpRequest, day: str) -> HttpResponse:
     import datetime
 
-    from . import personal
+    from . import browser
 
     permissions.require(request.user, "file.upload_personal")
     try:
         d = datetime.date.fromisoformat(day)
     except ValueError:
         raise NotFound("No such day.") from None
-    rows = personal.versions_on(request.user, d)
-    return render(
+    return _manager(request, browser.personal_day(request.user, d))
+
+
+@login_required
+@require_http_methods(["GET"])
+def mine_folder(request: HttpRequest, folder_id: uuid.UUID) -> HttpResponse:
+    from . import browser, folders
+
+    permissions.require(request.user, "file.upload_personal")
+    folder = folders.my_folder(request.user, folder_id)
+    return _manager(request, browser.personal_folder(request.user, folder))
+
+
+def _manager(request: HttpRequest, m: dict[str, Any]) -> HttpResponse:
+    """Every file section renders through this one page (IMP-14.3)."""
+    from . import browser
+
+    ctx = {
+        "m": m, "page_title": m["title"], "crumbs": m["crumbs"], "max_mb": settings.OTS_UPLOAD_MAX_MB,
+        "move_targets": browser.move_targets(request.user) if m.get("section") == "mine" else [],
+    }  # fmt: skip
+    return render(request, "files/manager.html", ctx)
+
+
+def _folder_post(request: HttpRequest, run: Any, fallback: str) -> HttpResponse:
+    """Run a folder write from a form; a refusal comes back as a message on the same page."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    try:
+        run()
+    except (ValidationFailed, Conflict, NotFound) as exc:
+        messages.error(request, str(exc))
+    nxt = request.POST.get("next") or ""
+    return redirect(nxt if nxt.startswith("/files/") and not nxt.startswith("//") else fallback)
+
+
+@login_required
+@require_http_methods(["POST"])
+def folder_create(request: HttpRequest) -> HttpResponse:
+    from . import folders
+
+    parent = request.POST.get("parent") or None
+    day = None
+    if request.POST.get("day"):
+        import datetime
+
+        try:
+            day = datetime.date.fromisoformat(request.POST["day"])
+        except ValueError:
+            day = None
+    return _folder_post(
         request,
-        "files/mine_day.html",
-        _personal_ctx(request, "mine", page_title=f"My files from {d:%d %b %Y}", rows=rows, day=d),
+        lambda: folders.create_personal(request.user, request.POST.get("name", ""), parent, day, request),
+        "/files/mine",
     )
+
+
+@login_required
+@require_http_methods(["POST"])
+def folder_rename(request: HttpRequest, folder_id: uuid.UUID) -> HttpResponse:
+    from . import folders
+
+    return _folder_post(
+        request,
+        lambda: folders.rename_personal(request.user, folder_id, request.POST.get("name", ""), request),
+        "/files/mine",
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def mine_move(request: HttpRequest) -> HttpResponse:
+    """Move one of my files or folders into another of my folders (empty target = under its date / a root)."""
+    from . import folders
+
+    kind, item, to = request.POST.get("kind"), request.POST.get("id", ""), request.POST.get("to") or None
+    if kind == "folder":
+        run = lambda: folders.move_personal(request.user, _uuid(item, "id", True), to, request)  # noqa: E731
+    else:
+        run = lambda: folders.place_personal_file(request.user, _uuid(item, "id", True), to, request)  # noqa: E731
+    return _folder_post(request, run, "/files/mine")
 
 
 @login_required

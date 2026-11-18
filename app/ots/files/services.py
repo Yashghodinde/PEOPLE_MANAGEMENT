@@ -201,6 +201,8 @@ def start_upload(
     scope: str = "",
     note: str = "",
     workspace: Any = None,
+    folder_id: uuid.UUID | None = None,
+    relative_dirs: list[str] | None = None,
     request: Any = None,
 ) -> tuple[UploadSession, bool]:
     """Open (or find) the upload for this key: (session, created). The same key returns the same session."""
@@ -249,6 +251,17 @@ def start_upload(
         target, assignment = _resolve_workspace_target(user, workspace, file_id), None
     else:
         target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
+    folder = None
+    if (
+        personal and (folder_id or relative_dirs) and target is None
+    ):  # into a folder; the missing ones are made
+        from .folders import ensure_path
+
+        folder = ensure_path(user, relative_dirs or [], folder_id) if relative_dirs else None
+        if folder is None and folder_id:
+            from .folders import my_folder
+
+            folder = my_folder(user, folder_id)
     layout.admit(size)
     try:
         with transaction.atomic():
@@ -264,6 +277,7 @@ def start_upload(
                 original_filename=name,
                 scope=scope if (personal or in_workspace) else "",
                 workspace_id=workspace.pk if in_workspace else None,
+                folder_id=folder.pk if folder else None,
                 note=" ".join((note or "").split())[:200],
                 display_name=shown,
                 override_block=override,
@@ -435,6 +449,7 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             company=user.company,
             display_name=s.display_name or s.original_filename,
             owner=user,
+            folder_id=s.folder_id if s.scope == PERSONAL else None,
             visibility=FileVisibility.PRIVATE
             if s.scope == PERSONAL
             else FileVisibility.WORKSPACE

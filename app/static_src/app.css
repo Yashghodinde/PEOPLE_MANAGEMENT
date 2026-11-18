@@ -63,3 +63,19 @@
     border: 1px solid theme("colors.ink-400"); background: theme("colors.canvas"); color: theme("colors.ink-900"); font-size: 13px; }
   .org-btn:hover { background: theme("colors.line"); }
 }
+
+/* File manager (IMP-14.3): one list that is either rows or tiles, switched by data-view on the list. */
+.fm-list[data-view="list"] { display: flex; flex-direction: column; }
+.fm-list[data-view="list"] > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 10px 12px; border-bottom: 1px solid theme("colors.line"); }
+.fm-list[data-view="list"] .fm-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+@media (min-width: 900px) {
+  .fm-list[data-view="list"] > li { grid-template-columns: minmax(0, 3fr) 130px 120px 80px 90px auto; }
+  .fm-list[data-view="list"] .fm-meta { display: contents; }
+}
+.fm-list[data-view="grid"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 12px; }
+.fm-list[data-view="grid"] > li { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid theme("colors.line"); border-radius: 13px; }
+.fm-list[data-view="grid"] .fm-meta { display: flex; flex-direction: column; gap: 2px; }
+.fm-head { display: none; }
+@media (min-width: 900px) { .fm-list-head[data-view="list"] { display: grid; grid-template-columns: minmax(0, 3fr) 130px 120px 80px 90px auto; gap: 12px; padding: 8px 12px; } }
+.fm-list > li[aria-selected="true"] { background: theme("colors.line"); }
+.fm-menu { position: absolute; right: 0; z-index: 30; min-width: 170px; }

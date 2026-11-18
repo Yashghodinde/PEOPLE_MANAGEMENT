@@ -9,6 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from freezegun import freeze_time
 from ots.accounts.models import Role
 from ots.audit.models import AuditLog
+from ots.core.clock import today_local
 from ots.files import codes, personal, selectors
 from ots.files.models import File, FileStatus, FileVersion, FileVisibility, TaskFile
 
@@ -109,11 +110,14 @@ def test_today_lists_todays_files_and_earlier_days_are_folders_newest_first(offi
         mine_upload("emp", name="2026-11-16_More-notes.txt", data=DATA + b"c")
     with freeze_time("2026-11-17 06:00:00"):
         mine_upload("emp", name="2026-11-17_Fresh-notes.txt", data=DATA + b"d")
-        page = login("emp").get("/files/mine").content.decode()
-    today_part, earlier = page.split('aria-label="Earlier days"')
-    assert "Fresh-notes" in today_part and "Mid-notes" not in today_part
-    assert earlier.index("16 Nov 2026") < earlier.index("15 Nov 2026")
-    assert "2 files" in earlier and "1 file<" in earlier or "1 file" in earlier
+        c = login("emp")
+        root = c.get("/files/mine").content.decode()
+        assert "Today" in root and "17 November 2026" in root  # Today is a folder at the top
+        assert root.index("16 November 2026") < root.index("15 November 2026")  # earlier dates, newest first
+        assert "2 items" in root and "1 item" in root  # each date shows how many files it holds
+        today = c.get("/files/mine/2026-11-17").content.decode()
+        assert "Fresh-notes" in today and "Mid-notes" not in today
+        assert "Mid-notes" in c.get("/files/mine/2026-11-16").content.decode()
 
 
 def test_a_day_folder_lists_its_files_and_nobody_elses(office):
@@ -198,7 +202,7 @@ def test_only_the_super_admin_restores_and_it_returns_to_the_owner(office):
         assert login(who).get("/files/deleted").status_code == 403
     assert login("boss").post(f"/files/{v.file_id}/restore").status_code == 302
     assert File.objects.get(pk=v.file_id).status == FileStatus.ACTIVE
-    assert "Notes" in login("emp").get("/files/mine").content.decode()
+    assert "Notes" in login("emp").get(f"/files/mine/{today_local():%Y-%m-%d}").content.decode()
     assert AuditLog.objects.filter(action="file.restored").count() == 1
 
 
