@@ -84,6 +84,7 @@
 .fm-stretch:focus-visible::after { outline: 2px solid theme("colors.accent"); outline-offset: -2px; }
 .fm-item[data-kind="folder"] { cursor: pointer; }
 .fm-item[data-kind="folder"]:hover { background: theme("colors.line"); }
+.fm-pending .fm-name, .fm-pending .fm-meta { opacity: 0.55; }
 .fm-item[aria-selected="true"] { background: theme("colors.line"); }
 .fm-menu { position: absolute; right: 0; z-index: 30; min-width: 180px; }
 

@@ -46,7 +46,7 @@ document.addEventListener("alpine:init", function () {
   Alpine.data("fileManager", function () {
     return {
       view: "list", sort: "name_asc", detailsOpen: false, details: [], selected: null,
-      newOpen: false, renameOpen: false, renameAction: "", renameName: "", renameKind: "",
+      newOpen: false, rejectOpen: false, rejectAction: "", rejectName: "", renameOpen: false, renameAction: "", renameName: "", renameKind: "",
       moveOpen: false, moveKind: "", moveId: "", hideOpen: false, hideAction: "", hideName: "",
       init: function () {
         this.key = "ots.fm." + (this.$el.dataset.key || "x");
@@ -61,7 +61,7 @@ document.addEventListener("alpine:init", function () {
       get listBtn() { return this.view === "list" ? "bg-line font-medium" : ""; },
       get gridBtn() { return this.view === "grid" ? "bg-line font-medium" : ""; },
       get headClass() { return this.view === "list" ? "" : "hidden"; },
-      get anyDialog() { return this.newOpen || this.renameOpen || this.moveOpen || this.hideOpen; },
+      get anyDialog() { return this.newOpen || this.renameOpen || this.moveOpen || this.hideOpen || this.rejectOpen; },
       get noSelection() { return this.details.length === 0; },
       setList: function () { this.view = "list"; set(this.key + ".view", "list"); },
       setGrid: function () { this.view = "grid"; set(this.key + ".view", "grid"); },
@@ -115,7 +115,12 @@ document.addEventListener("alpine:init", function () {
         this.hideAction = li.dataset.hide; this.hideName = li.dataset.title; this.hideOpen = true;
         e.currentTarget.closest("details").removeAttribute("open");
       },
-      closeAll: function () { this.newOpen = this.renameOpen = this.moveOpen = this.hideOpen = false; },
+      openReject: function (e) {
+        var li = e.currentTarget.closest("[data-item]");
+        this.rejectAction = li.dataset.reject; this.rejectName = li.dataset.title; this.rejectOpen = true;
+        e.currentTarget.closest("details").removeAttribute("open");
+      },
+      closeAll: function () { this.newOpen = this.renameOpen = this.moveOpen = this.hideOpen = this.rejectOpen = false; },
     };
   });
 });

@@ -51,12 +51,19 @@ class FileVisibility(models.TextChoices):
     WORKSPACE = "WORKSPACE"  # uploaded into a File ID workspace: readable only through that link (IMP-04)
 
 
+class LibraryState(models.TextChoices):
+    APPROVED = "APPROVED", "Approved"  # also what every non-library file and every older library file is
+    PENDING = "PENDING", "Waiting for approval"
+    REJECTED = "REJECTED", "Not approved"
+
+
 class LibraryFolder(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     parent = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
     )
     name = models.CharField(max_length=120)
+    employee_upload = models.BooleanField(default=True)  # staff may put files here; each waits for approval
 
     class Meta:
         db_table = "library_folders"
@@ -154,6 +161,9 @@ class File(models.Model):
     )
     created_at = models.DateTimeField(default=now)
     status = models.CharField(max_length=8, choices=FileStatus.choices, default=FileStatus.ACTIVE)
+    library_state = models.CharField(
+        max_length=10, choices=LibraryState.choices, default=LibraryState.APPROVED
+    )
     deleted_at = models.DateTimeField(null=True, blank=True)
     deleted_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.PROTECT, related_name="files_hidden"
@@ -394,3 +404,22 @@ class FileFetchRequest(models.Model):
 
     def __str__(self) -> str:
         return f"fetch {self.version_id} for {self.user_id} ({self.state})"
+
+
+class LibraryReview(models.Model):
+    """A manager's decision on a Library upload. Rows are never edited; a resubmission is a new upload."""
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    file = models.ForeignKey(File, on_delete=models.PROTECT, related_name="library_reviews")
+    version = models.ForeignKey(FileVersion, on_delete=models.PROTECT, related_name="+")
+    reviewer = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    decision = models.CharField(max_length=10, choices=LibraryState.choices)
+    reason = models.CharField(max_length=300, blank=True, default="")
+    at = models.DateTimeField(default=now)
+
+    class Meta:
+        db_table = "library_reviews"
+        indexes = [models.Index(fields=["file", "at"], name="librev_file_ix")]
+
+    def __str__(self) -> str:
+        return f"{self.decision} {self.file_id}"

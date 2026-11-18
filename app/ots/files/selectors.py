@@ -57,7 +57,7 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     """
     from ots.accounts import selectors as accounts
     from ots.accounts.models import Role
-    from ots.files.models import FileHandoverRecipient, FileVisibility
+    from ots.files.models import FileHandoverRecipient, FileVisibility, LibraryState
 
     if viewer is None or not getattr(viewer, "is_authenticated", False) or not viewer.is_active:
         return FileVersion.objects.none()
@@ -79,7 +79,7 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     team = accounts.subtree_ids(viewer.pk) if viewer.role == Role.SUB_ADMIN else set()
     wanted = (
         mine
-        | Q(file__visibility=FileVisibility.LIBRARY)
+        | Q(file__visibility=FileVisibility.LIBRARY, file__library_state=LibraryState.APPROVED)
         | Exists(_exchange_links(viewer, visible_tasks, team))
         | Exists(FileHandoverRecipient.objects.filter(handover__version=OuterRef("pk"), to_user_id=viewer.pk))
     )
@@ -100,7 +100,9 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     )  # a document of a File ID the viewer belongs to (IMP-04); grants nothing on its other links
     wanted = wanted | in_workspace
     heard = Exists(TaskComment.objects.filter(voice_version=OuterRef("pk"), task__in=visible_tasks))
-    return qs.filter((Q(is_voice=False) & wanted) | (Q(is_voice=True) & heard))
+    return qs.filter((Q(is_voice=False) & wanted) | (Q(is_voice=True) & heard)).exclude(
+        file__visibility=FileVisibility.LIBRARY, file__library_state=LibraryState.REJECTED
+    )  # a Library file that was turned down is gone from every view but the Super Admin's
 
 
 def handover_targets(sender: Any) -> QuerySet[Any]:

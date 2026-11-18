@@ -46,6 +46,7 @@ from .models import (
     FileStatus,
     FileVersion,
     FileVisibility,
+    LibraryState,
     TaskFile,
     UploadSession,
 )
@@ -249,8 +250,13 @@ def start_upload(
         raise ValidationFailed("That upload does not belong to a task.", fields={"scope": ["Invalid."]})
     if in_workspace and workspace is None:
         raise NotFound("Not found.")
+    lib_staff = in_library and user.role != Role.SUPER_ADMIN  # staff add a new file for approval (IMP-15.5)
+    if lib_staff and file_id:
+        raise PermissionDenied("Only the Super Admin adds a version to a Library file.", action="file.upload")
     if in_workspace:
         target, assignment = _resolve_workspace_target(user, workspace, file_id), None
+    elif lib_staff:
+        target, assignment = None, None
     else:
         target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
     folder: Any = None
@@ -272,6 +278,11 @@ def start_upload(
             if relative_dirs
             else ws_folders.folder_of(workspace, folder_id)
         )
+    if lib_staff:
+        from .library import may_upload
+
+        if not may_upload(user, folder):
+            raise PermissionDenied("You cannot upload to the Library here.", action="library.upload")
     if (
         personal and (folder_id or relative_dirs) and target is None
     ):  # into a folder; the missing ones are made
@@ -471,6 +482,11 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
             owner=user,
             folder_id=s.folder_id if s.scope == PERSONAL else None,
             library_folder_id=s.folder_id if s.scope == LIBRARY_SCOPE else None,
+            library_state=(
+                LibraryState.PENDING
+                if s.scope == LIBRARY_SCOPE and user.role != Role.SUPER_ADMIN
+                else LibraryState.APPROVED
+            ),
             visibility=FileVisibility.PRIVATE
             if s.scope == PERSONAL
             else FileVisibility.WORKSPACE
@@ -570,6 +586,10 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         "file.uploaded", user, version, {k: body[k] for k in ("file_code", "version", "size")}, request
     )
     events.publish("file.staged", ("file_version", str(version.pk)), body)
+    if file.library_state == LibraryState.PENDING and not s.file_id:
+        from .library import notify_pending
+
+        notify_pending(file, file.library_folder, request)
     s.state = FileState.STAGED
     s.save(update_fields=["state"])
     transaction.on_commit(lambda: _drop(part))

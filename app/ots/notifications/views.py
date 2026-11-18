@@ -27,6 +27,8 @@ def bell(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["POST"])
 def open_notification(request: HttpRequest, notification_id: str) -> HttpResponse:
     n = services.open_one(request.user, notification_id)
+    if n and n.link.startswith("/") and not n.link.startswith("//"):
+        return redirect(n.link)
     return redirect(f"/app/tasks/{n.task_id}" if n and n.task_id else "/app/notifications")
 
 

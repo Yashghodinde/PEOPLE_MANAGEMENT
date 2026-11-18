@@ -21,6 +21,7 @@ def notify(
     comment: Any = None,
     body: str = "",
     source: str = "",
+    link: str = "",
 ) -> list[Notification]:
     """One notification per person, never to the person who did it, never twice for the same cause.
 
@@ -42,6 +43,7 @@ def notify(
             title=title[:200],
             body=body[:200],
             source=source,
+            link=link[:200],
         )
         for u in wanted
     ]

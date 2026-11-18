@@ -29,6 +29,8 @@ class Kind(models.TextChoices):
     FILE_HANDED = "FILE_HANDED", "File sent to you"
     REMINDER = "REMINDER", "Reminder"
     ALERT = "ALERT", "System alert"
+    LIBRARY_REVIEW = "LIBRARY_REVIEW", "Library file waiting"
+    LIBRARY_DECISION = "LIBRARY_DECISION", "Library file decision"
     UNDELIVERED = "UNDELIVERED", "Not received yet"
 
 
@@ -49,6 +51,7 @@ class Notification(models.Model):
     body = models.CharField(max_length=200, blank=True, default="")
     # what caused it (an event id or a reminder window): one cause never notifies a person twice (F-NT-1)
     source = models.CharField(max_length=100, blank=True, default="")
+    link = models.CharField(max_length=200, blank=True, default="")  # where opening it goes, when not a task
     created_at = models.DateTimeField(default=now)
     read_at = models.DateTimeField(null=True, blank=True)
 

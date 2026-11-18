@@ -29,10 +29,13 @@ def test_a_folder_upload_builds_library_folders(office):
     assert LibraryFolder.objects.count() == 2
 
 
-def test_an_employee_cannot_upload_to_the_library(office):
+def test_an_employee_cannot_upload_to_the_library_root_or_a_closed_folder(office):
     fo = library.create_folder(office["sa"], "Policies")
+    root = start(login("emp"), DATA, uuid.uuid4(), name="2026-11-17_X.txt", scope="library")
+    assert root.status_code == 403
+    library.set_employee_upload(office["sa"], fo.pk, False)
     r = start(
-        login("emp"), DATA, uuid.uuid4(), name="2026-11-17_X.txt", scope="library", folder_id=str(fo.pk)
+        login("emp"), DATA, uuid.uuid4(), name="2026-11-17_Y.txt", scope="library", folder_id=str(fo.pk)
     )
     assert r.status_code == 403
     assert not File.objects.exists()
@@ -44,7 +47,10 @@ def test_folder_pages_show_the_toolbar_only_to_who_may_use_it(office):
     boss = login("boss").get(f"/files/library?folder={fo.pk}").content.decode()
     emp = login("emp").get(f"/files/library?folder={fo.pk}").content.decode()
     assert "Create or Upload" in boss and "Upload folder" in boss and "data-pagehead" in boss
-    assert "Create or Upload" not in emp and "Upload folder" not in emp and "Inner" in emp
+    # staff may add files to an open folder (they wait for approval) but not folders or whole-folder uploads
+    assert (
+        "Upload files" in emp and "Upload folder" not in emp and ">New folder<" not in emp and "Inner" in emp
+    )
 
 
 def test_rename_and_move_through_the_manager_forms(office):

@@ -427,6 +427,37 @@ def library_move(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
 
 @login_required
 @require_http_methods(["POST"])
+def library_approve(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    from . import library
+
+    return _folder_post(request, lambda: library.approve(request.user, file_id, request), "/files/library")
+
+
+@login_required
+@require_http_methods(["POST"])
+def library_reject(request: HttpRequest, file_id: uuid.UUID) -> HttpResponse:
+    from . import library
+
+    reason = request.POST.get("reason", "")
+    return _folder_post(
+        request, lambda: library.reject(request.user, file_id, reason, request), "/files/library"
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def library_folder_uploads(request: HttpRequest, folder_id: uuid.UUID) -> HttpResponse:
+    from . import library
+
+    allowed = request.POST.get("allow") == "1"
+    return _folder_post(
+        request, lambda: library.set_employee_upload(request.user, folder_id, allowed, request),
+        _back_to_library(folder_id),
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["POST"])
 def library_move_item(request: HttpRequest) -> HttpResponse:
     """The file manager's Move dialog: kind, id, to."""
     from . import library

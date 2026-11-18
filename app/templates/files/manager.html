@@ -23,7 +23,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
               <button type="button" role="menuitem" @click="openNew" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder-plus" %}New folder</button>{% endif %}
               <p class="px-3 pt-2 pb-1 text-cap font-medium text-ink-600">Upload</p>
               <button type="button" role="menuitem" @click="choose" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "upload" %}Upload files</button>
-              <button type="button" role="menuitem" @click="chooseDir" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder" %}Upload folder</button>
+              {% if not m.no_folder_upload %}<button type="button" role="menuitem" @click="chooseDir" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line">{% icon "folder" %}Upload folder</button>{% endif %}
             </div>
           </div>
           {% elif m.show_disabled_create %}
@@ -55,7 +55,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
           {% if m.items %}
           <ul x-ref="list" class="fm-list" :data-view="view" data-view="list" aria-label="Files and folders">
             {% for it in m.items %}
-            <li class="fm-item" data-item data-kind="{{ it.kind }}" data-id="{{ it.id }}" data-title="{{ it.name }}" data-name="{{ it.name|lower }}" data-mod="{{ it.modified|date:'U' }}" data-size="{{ it.size|default_if_none:0 }}" data-type="{{ it.type|lower }}" data-details="{{ it.details }}" data-rename="{{ it.rename_url }}" data-hide="{{ it.hide_url }}" @click="select" aria-selected="false">
+            <li class="fm-item{% if it.pending %} fm-pending{% endif %}" data-item data-kind="{{ it.kind }}" data-id="{{ it.id }}" data-title="{{ it.name }}" data-name="{{ it.name|lower }}" data-mod="{{ it.modified|date:'U' }}" data-size="{{ it.size|default_if_none:0 }}" data-type="{{ it.type|lower }}" data-details="{{ it.details }}" data-rename="{{ it.rename_url }}" data-hide="{{ it.hide_url }}" data-reject="{{ it.reject_url }}" @click="select" aria-selected="false">
               <div class="fm-name">
                 {% if it.kind == "folder" %}{% icon "folder" "5" "text-accent fm-icon" %}{% else %}{% icon "file-text" "5" "text-ink-600 fm-icon" %}{% endif %}
                 <span class="fm-title">
@@ -68,11 +68,12 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
                 <div class="fm-mod" data-label="Modified"><dd>{% if it.modified %}{{ it.modified|date:"d M Y, H:i" }}{% endif %}</dd></div>
                 <div class="fm-by" data-label="{{ m.column_by|default:'Modified by' }}"><dd>{{ it.by }}</dd></div>
                 <div class="fm-size" data-label="{% if it.kind == 'file' %}Size{% else %}Contents{% endif %}"><dd>{% if it.kind == "file" %}{{ it.size|filesizeformat }}{% elif it.items is not None %}{{ it.items }} item{{ it.items|pluralize }}{% endif %}</dd></div>
-                <div class="fm-status"><dd>{% if it.kind == "file" %}{% include "components/offsite_badge.html" with state=it.status %}{% endif %}</dd></div>
+                <div class="fm-status"><dd>{% if it.pending %}<span class="inline-flex items-center h-4 px-3 rounded-full border border-line text-cap text-ink-600 whitespace-nowrap">Waiting for approval</span>{% elif it.kind == "file" %}{% include "components/offsite_badge.html" with state=it.status %}{% endif %}</dd></div>
               </dl>
               <div class="fm-actions">
                 {% if it.kind == "file" %}<a href="{{ it.download }}" hx-boost="false" class="inline-flex items-center gap-1 h-5 px-3 rounded-full border border-accent text-accent text-cap font-medium hover:bg-line whitespace-nowrap">{% icon "download" %}Download</a>{% else %}<span></span>{% endif %}
-                {% if it.can_rename or it.kind == "file" %}
+                {% if it.can_review %}<form method="post" action="{{ it.approve_url }}" class="inline">{% csrf_token %}<input type="hidden" name="next" value="{{ m.next }}"><button type="submit" class="inline-flex items-center h-5 px-3 rounded-full bg-accent text-canvas text-cap font-medium whitespace-nowrap">Approve</button></form>{% endif %}
+                {% if it.can_rename or it.kind == "file" or it.toggle_url %}
                 <details class="relative"><summary class="list-none cursor-pointer inline-flex items-center justify-center h-5 px-3 rounded-full text-cap text-ink-600 hover:bg-line whitespace-nowrap" aria-label="More actions for {{ it.name }}">{% icon "more-horizontal" %}<span class="ml-1">More</span></summary>
                   <div class="fm-menu mt-2 bg-canvas border border-line rounded-md shadow-card p-2 flex flex-col">
                     <button type="button" @click="openDetails" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Details</button>
@@ -80,6 +81,8 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
                     {% if it.can_move %}<button type="button" @click="openMove" class="text-left h-5 px-3 rounded-sm text-body hover:bg-line">Move to...</button>{% endif %}
                     {% if it.kind == "file" %}<a href="{{ it.history }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Version history</a>{% endif %}
                     {% if it.can_send %}<a href="{{ it.send }}" class="h-5 px-3 rounded-sm text-body hover:bg-line inline-flex items-center">Send to...</a>{% endif %}
+                    {% if it.can_review %}<button type="button" @click="openReject" class="text-left h-5 px-3 rounded-sm text-body text-bad hover:bg-line">Do not approve...</button>{% endif %}
+                    {% if it.toggle_url %}<form method="post" action="{{ it.toggle_url }}">{% csrf_token %}<input type="hidden" name="allow" value="{{ it.toggle_value }}"><input type="hidden" name="next" value="{{ m.next }}"><button type="submit" class="text-left h-5 w-full px-3 rounded-sm text-body hover:bg-line">{{ it.toggle_label }}</button></form>{% endif %}
                     {% if it.can_hide %}<button type="button" @click="openHide" class="text-left h-5 px-3 rounded-sm text-body text-bad hover:bg-line">Delete</button>{% endif %}
                   </div>
                 </details>
@@ -130,6 +133,16 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
           <label class="text-cap text-ink-600" for="mv-to">Destination folder</label>
           <select id="mv-to" name="to" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><option value="">Directly under its date</option>{% for fid, label in move_targets %}<option value="{{ fid }}">{{ label }}</option>{% endfor %}</select>
           <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Move</button></div>
+        </form>
+      </div>
+      <div x-show="rejectOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Do not approve">
+        <form method="post" :action="rejectAction" class="bg-canvas rounded-md shadow-card p-5 w-[420px] max-w-full flex flex-col gap-3">{% csrf_token %}
+          <h2 class="text-sec font-semibold">Do not approve this file?</h2><input type="hidden" name="next" value="{{ m.next }}">
+          <p class="text-body text-ink-900 break-words" x-text="rejectName"></p>
+          <label class="text-cap text-ink-600" for="rj-reason">Tell the sender why</label>
+          <textarea id="rj-reason" name="reason" rows="3" maxlength="300" required class="px-3 py-2 rounded-sm border border-line bg-canvas text-body"></textarea>
+          <p class="text-cap text-ink-600">The file is taken out of the Library and the sender is told. It is not erased.</p>
+          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-bad text-canvas text-body font-medium">Do not approve</button></div>
         </form>
       </div>
       <div x-show="hideOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-label="Delete">

@@ -31,6 +31,13 @@ urlpatterns = [
         views.library_folder_rename,
         name="file-library-rename",
     ),
+    path("files/library/files/<uuid:file_id>/approve", views.library_approve, name="file-library-approve"),
+    path("files/library/files/<uuid:file_id>/reject", views.library_reject, name="file-library-reject"),
+    path(
+        "files/library/folders/<uuid:folder_id>/uploads",
+        views.library_folder_uploads,
+        name="file-library-uploads",
+    ),
     path("files/library/move", views.library_move_item, name="file-library-move-item"),
     path("files/library/files/<uuid:file_id>/move", views.library_move, name="file-library-move"),
     path("files/attach/<uuid:task_id>", views.attach, name="file-attach"),

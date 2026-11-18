@@ -419,15 +419,21 @@ def _lib_path(folder: Any) -> list[Any]:
 
 
 def library(user: Any, folder_id: Any = None) -> dict[str, Any]:
-    """One level of the Library. Everyone may read it; the Super Admin organises and uploads."""
+    """One level of the Library. Published files are seen by everyone; a file waiting for approval is pale and
+    seen only by its sender, the managers above them and the Super Admin, who also get Approve and Reject."""
+    from ots.accounts import selectors as accounts
+    from ots.accounts.models import Role
     from ots.core.permissions import can
 
-    from .models import LibraryFolder
+    from . import library as lib
+    from . import selectors
+    from .models import LibraryFolder, LibraryState
 
     folder = LibraryFolder.objects.filter(pk=folder_id).first() if folder_id else None
     if folder_id and folder is None:
         return {}
     manage = can(user, "library.manage", None)
+    may = lib.may_upload(user, folder)
     chain = _lib_path(folder)
     where = " > ".join(["Library", *[c.name for c in chain]])
     crumbs = [("Files", "/files/mine"), ("Library", "/files/library" if chain else "")]
@@ -441,45 +447,74 @@ def library(user: Any, folder_id: Any = None) -> dict[str, Any]:
         .annotate(n=Count("pk"))
     )
     nfile = dict(
-        File.objects.filter(visibility=FileVisibility.LIBRARY, library_folder_id__in=[f.pk for f in subs])
+        File.objects.filter(
+            visibility=FileVisibility.LIBRARY, library_state=LibraryState.APPROVED,
+            library_folder_id__in=[f.pk for f in subs],
+        )
         .values_list("library_folder_id")
         .annotate(n=Count("pk"))
-    )
+    )  # fmt: skip
     items = []
     for f in subs:
         n = nfold.get(f.pk, 0) + nfile.get(f.pk, 0)
+        allows = (
+            "Staff may add files (they wait for approval)"
+            if f.employee_upload
+            else "Only the Super Admin adds files"
+        )
         items.append(
             {
                 "kind": "folder", "id": str(f.pk), "name": f.name, "type": "Folder",
                 "url": f"/files/library?folder={f.pk}", "modified": None, "by": "", "size": None,
                 "status": "", "versions": None, "items": n, "can_rename": manage, "can_move": False,
                 "rename_url": f"/files/library/folders/{f.pk}/rename", "hide_url": "",
+                "toggle_url": f"/files/library/folders/{f.pk}/uploads" if manage else "",
+                "toggle_value": "0" if f.employee_upload else "1",
+                "toggle_label": "Stop staff uploads" if f.employee_upload else "Allow staff uploads",
                 "details": json.dumps(
-                    {"Name": f.name, "Parent": where, "Items": str(n), "Access": ACCESS_LIBRARY}
+                    {
+                        "Name": f.name, "Parent": where, "Items": str(n), "Access": ACCESS_LIBRARY,
+                        "Uploads": allows,
+                    }
                 ),
             }
         )  # fmt: skip
+    visible = selectors.versions_visible_to(user).values("pk")
     files = (
         File.objects.filter(
-            visibility=FileVisibility.LIBRARY, library_folder=folder, status=FileStatus.ACTIVE
+            visibility=FileVisibility.LIBRARY, library_folder=folder, status=FileStatus.ACTIVE,
+            current_version__in=visible,
         )
-        .select_related("current_version__file", "current_version__uploaded_by")
+        .exclude(library_state=LibraryState.REJECTED)
+        .select_related("current_version__file", "current_version__uploaded_by", "owner")
         .order_by("display_name")[:500]
-    )
+    )  # fmt: skip
+    team = accounts.subtree_ids(user.pk) if user.role == Role.SUB_ADMIN else set()
     for f in files:
         v = f.current_version
         if v is None:
             continue
-        d = version_item(v, where, ACCESS_LIBRARY, mine=False)
-        d["can_move"] = manage
+        pending = f.library_state == LibraryState.PENDING
+        d = version_item(v, where, "Waiting for approval" if pending else ACCESS_LIBRARY, mine=False)
+        d["can_move"] = manage and not pending
+        d["pending"] = pending
+        if pending:
+            reviewer = user.role == Role.SUPER_ADMIN or f.owner_id in team
+            d["can_review"] = reviewer
+            d["approve_url"] = f"/files/library/files/{f.pk}/approve"
+            d["reject_url"] = f"/files/library/files/{f.pk}/reject"
+            d["details"] = json.dumps(
+                {**json.loads(d["details"]), "Status": "Waiting for approval", "Sent by": f.owner.full_name}
+            )
         items.append(d)
     return {
         "title": folder.name if folder else "Library", "items": items, "section": "library",
         "crumbs": crumbs if chain else [], "scope": "library", "workspace_id": "",
-        "can_upload": manage, "can_create": manage, "create_url": "/files/library/folders" if manage else "",
+        "can_upload": may, "can_create": may, "create_url": "/files/library/folders" if manage else "",
         "create_hidden": [], "move_url": "/files/library/move", "actions": [], "next": "",
-        "parent_id": str(folder.pk) if folder else "", "show_disabled_create": False,
-        "empty": "This folder is empty.", "note": "",
+        "parent_id": str(folder.pk) if folder else "", "show_disabled_create": not may,
+        "no_folder_upload": not manage, "empty": "This folder is empty.",
+        "note": "" if manage or not may else "Files you add wait for your manager's approval first.",
     }  # fmt: skip
 
 
