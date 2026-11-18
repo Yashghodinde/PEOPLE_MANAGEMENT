@@ -44,4 +44,63 @@
     try { same = !!ref && new URL(ref).origin === location.origin; } catch (_) {}
     if (same && history.length > 1) { e.preventDefault(); history.back(); }
   });
+
+  // Persistent shell (IMP-15.2): the sidebar and the top bar stay put; only the content area, the page title, the sidebar
+  // highlight and the bell are replaced. Anything that is not an ordinary page (a download, a preview, logout, an
+  // error, a login redirect, another site) is left to the browser, so nothing can be swapped into the page by mistake.
+  var PLAIN = /\/(download|preview|logout|login|static|media|healthz|live|display)(\/|$)|\.(pdf|png|jpe?g|zip|xlsx?|docx?|txt|csv)$/i;
+  var shellBusy = null;
+
+  function plain(url) { window.location.assign(url); }
+
+  function go(url, push) {
+    if (shellBusy) shellBusy.abort();
+    var ctl = shellBusy = new AbortController();
+    fetch(url, { credentials: "same-origin", signal: ctl.signal, headers: { "X-OTS-Shell": "1", Accept: "text/html" } }).then(function (r) {
+      var type = r.headers.get("content-type") || "";
+      var landed = new URL(r.url, location.href);
+      if (!r.ok || type.indexOf("text/html") === -1 || PLAIN.test(landed.pathname)) return plain(url);
+      return r.text().then(function (html) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var main = doc.getElementById("main"), mine = document.getElementById("main");
+        if (!main || !mine || !doc.getElementById("shell-title")) return plain(url);
+        if (push) history.pushState({ shell: 1 }, "", landed.pathname + landed.search);
+        mine.innerHTML = main.innerHTML;
+        ["shell-title", "sidebar-nav", "shell-tools"].forEach(function (id) {
+          var a = document.getElementById(id), b = doc.getElementById(id);
+          if (a && b) a.innerHTML = b.innerHTML;
+        });
+        document.title = doc.title;
+        if (window.htmx) window.htmx.process(mine);
+        window.scrollTo(0, 0);
+        mine.setAttribute("tabindex", "-1"); mine.focus({ preventScroll: true });
+        document.dispatchEvent(new CustomEvent("ots:page", { detail: { url: url } }));
+      });
+    }).catch(function (err) { if (!err || err.name !== "AbortError") plain(url); });
+  }
+
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a[href]") : null;
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (a.target || a.hasAttribute("download") || a.hasAttribute("data-no-boost") || a.closest('[hx-boost="false"]')) return;
+    var u;
+    try { u = new URL(a.href, location.href); } catch (_) { return; }
+    if (u.origin !== location.origin || PLAIN.test(u.pathname) || !document.getElementById("shell-title")) return;
+    if (u.pathname === location.pathname && u.search === location.search) { if (u.hash) return; }
+    e.preventDefault();
+    go(u.pathname + u.search, true);
+  });
+
+  // a search box (a GET form) navigates the same way
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (e.defaultPrevented || !f || (f.method || "get").toLowerCase() !== "get" || f.hasAttribute("data-no-boost")) return;
+    var action = new URL(f.getAttribute("action") || location.pathname, location.href);
+    if (action.origin !== location.origin || PLAIN.test(action.pathname) || !document.getElementById("shell-title")) return;
+    e.preventDefault();
+    var q = new URLSearchParams(new FormData(f)).toString();
+    go(action.pathname + (q ? "?" + q : ""), true);
+  });
+
+  window.addEventListener("popstate", function () { go(location.pathname + location.search, false); });
 })();

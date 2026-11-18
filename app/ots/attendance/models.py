@@ -17,6 +17,7 @@ class IdleMode(models.TextChoices):
 class SessionEndReason(models.TextChoices):
     END_OF_DAY = "END_OF_DAY", "End of day"
     MANUAL = "MANUAL", "Logged out (break)"
+    LUNCH = "LUNCH", "Lunch break"
     IDLE_45 = "IDLE_45", "Idle for 45 minutes"
     BROWSER_CLOSED = "BROWSER_CLOSED", "Browser closed"
     FORCED = "FORCED", "Ended by an administrator"

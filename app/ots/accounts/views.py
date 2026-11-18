@@ -65,7 +65,8 @@ def login_view(request: HttpRequest) -> HttpResponse:
 def logout_view(request: HttpRequest) -> HttpResponse:
     from ots.attendance import sessions
 
-    sessions.end_current(request.session.session_key or "", "MANUAL")
+    reason = "LUNCH" if request.POST.get("reason") == "lunch" else "MANUAL"
+    sessions.end_current(request.session.session_key or "", reason)
     logout(request)
     return redirect("/login")
 
