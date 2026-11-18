@@ -70,6 +70,31 @@ def _new_form(request: HttpRequest, *, error: str = "", form: Any = None, status
 
 
 @login_required
+@require_http_methods(["GET"])
+def ids_check(request: HttpRequest) -> Any:
+    """The create form asks: is this File ID free, or what ID would this name get? Writes nothing."""
+    from django.http import JsonResponse
+
+    from . import ids
+    from .models import FileIdWorkspace
+
+    permissions.require(request.user, "fileid.create")
+    typed = ids.normalise(request.GET.get("file_id", ""))
+    if typed:
+        if not ids.is_standard(typed):
+            return JsonResponse({"ok": False, "id": typed, "message": "Use the form FTS-AZE-483921."})
+        taken = FileIdWorkspace.objects.filter(file_id_norm=typed).exists()
+        return JsonResponse(
+            {"ok": not taken, "id": typed, "message": "Already registered." if taken else "Available."}
+        )
+    for _ in range(8):
+        shown = ids.generate(request.GET.get("name", ""))
+        if not FileIdWorkspace.objects.filter(file_id_norm=shown).exists():
+            return JsonResponse({"ok": True, "id": shown, "message": "Available."})
+    return JsonResponse({"ok": False, "id": "", "message": "Try again."})
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def ids_create(request: HttpRequest) -> HttpResponse:
     permissions.require(request.user, "fileid.create")
@@ -80,7 +105,7 @@ def ids_create(request: HttpRequest) -> HttpResponse:
         ws = services.create_workspace(
             request.user, name=p.get("name", ""), file_id=p.get("file_id", ""),
             description=p.get("description", ""), category=p.get("category", Category.CLIENT),
-            tags=p.get("tags", ""), request=request,
+            tags=p.get("tags", ""), request=request, strict_format=True,
         )  # fmt: skip
     except ValidationFailed as exc:
         return _new_form(request, error=str(exc), form=p, status=422)

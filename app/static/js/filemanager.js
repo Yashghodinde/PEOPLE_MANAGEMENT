@@ -23,6 +23,26 @@ document.addEventListener("alpine:init", function () {
     e.target.click();
   });
 
+  // The New File ID form: shows the ID the name would get (the person may type another) and whether it is free.
+  Alpine.data("fileIdForm", function () {
+    return {
+      note: "", ok: true, manual: false, timer: null,
+      get stateClass() { return this.note ? (this.ok ? "text-ok" : "text-bad") : "text-ink-600"; },
+      ask: function () {
+        var self = this, f = this.$refs.fid, n = this.$refs.name;
+        var q = "name=" + encodeURIComponent(n.value) + "&file_id=" + encodeURIComponent(this.manual ? f.value : "");
+        if (!this.manual && !n.value.trim()) { this.note = ""; return; }
+        fetch("/files/ids/check?" + q, { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+          if (!self.manual && d.id) f.value = d.id;
+          self.ok = d.ok; self.note = d.message || "";
+        }).catch(function () { self.note = ""; });
+      },
+      later: function () { var self = this; clearTimeout(this.timer); this.timer = setTimeout(function () { self.ask(); }, 350); },
+      nameTyped: function () { this.later(); },
+      typedId: function () { this.manual = this.$refs.fid.value.trim() !== ""; this.later(); },
+    };
+  });
+
   Alpine.data("fileManager", function () {
     return {
       view: "list", sort: "name_asc", detailsOpen: false, details: [], selected: null,

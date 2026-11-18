@@ -51,6 +51,7 @@ def _clean(name: str, description: str, category: str) -> tuple[str, str, str]:
 def create_workspace(
     actor: User, *, name: str, file_id: str = "", description: str = "", category: str = Category.CLIENT,
     tags: Any = None, members: list[tuple[User, str]] | None = None, request: Any = None,
+    strict_format: bool = False,
 ) -> FileIdWorkspace:  # fmt: skip
     """Make a File ID. Blank `file_id` generates one; a typed one is normalised and must be free. The creator
     becomes the Owner. Two people typing the same id at the same moment: exactly one wins."""
@@ -58,7 +59,12 @@ def create_workspace(
     name, description, category = _clean(name, description, category)
     typed = bool(file_id.strip())
     for _attempt in range(8):
-        shown = ids.normalise(file_id) if typed else ids.generate()
+        shown = ids.normalise(file_id) if typed else ids.generate(name)
+        if typed and strict_format and not ids.is_standard(shown):
+            raise ValidationFailed(
+                "A File ID looks like FTS-AZE-483921: FTS, 2 to 4 capital letters, then 6 digits.",
+                fields={"file_id": ["Invalid."]},
+            )
         if not ids.is_valid(shown):
             raise ValidationFailed(
                 "A File ID is 4 to 40 letters, digits or hyphens, starting with a letter or digit.",
