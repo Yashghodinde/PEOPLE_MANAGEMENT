@@ -172,8 +172,10 @@ def uploads(request: HttpRequest) -> JsonResponse:
         display_name=str(data.get("display_name") or ""),
         scope=scope_in,
         workspace=ws,
-        folder_id=_uuid(data.get("folder_id"), "folder_id") if scope_in in ("personal", "library") else None,
-        relative_dirs=rel if scope_in in ("personal", "library") else None,
+        folder_id=_uuid(data.get("folder_id"), "folder_id")
+        if scope_in in ("personal", "library", "workspace")
+        else None,
+        relative_dirs=rel if scope_in in ("personal", "library", "workspace") else None,
         note=str(data.get("note") or "")[:200],
         size=size,
         sha256=str(data.get("sha256") or ""),
@@ -378,7 +380,9 @@ def library_page(request: HttpRequest) -> HttpResponse:
     m = browser.library(request.user, raw if _is_uuid(raw) else None)
     if not m:
         raise NotFound("No such folder.")
-    return _manager(request, m, move_targets=browser.library_move_targets() if m["can_create"] else [])
+    return manager_response(
+        request, m, move_targets=browser.library_move_targets() if m["can_create"] else []
+    )
 
 
 def _back_to_library(folder: Any) -> str:
@@ -451,7 +455,7 @@ def mine(request: HttpRequest) -> HttpResponse:
         page = max(0, int(request.GET.get("page", "0")))
     except ValueError:
         page = 0
-    return _manager(request, browser.personal_root(request.user, page))
+    return manager_response(request, browser.personal_root(request.user, page))
 
 
 @login_required
@@ -466,7 +470,7 @@ def mine_day(request: HttpRequest, day: str) -> HttpResponse:
         d = datetime.date.fromisoformat(day)
     except ValueError:
         raise NotFound("No such day.") from None
-    return _manager(request, browser.personal_day(request.user, d))
+    return manager_response(request, browser.personal_day(request.user, d))
 
 
 @login_required
@@ -476,10 +480,10 @@ def mine_folder(request: HttpRequest, folder_id: uuid.UUID) -> HttpResponse:
 
     permissions.require(request.user, "file.upload_personal")
     folder = folders.my_folder(request.user, folder_id)
-    return _manager(request, browser.personal_folder(request.user, folder))
+    return manager_response(request, browser.personal_folder(request.user, folder))
 
 
-def _manager(request: HttpRequest, m: dict[str, Any], **extra: Any) -> HttpResponse:
+def manager_response(request: HttpRequest, m: dict[str, Any], **extra: Any) -> HttpResponse:
     """Every file section renders through this one page (IMP-14.3)."""
     from . import browser
 
@@ -557,7 +561,7 @@ def mine_move(request: HttpRequest) -> HttpResponse:
 def shared(request: HttpRequest) -> HttpResponse:
     from . import browser
 
-    return _manager(request, browser.shared_with_me(request.user))
+    return manager_response(request, browser.shared_with_me(request.user))
 
 
 @login_required
@@ -576,7 +580,7 @@ def task_storage_page(request: HttpRequest) -> HttpResponse:
         before = None
     m = browser.task_root(request.user, before)
     m["page_param"] = "before"
-    return _manager(request, m)
+    return manager_response(request, m)
 
 
 @login_required
@@ -590,7 +594,7 @@ def task_day_page(request: HttpRequest, day: str) -> HttpResponse:
         d = datetime.date.fromisoformat(day)
     except ValueError:
         raise NotFound("No such day.") from None
-    return _manager(request, browser.task_day(request.user, d, request.GET.get("p", "")[:120]))
+    return manager_response(request, browser.task_day(request.user, d, request.GET.get("p", "")[:120]))
 
 
 @login_required
@@ -609,7 +613,7 @@ def task_exchange_page(request: HttpRequest, task_id: uuid.UUID) -> HttpResponse
     except ValueError:
         day = None
     m = browser.task_exchange(request.user, task, day, request.GET.get("p", "")[:120])
-    return _manager(request, m, timeline=taskstorage.task_timeline(request.user, task))
+    return manager_response(request, m, timeline=taskstorage.task_timeline(request.user, task))
 
 
 @login_required

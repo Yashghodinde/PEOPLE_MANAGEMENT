@@ -144,7 +144,7 @@ def move_personal(user: Any, folder_id: Any, to_parent_id: Any, request: HttpReq
         if folder.pk in {a.pk for a in ancestors(parent)}:
             raise ValidationFailed("A folder cannot go inside itself.", fields={"to": ["Invalid."]})
         # the deepest branch under `folder` plus the new parent's depth must stay within the cap
-        if depth(parent) + _height(folder) > MAX_DEPTH:
+        if depth(parent) + height(folder) > MAX_DEPTH:
             raise ValidationFailed(
                 f"Folders can go {MAX_DEPTH} levels deep, no further.", fields={"to": ["Too deep."]}
             )
@@ -161,9 +161,9 @@ def move_personal(user: Any, folder_id: Any, to_parent_id: Any, request: HttpReq
     return folder
 
 
-def _height(folder: Folder) -> int:
+def height(folder: Folder) -> int:
     kids = list(Folder.objects.filter(parent=folder, status=FileStatus.ACTIVE).values_list("pk", flat=True))
-    return 1 + max((_height(Folder.objects.get(pk=k)) for k in kids), default=0)
+    return 1 + max((height(Folder.objects.get(pk=k)) for k in kids), default=0)
 
 
 @transaction.atomic

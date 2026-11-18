@@ -88,6 +88,9 @@ class FileIdDocument(models.Model):
     added_at = models.DateTimeField(default=now)
     removed_at = models.DateTimeField(null=True, blank=True)
     removed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    folder = models.ForeignKey(  # the workspace folder it sits in (None = at the top of the File ID)
+        "files.Folder", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
 
     class Meta:
         db_table = "file_id_documents"

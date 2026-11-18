@@ -77,7 +77,7 @@ document.addEventListener("alpine:init", function () {
     return {
       items: [], minimised: false, relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
       init: function () {
-        var self = this, d = this.$el.dataset;
+        var self = this, d = this.$el.dataset; this.root = this.$el; // handlers on inner inputs see their own $el, so keep the root
         this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; this.folderId = d.folderId || ""; this.locked = d.locked === "1"; // scope "personal" = into My storage, no task
         this.relation = d.defaultRelation || "SUBMISSION";
         this.queue = OtsUploadCore.create({
@@ -108,8 +108,8 @@ document.addEventListener("alpine:init", function () {
           var f = fileList[i], rel = paths ? paths[i] : (f.webkitRelativePath || "");
           this.queue.add(f, Object.assign({}, meta, { relPath: rel }));
         }
-        this.refresh = this.$el.dataset.refresh === "1";
-        this.fileId = ""; this.note = ""; this.relation = this.$el.dataset.defaultRelation || "SUBMISSION";
+        this.refresh = this.root.dataset.refresh === "1";
+        this.fileId = ""; this.note = ""; this.relation = this.root.dataset.defaultRelation || "SUBMISSION";
       },
       picked: function (e) { this.take(e.target.files); e.target.value = ""; },
       dropped: function (e) {

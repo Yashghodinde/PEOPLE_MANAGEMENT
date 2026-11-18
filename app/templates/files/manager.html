@@ -4,6 +4,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
 {% block content %}
 <div class="flex flex-col gap-4 max-w-page">
   {% include "files/_nav.html" %}
+  {% if m.header %}{% include "workspaces/_header.html" with ws=m.header.ws role=m.header.role tab=m.header.tab %}{% endif %}
   <div x-data="uploader" data-scope="{{ m.scope }}" data-workspace-id="{{ m.workspace_id }}" data-default-relation="REFERENCE" data-folder-id="{{ m.parent_id }}" data-refresh="1"{% if not m.can_upload %} data-locked="1"{% endif %}
        @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped" class="relative">
     <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
@@ -56,7 +57,7 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
             {% for it in m.items %}
             <li data-item data-kind="{{ it.kind }}" data-id="{{ it.id }}" data-title="{{ it.name }}" data-name="{{ it.name|lower }}" data-mod="{{ it.modified|date:'U' }}" data-size="{{ it.size|default_if_none:0 }}" data-type="{{ it.type|lower }}" data-details="{{ it.details }}" data-rename="{{ it.rename_url }}" data-hide="{{ it.hide_url }}" @click="select" aria-selected="false">
               <div class="flex items-center gap-3 min-w-0">
-                {% if it.kind == "folder" %}{% icon "folder" "5" "text-accent" %}<a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>
+                {% if it.kind == "folder" %}{% icon "folder" "5" "text-accent" %}<span class="flex flex-col min-w-0"><a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>{% if it.sub %}<span class="text-cap text-ink-600">{{ it.sub }}</span>{% endif %}</span>
                 {% else %}{% icon "file-text" "5" "text-ink-600" %}<a href="{{ it.url }}" class="text-body font-medium text-ink-900 hover:underline break-words min-w-0">{{ it.name }}</a>{% if it.versions and it.versions > 1 %}<span class="text-cap text-ink-600 shrink-0">v{{ it.versions }}</span>{% endif %}{% endif %}
               </div>
               <div class="fm-meta text-cap text-ink-600">
@@ -129,10 +130,10 @@ Every folder-based section renders through this one page: toolbar, Create or Upl
       </div>
       <div x-show="hideOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-label="Delete">
         <form method="post" :action="hideAction" class="bg-canvas rounded-md shadow-card p-5 w-[400px] max-w-full flex flex-col gap-3">{% csrf_token %}
-          <h2 class="text-sec font-semibold">Delete this file?</h2><input type="hidden" name="next" value="{{ m.next }}">
+          <h2 class="text-sec font-semibold">{{ m.hide_title|default:"Delete this file?" }}</h2><input type="hidden" name="next" value="{{ m.next }}">
           <p class="text-body text-ink-900 break-words" x-text="hideName"></p>
-          <p class="text-cap text-ink-600">It leaves your storage. Nothing is erased, and anyone you already sent it to keeps their copy.</p>
-          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-bad text-canvas text-body font-medium">Delete</button></div>
+          <p class="text-cap text-ink-600">{{ m.hide_text|default:"It leaves your storage. Nothing is erased, and anyone you already sent it to keeps their copy." }}</p>
+          <div class="flex justify-end gap-2"><button type="button" @click="closeAll" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="submit" class="h-5 px-4 rounded-full bg-bad text-canvas text-body font-medium">{{ m.hide_button|default:"Delete" }}</button></div>
         </form>
       </div>
     </section>

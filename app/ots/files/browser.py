@@ -496,3 +496,120 @@ def library_move_targets() -> list[tuple[str, str]]:
             guard += 1
         out.append((str(r["pk"]), "Library > " + " > ".join(reversed(parts))))
     return sorted(out, key=lambda t: t[1])
+
+
+# ---------------------------------------------------------------- File IDs (IMP-14.6, layout)
+
+
+def workspace_list(user: Any, can_create: bool) -> dict[str, Any]:
+    from ots.workspaces import selectors as ws_sel
+
+    items = []
+    for w in ws_sel.cards(user):
+        arch = " (archived)" if w.status == "ARCHIVED" else ""
+        items.append(
+            {
+                "kind": "folder", "id": str(w.pk), "name": w.name, "sub": f"{w.file_id}{arch}",
+                "type": w.get_category_display(), "url": f"/files/ids/{w.pk}", "modified": w.created_at,
+                "by": w.owner.full_name, "size": None, "status": "", "versions": None,
+                "items": w.document_count, "can_rename": False, "can_move": False, "rename_url": "",
+                "hide_url": "",
+                "details": json.dumps(
+                    {
+                        "Name": w.name, "File ID": w.file_id, "Category": w.get_category_display(),
+                        "Owner": w.owner.full_name, "Members": str(w.member_count),
+                        "Documents": str(w.document_count), "Access": "Members of this File ID only",
+                    }
+                ),
+            }
+        )  # fmt: skip
+    return {
+        "title": "File IDs", "items": items, "section": "ids", "column_by": "Owner",
+        "empty": "You are not in any File ID yet.",
+        **NO_WRITE, "actions": [("New File ID", "/files/ids/new")] if can_create else [],
+    }  # fmt: skip
+
+
+def _ws_path(ws: Any, folder: Folder | None) -> list[Folder]:
+    return folder_svc.ancestors(folder) if folder is not None else []
+
+
+def workspace_files(ws: Any, role: str, can_write: bool, folder: Folder | None) -> dict[str, Any]:
+    from ots.workspaces import selectors as ws_sel
+    from ots.workspaces.models import FileIdDocument
+
+    chain = _ws_path(ws, folder)
+    where = " > ".join([ws.name, *[c.name for c in chain]])
+    base = f"/files/ids/{ws.pk}"
+    crumbs = [("Files", "/files/mine"), ("File IDs", "/files/ids"), (ws.name, base if chain else "")]
+    crumbs += [(c.name, f"{base}/f/{c.pk}") for c in chain[:-1]]
+    if chain:
+        crumbs.append((chain[-1].name, ""))
+    access = "Members of this File ID"
+    parent = folder
+    subs = list(
+        Folder.objects.filter(
+            context=FolderContext.WORKSPACE, workspace_id=ws.pk, parent=parent, status=FileStatus.ACTIVE
+        )
+        .select_related("created_by")
+        .order_by("name_key")[:500]
+    )
+    ids = [f.pk for f in subs]
+    counts = _folder_counts(ids)
+    docs_in = dict(
+        FileIdDocument.objects.filter(workspace=ws, folder_id__in=ids, removed_at__isnull=True)
+        .values_list("folder_id")
+        .annotate(n=Count("pk"))
+    )
+    items = []
+    for f in subs:
+        n_folders, _ = counts[f.pk]
+        d = folder_item(
+            f, (n_folders, docs_in.get(f.pk, 0)), f"{base}/f/{f.pk}", where, access,
+            f"{base}/folders/{f.pk}/rename" if can_write else "",
+        )  # fmt: skip
+        items.append(d)
+    docs = (
+        ws_sel.active_documents(ws)
+        .filter(folder=parent, file__status=FileStatus.ACTIVE)
+        .select_related("file__current_version__uploaded_by", "file__current_version__file")
+        .order_by("file__display_name")[:500]
+    )
+    for doc in docs:
+        v = doc.file.current_version
+        if v is None:
+            continue
+        d = version_item(v, where, access, mine=False)
+        d["can_move"] = can_write
+        d["can_hide"] = can_write
+        d["hide_url"] = f"{base}/documents/{doc.file_id}/remove"
+        items.append(d)
+    return {
+        "title": folder.name if folder else ws.name, "items": items, "section": "ids", "crumbs": crumbs,
+        "scope": "workspace", "workspace_id": str(ws.pk), "can_upload": can_write, "can_create": can_write,
+        "create_url": f"{base}/folders" if can_write else "", "create_hidden": [],
+        "move_url": f"{base}/move", "actions": [], "next": "",
+        "parent_id": str(folder.pk) if folder else "", "show_disabled_create": not can_write,
+        "empty": "This folder is empty.", "note": "" if can_write else "You can view and download here.",
+        "hide_title": "Remove from this File ID?",
+        "hide_text": "The document leaves this File ID. The file and its history are kept.",
+        "hide_button": "Remove", "header": {"ws": ws, "role": role, "tab": "files"},
+    }  # fmt: skip
+
+
+def workspace_move_targets(ws: Any) -> list[tuple[str, str]]:
+    rows = {
+        f["pk"]: f
+        for f in Folder.objects.filter(
+            context=FolderContext.WORKSPACE, workspace_id=ws.pk, status=FileStatus.ACTIVE
+        ).values("pk", "parent_id", "name")[:500]
+    }
+    out = []
+    for r in rows.values():
+        parts, cur, guard = [], r, 0
+        while cur is not None and guard < 10:
+            parts.append(cur["name"])
+            cur = rows.get(cur["parent_id"])
+            guard += 1
+        out.append((str(r["pk"]), f"{ws.name} > " + " > ".join(reversed(parts))))
+    return sorted(out, key=lambda t: t[1])

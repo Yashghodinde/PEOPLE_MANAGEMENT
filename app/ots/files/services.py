@@ -264,6 +264,14 @@ def start_upload(
             from .library import ensure_path as library_path
 
             folder = library_path(user, relative_dirs, folder_id)
+    if in_workspace and (folder_id or relative_dirs) and target is None:
+        from ots.workspaces import folders as ws_folders
+
+        folder = (
+            ws_folders.ensure_path(user, workspace, relative_dirs, folder_id)
+            if relative_dirs
+            else ws_folders.folder_of(workspace, folder_id)
+        )
     if (
         personal and (folder_id or relative_dirs) and target is None
     ):  # into a folder; the missing ones are made
@@ -508,7 +516,10 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
         from ots.workspaces.models import FileIdWorkspace
         from ots.workspaces.services import link_new_file
 
-        link_new_file(user, FileIdWorkspace.objects.get(pk=s.workspace_id), file, request)
+        link_new_file(
+            user, FileIdWorkspace.objects.get(pk=s.workspace_id), file, request,
+            folder_id=s.folder_id,
+        )  # fmt: skip
 
     body = {
         "file_id": str(file.pk),

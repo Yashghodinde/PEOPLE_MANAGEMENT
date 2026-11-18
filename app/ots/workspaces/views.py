@@ -51,23 +51,30 @@ def _fail(request: HttpRequest, ws: Any, exc: ValidationFailed) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def ids_list(request: HttpRequest) -> HttpResponse:
+    from ots.files import browser
+    from ots.files.views import manager_response
+
     if request.user.role == UserRole.HR:
         raise NotFound("Not found.")
+    m = browser.workspace_list(request.user, permissions.can(request.user, "fileid.create"))
+    return manager_response(request, m)
+
+
+def _new_form(request: HttpRequest, *, error: str = "", form: Any = None, status: int = 200) -> HttpResponse:
     return render(
         request,
-        "workspaces/list.html",
-        {
-            "page_title": "File IDs",
-            "cards": selectors.cards(request.user),
-            "can_create": permissions.can(request.user, "fileid.create"),
-            "categories": Category.choices,
-        },
+        "workspaces/new.html",
+        {"page_title": "New File ID", "categories": Category.choices, "error": error, "form": form or {}},
+        status=status,
     )
 
 
 @login_required
-@require_http_methods(["POST"])
+@require_http_methods(["GET", "POST"])
 def ids_create(request: HttpRequest) -> HttpResponse:
+    permissions.require(request.user, "fileid.create")
+    if request.method == "GET":
+        return _new_form(request)
     p = request.POST
     try:
         ws = services.create_workspace(
@@ -76,15 +83,7 @@ def ids_create(request: HttpRequest) -> HttpResponse:
             tags=p.get("tags", ""), request=request,
         )  # fmt: skip
     except ValidationFailed as exc:
-        return render(
-            request,
-            "workspaces/list.html",
-            {
-                "page_title": "File IDs", "cards": selectors.cards(request.user), "can_create": True,
-                "categories": Category.choices, "error": str(exc), "form": p,
-            },
-            status=422,
-        )  # fmt: skip
+        return _new_form(request, error=str(exc), form=p, status=422)
     return _back(ws)
 
 
@@ -117,7 +116,82 @@ def _page(request: HttpRequest, ws: Any, *, error: str = "", status: int = 200) 
 @login_required
 @require_http_methods(["GET"])
 def ids_detail(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
-    return _page(request, _ws(request, ws_id))
+    ws = _ws(request, ws_id)
+    if request.GET.get("tab") == "members":
+        return _page(request, ws)
+    return _files(request, ws, None)
+
+
+def _files(request: HttpRequest, ws: Any, folder: Any) -> HttpResponse:
+    from ots.files import browser
+    from ots.files.views import manager_response
+
+    role = effective_role(request.user, ws)
+    can_write = role in (Role.OWNER, Role.CONTRIBUTOR) and ws.status != WorkspaceStatus.ARCHIVED
+    m = browser.workspace_files(ws, role, can_write, folder)
+    targets = browser.workspace_move_targets(ws) if can_write else []
+    return manager_response(request, m, move_targets=targets)
+
+
+@login_required
+@require_http_methods(["GET"])
+def ids_folder(request: HttpRequest, ws_id: uuid.UUID, folder_id: uuid.UUID) -> HttpResponse:
+    from . import folders
+
+    ws = _ws(request, ws_id)
+    return _files(request, ws, folders.folder_of(ws, folder_id))
+
+
+def _folder_write(request: HttpRequest, ws: Any, run: Any) -> HttpResponse:
+    """A folder action from a form: a refusal comes back as a message on the same page."""
+    from django.contrib import messages
+
+    from ots.core.errors import Conflict
+
+    try:
+        run()
+    except (ValidationFailed, Conflict, NotFound) as exc:
+        messages.error(request, str(exc))
+    nxt = request.POST.get("next") or ""
+    ok = nxt.startswith(f"/files/ids/{ws.pk}") and not nxt.startswith("//")
+    return redirect(nxt if ok else f"/files/ids/{ws.pk}")
+
+
+@login_required
+@require_http_methods(["POST"])
+def ids_folder_create(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
+    from . import folders
+
+    ws = _ws(request, ws_id)
+    name, parent = request.POST.get("name", ""), request.POST.get("parent") or None
+    return _folder_write(request, ws, lambda: folders.create(request.user, ws, name, parent, request))
+
+
+@login_required
+@require_http_methods(["POST"])
+def ids_folder_rename(request: HttpRequest, ws_id: uuid.UUID, folder_id: uuid.UUID) -> HttpResponse:
+    from . import folders
+
+    ws = _ws(request, ws_id)
+    name = request.POST.get("name", "")
+    return _folder_write(request, ws, lambda: folders.rename(request.user, ws, folder_id, name, request))
+
+
+@login_required
+@require_http_methods(["POST"])
+def ids_move(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
+    """The Move dialog: kind (file | folder), id, to."""
+    from . import folders
+
+    ws = _ws(request, ws_id)
+    kind, to = request.POST.get("kind"), request.POST.get("to") or None
+    try:
+        item = uuid.UUID(request.POST.get("id", ""))
+    except ValueError:
+        raise ValidationFailed("Choose what to move.") from None
+    if kind == "folder":
+        return _folder_write(request, ws, lambda: folders.move_folder(request.user, ws, item, to, request))
+    return _folder_write(request, ws, lambda: folders.place_document(request.user, ws, item, to, request))
 
 
 @login_required
@@ -167,7 +241,10 @@ def ids_unlink(request: HttpRequest, ws_id: uuid.UUID, file_id: uuid.UUID) -> Ht
     if file is None:
         raise NotFound("Not found.")
     services.unlink_document(request.user, ws, file, request=request)
-    return _back(ws)
+    nxt = request.POST.get("next") or ""
+    return redirect(
+        nxt if nxt.startswith(f"/files/ids/{ws.pk}") and not nxt.startswith("//") else f"/files/ids/{ws.pk}"
+    )
 
 
 @login_required

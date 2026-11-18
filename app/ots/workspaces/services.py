@@ -212,11 +212,11 @@ def link_document(actor: User, ws: FileIdWorkspace, file: Any, *, request: Any =
     return _link(actor, ws, file, request)
 
 
-def _link(actor: User, ws: FileIdWorkspace, file: Any, request: Any) -> FileIdDocument:
+def _link(actor: User, ws: FileIdWorkspace, file: Any, request: Any, folder_id: Any = None) -> FileIdDocument:
     existing = FileIdDocument.objects.filter(workspace=ws, file=file, removed_at__isnull=True).first()
     if existing is not None:
         return existing  # linking twice is the same as linking once
-    doc = FileIdDocument.objects.create(workspace=ws, file=file, added_by=actor)
+    doc = FileIdDocument.objects.create(workspace=ws, file=file, added_by=actor, folder_id=folder_id)
     audit.record(
         "fileid.document_linked", actor, ws, {"file": str(file.pk), "name": file.display_name}, request
     )
@@ -224,9 +224,11 @@ def _link(actor: User, ws: FileIdWorkspace, file: Any, request: Any) -> FileIdDo
     return doc
 
 
-def link_new_file(actor: User, ws: FileIdWorkspace, file: Any, request: Any = None) -> FileIdDocument:
+def link_new_file(
+    actor: User, ws: FileIdWorkspace, file: Any, request: Any = None, folder_id: Any = None
+) -> FileIdDocument:
     """A file just uploaded into a workspace (called in the upload's commit, which checked the rights)."""
-    return _link(actor, ws, file, request)
+    return _link(actor, ws, file, request, folder_id)
 
 
 @transaction.atomic
