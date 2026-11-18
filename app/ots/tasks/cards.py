@@ -375,4 +375,6 @@ def card_tone(a: TaskAssignment) -> str:
     """grey, yellow, red, pink, blue, green or muted. A cancelled task is muted whatever its people did."""
     if getattr(a.task, "is_cancelled", False):
         return "muted"
+    if a.status == S.BLOCKED and getattr(a, "help_answered", False):
+        return "pink"  # the manager has answered; the employee has to act (D-100)
     return TONES.get(S(a.status), "grey")

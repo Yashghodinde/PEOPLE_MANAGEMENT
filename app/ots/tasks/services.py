@@ -497,7 +497,9 @@ def cancel_task(actor: Any, task_id: Any, reason: str, expected_version: int | N
 
 
 @transaction.atomic
-def add_comment(actor: Any, task_id: Any, body: str, assignment_id: Any = None) -> TaskComment:
+def add_comment(
+    actor: Any, task_id: Any, body: str, assignment_id: Any = None, help_request: Any = None
+) -> TaskComment:
     """Comments are immutable. Anyone who may see the discussion can add one, also on a cancelled task."""
     try:
         task = Task.objects.get(pk=task_id)
@@ -514,7 +516,7 @@ def add_comment(actor: Any, task_id: Any, body: str, assignment_id: Any = None) 
             )
     at = now()
     comment = TaskComment.objects.create(
-        task=task, assignment=assignment, author=actor, body=text, created_at=at
+        task=task, assignment=assignment, author=actor, body=text, created_at=at, help_request=help_request
     )
     _record(
         task, actor, "comment.added", {"comment_id": str(comment.pk), "length": len(text)}, at, assignment

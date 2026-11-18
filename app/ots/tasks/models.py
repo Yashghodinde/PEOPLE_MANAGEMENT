@@ -181,6 +181,54 @@ class CommentKind(models.TextChoices):
     VOICE = "VOICE"
 
 
+class SupportKind(models.TextChoices):
+    WAITING_FOR_MANAGER = "WAITING_FOR_MANAGER", "Waiting for manager input"
+    MISSING_FILE = "MISSING_FILE", "Missing file"
+    MISSING_INFORMATION = "MISSING_INFORMATION", "Missing information"
+    RESOURCE_REQUIRED = "RESOURCE_REQUIRED", "Resource required"
+    APPROVAL_REQUIRED = "APPROVAL_REQUIRED", "Approval required"
+    ACCESS_REQUIRED = "ACCESS_REQUIRED", "Access required"
+    CLARIFICATION_REQUIRED = "CLARIFICATION_REQUIRED", "Clarification required"
+    EXTERNAL_DEPENDENCY = "EXTERNAL_DEPENDENCY", "External dependency"
+    OTHER = "OTHER", "Other"
+
+
+class SupportStatus(models.TextChoices):
+    OPEN = "OPEN", "Waiting for the manager"
+    MANAGER_RESPONDED = "MANAGER_RESPONDED", "Manager responded"
+    WAITING_FOR_EMPLOYEE = "WAITING_FOR_EMPLOYEE", "Waiting for the employee"
+    RESOLVED = "RESOLVED", "Resolved"
+    CLOSED = "CLOSED", "Closed"
+
+
+class SupportRequest(models.Model):
+    """An employee's structured "I am waiting / I need help" (IMP-15.11). It lives on the task and survives
+    its notification; its replies are ordinary task comments linked to it. Its status is its own lifecycle and
+    never replaces the assignment's (the assignment goes BLOCKED through the normal `block` action)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    task = models.ForeignKey(Task, on_delete=models.PROTECT, related_name="support_requests")
+    assignment = models.ForeignKey(TaskAssignment, on_delete=models.PROTECT, related_name="support_requests")
+    raised_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    manager = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=24, choices=SupportKind.choices)
+    what = models.TextField()
+    why = models.TextField(blank=True, default="")
+    impact = models.TextField(blank=True, default="")
+    urgent = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=SupportStatus.choices, default=SupportStatus.OPEN)
+    created_at = models.DateTimeField(default=now)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        db_table = "support_requests"
+        indexes = [models.Index(fields=["task", "created_at"], name="support_task_ix")]
+
+    def __str__(self) -> str:
+        return f"{self.kind} on {self.task_id}"
+
+
 class TaskComment(models.Model):
     """Immutable (the table is append-only). A voice message is written once, after its recording has been
     uploaded and verified; its `body` is the short line shown in the bell ("Voice message (0:23)")."""
@@ -196,6 +244,9 @@ class TaskComment(models.Model):
     kind = models.CharField(max_length=5, choices=CommentKind.choices, default=CommentKind.TEXT)
     voice_version = models.ForeignKey(
         "files.FileVersion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    help_request = models.ForeignKey(  # set when the message is part of a help request's thread
+        "SupportRequest", null=True, blank=True, on_delete=models.PROTECT, related_name="comments"
     )
     voice_seconds = models.PositiveSmallIntegerField(
         null=True, blank=True

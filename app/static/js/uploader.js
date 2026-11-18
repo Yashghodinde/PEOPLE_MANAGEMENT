@@ -75,10 +75,10 @@ document.addEventListener("alpine:init", function () {
 
   Alpine.data("uploader", function () {
     return {
-      items: [], minimised: false, relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
+      items: [], staged: [], stage: false, minimised: false, relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
       init: function () {
         var self = this, d = this.$el.dataset; this.root = this.$el; // handlers on inner inputs see their own $el, so keep the root
-        this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; this.folderId = d.folderId || ""; this.locked = d.locked === "1"; // scope "personal" = into My storage, no task
+        this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; this.folderId = d.folderId || ""; this.locked = d.locked === "1"; this.stage = d.stage === "1"; this.staged = []; // scope "personal" = into My storage, no task
         this.relation = d.defaultRelation || "SUBMISSION";
         this.queue = OtsUploadCore.create({
           fetch: window.fetch.bind(window), hashFile: hashFile, uuid: uuid, storage: storage(), csrf: csrf,
@@ -116,6 +116,7 @@ document.addEventListener("alpine:init", function () {
         this.dragging = false;
         this.fileId = ""; // dropped files are new files, even if "Upload a new version" was clicked and then cancelled
         if (!e.dataTransfer) return;
+        if (this.stage) { this.staged = this.staged.concat(Array.prototype.slice.call(e.dataTransfer.files)); return; } // wait for a yes
         var self = this, items = e.dataTransfer.items, entries = [];
         if (items && items.length && items[0].webkitGetAsEntry) {  // folders keep their tree
           for (var i = 0; i < items.length; i++) { var en = items[i].webkitGetAsEntry(); if (en) entries.push(en); }
@@ -129,6 +130,10 @@ document.addEventListener("alpine:init", function () {
         if (!("webkitdirectory" in probe)) { if (window.otsToast) window.otsToast("warning", "This browser cannot upload a whole folder. Choose files instead."); return; }
         this.fileId = ""; this.$refs.dir.click();
       },
+      get hasStaged() { return this.staged.length > 0; },
+      get stagedLabel() { var n = this.staged.length; return n === 1 ? this.staged[0].name : n + " files"; },
+      sendStaged: function () { var f = this.staged; this.staged = []; this.take(f); },
+      clearStaged: function () { this.staged = []; },
       get trayClass() { return this.minimised ? "hidden" : "flex flex-col gap-2"; },
       get trayLabel() { return this.minimised ? "Show uploads" : "Minimise"; },
       toggleTray: function () { this.minimised = !this.minimised; },

@@ -33,13 +33,14 @@ from ots.notifications import selectors as notes
 from ots.notifications import services as note_services
 from ots.ui.templatetags.ots_ui import dot
 
-from . import cards, dashboard, receipts, selectors, services, state
+from . import cards, chat, dashboard, receipts, selectors, services, state, support
 from .models import (
     OPEN_STATUSES,
     AssignmentStatus,
     BlockReason,
     DerivedStatus,
     Priority,
+    SupportKind,
     Task,
     TaskAssignment,
 )
@@ -157,11 +158,14 @@ def safe_back(raw: str) -> str:
 def _decorate(viewer: Any, rows: list[TaskAssignment], shown_to: str) -> list[TaskAssignment]:
     """What each task card needs to draw itself, added to the rows (no further queries)."""
     at = now()
+    blocked = [a.pk for a in rows if a.status == AssignmentStatus.BLOCKED]
+    answered_help = support.answered_assignment_ids(blocked) if blocked else set()
     unread = cards.unread_by_task(viewer, [a.task_id for a in rows])
     dots = notes.dots_for(viewer, [a.task_id for a in rows])
     for a in rows:
         a.accent = cards.accent(a, at)
         a.accent_label = ACCENT_LABELS[a.accent]
+        a.help_answered = a.pk in answered_help
         a.tone = cards.card_tone(a)
         a.status_text = _status_text(viewer, a)
         a.due_text = a.task.due_at.astimezone(IST).strftime("%d %b, %H:%M")
@@ -395,11 +399,11 @@ def task_create(request: HttpRequest) -> HttpResponse:
 ACTION_UI: dict[str, tuple[str, tuple[str, ...]]] = {
     "start": ("Start", ()),
     "resume": ("Resume", ()),
-    "block": ("I am waiting", ("block_reason", "block_note")),
+    "block": ("I'm waiting", ("block_reason", "block_note")),
     "unblock": ("Back to work", ("note",)),
-    "submit": ("Mark complete", ("note",)),
-    "approve": ("Approve", ()),
-    "request_changes": ("Ask for changes", ("feedback",)),
+    "submit": ("Submit task for review", ("note",)),
+    "approve": ("Approve task", ()),
+    "request_changes": ("Request changes", ("feedback",)),
     "remove": ("Remove from task", ("reason",)),
     "cancel": ("Cancel this part", ("reason",)),
 }
@@ -434,6 +438,17 @@ def _detail_ctx(
         a.waiting_hours = dashboard.blocked_hours(a, at) if a.status == AssignmentStatus.BLOCKED else 0
     comments = list(task.comments.select_related("author").order_by("created_at"))
     overdue = task.due_at < at and not task.is_cancelled and any(a.status in OPEN_STATUSES for a in lines)
+    assignee_ids = {a.user_id for a in lines}
+    chat_items = chat.build(viewer, task, comments, assignee_ids)
+    waiting_ids = [a.pk for a in lines if a.status == AssignmentStatus.BLOCKED]
+    answered = support.answered_assignment_ids(waiting_ids) if waiting_ids else set()
+    for a in lines:
+        a.help_answered = a.pk in answered
+    for m in chat_items:
+        sr = m.get("request")
+        if sr is not None:
+            m["can_answer"] = support.may_answer(viewer, sr) and sr.status in support.OPEN_STATES
+            m["can_reply"] = viewer.pk == sr.raised_by_id and sr.status in support.OPEN_STATES
     can_add = permissions.can(viewer, "assignment.add", task) and not task.is_cancelled
     return {
         "page_title": task.task_code,
@@ -452,6 +467,13 @@ def _detail_ctx(
         "can_add": can_add,
         "addable": selectors.assignable_users(viewer) if can_add else [],
         "priorities": Priority.choices,
+        "chat": chat_items,
+        "can_upload": permissions.can(viewer, "file.upload", task) and not task.is_cancelled,
+        "default_relation": "SUBMISSION" if viewer.role == "EMPLOYEE" else "DELIVERABLE",
+        "max_mb": settings.OTS_UPLOAD_MAX_MB,
+        "help_kinds": SupportKind.choices,
+        "my_lines": [a for a in lines if a.user_id == viewer.pk and a.removed_at is None],
+        "open_request": request.GET.get("request", ""),
         "due_local": task.due_at.astimezone(IST).strftime("%Y-%m-%dT%H:%M"),
     }  # fmt: skip
 
@@ -504,6 +526,46 @@ def _task_post(request: HttpRequest, task_id: str, run: Any) -> HttpResponse:
     except ValidationFailed as exc:
         return _rerender(request, task.pk, exc)
     return _done(request, f"/app/tasks/{task.pk}")
+
+
+def _help_post(request: HttpRequest, task: Task, run: Any) -> HttpResponse:
+    from django.contrib import messages
+
+    rid = ""
+    try:
+        rid = str(run().pk)
+    except (ValidationFailed, NotFound) as exc:
+        messages.error(request, str(exc))
+    return redirect(f"/app/tasks/{task.pk}" + (f"?request={rid}" if rid else ""))
+
+
+@login_required
+@idempotency_optional
+@require_http_methods(["POST"])
+def task_help(request: HttpRequest, task_id: str) -> HttpResponse:
+    """ "I am waiting": a structured help request on one of my own assignments."""
+    task = _task_or_404(request, task_id)
+    p = request.POST
+    return _help_post(
+        request, task,
+        lambda: support.raise_request(
+            request.user, p.get("assignment", ""), kind=p.get("kind", ""), what=p.get("what", ""),
+            why=p.get("why", ""), impact=p.get("impact", ""), urgent=p.get("urgent") == "1", request=request,
+        ),
+    )  # fmt: skip
+
+
+@login_required
+@idempotency_optional
+@require_http_methods(["POST"])
+def task_help_reply(request: HttpRequest, task_id: str, request_id: str) -> HttpResponse:
+    task = _task_or_404(request, task_id)
+    p = request.POST
+    return _help_post(
+        request,
+        task,
+        lambda: support.reply(request.user, request_id, p.get("body", ""), p.get("action", "reply"), request),
+    )
 
 
 @login_required

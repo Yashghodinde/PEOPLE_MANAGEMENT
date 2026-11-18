@@ -17,14 +17,16 @@ PENDING_STATES = ("STAGED", "ARCHIVING", "RETRY_WAIT", "VERIFYING", "BLOCKED_QUO
 
 
 def task_file_rows(viewer: Any, task: Task) -> list[TaskFile]:
-    """Newest first, one row per upload linked to this task. The task must already be visible to `viewer`."""
+    """Oldest first, newest last (the order of the exchange), one row per upload linked to this task. Past the
+    panel's limit it is the oldest that are left out. The task must already be visible to `viewer`."""
     if not Task.objects.visible_to(viewer).filter(pk=task.pk).exists():
         return []
-    return list(
+    newest = list(
         TaskFile.objects.filter(task=task, version__in=versions_visible_to(viewer).values("pk"))  # D-095 D1
         .select_related("file", "version", "version__uploaded_by", "assignment__user")
         .order_by("-linked_at", "-id")[:PANEL_LIMIT]
     )
+    return newest[::-1]
 
 
 def anything_pending(rows: list[TaskFile]) -> bool:

@@ -19,7 +19,7 @@ def panel(c, task, query=""):
 
 def test_the_task_page_loads_the_files_section_after_the_page(office):
     body = login("emp").get(f"/app/tasks/{office['task'].pk}").content.decode()
-    assert f'hx-get="/app/tasks/{office["task"].pk}/files"' in body and 'hx-trigger="load"' in body
+    assert f'hx-get="/app/tasks/{office["task"].pk}/files"' in body and 'hx-trigger="intersect once"' in body
 
 
 def test_the_uploader_scripts_load_for_signed_in_people(office):
