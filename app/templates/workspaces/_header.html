@@ -12,6 +12,7 @@ Params: ws, role, tab (files | members).{% endcomment %}
   <p class="text-cap text-ink-600">Owner: {{ ws.owner.full_name }}</p>
   <nav class="flex items-center gap-2 flex-wrap pt-1" aria-label="File ID sections">
     <a href="/files/ids/{{ ws.pk }}" {% if tab == "files" %}aria-current="page"{% endif %} class="inline-flex items-center h-5 px-4 rounded-full border text-body {% if tab == "files" %}border-accent bg-accent text-canvas font-medium{% else %}border-line text-ink-900 hover:bg-line{% endif %}">Files</a>
+    {% if role != "VIEWER" or ws.physical_visible_to_viewers %}<a href="/files/ids/{{ ws.pk }}/physical" {% if tab == "physical" %}aria-current="page"{% endif %} class="inline-flex items-center h-5 px-4 rounded-full border text-body {% if tab == "physical" %}border-accent bg-accent text-canvas font-medium{% else %}border-line text-ink-900 hover:bg-line{% endif %}">Physical records</a>{% endif %}
     <a href="/files/ids/{{ ws.pk }}?tab=members" {% if tab == "members" %}aria-current="page"{% endif %} class="inline-flex items-center h-5 px-4 rounded-full border text-body {% if tab == "members" %}border-accent bg-accent text-canvas font-medium{% else %}border-line text-ink-900 hover:bg-line{% endif %}">Members</a>
   </nav>
 </section>

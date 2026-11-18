@@ -105,3 +105,71 @@ class FileIdDocument(models.Model):
 
     def __str__(self) -> str:
         return f"{self.file_id} in {self.workspace_id}"
+
+
+class PhysicalStatus(models.TextChoices):
+    STORED = "STORED", "Stored"
+    MISSING = "MISSING", "Missing"
+    ARCHIVED = "ARCHIVED", "Archived"
+
+
+class PhysicalRecord(models.Model):
+    """A hard-copy record of a File ID and where it is kept (IMP-15.4). The number is a label, never a key to
+    anything (D-102). Nothing is deleted: a record is marked Missing or Archived, and every change of place is
+    a row in `PhysicalMove`."""
+
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    number = models.CharField(max_length=14, unique=True)  # PHY-000123
+    workspace = models.ForeignKey(FileIdWorkspace, on_delete=models.PROTECT, related_name="physical_records")
+    name = models.CharField(max_length=200)
+    category = models.CharField(max_length=60, blank=True, default="")
+    office = models.CharField(max_length=80)
+    block = models.CharField(max_length=40)
+    shelf = models.CharField(max_length=40)
+    box = models.CharField(max_length=40, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=10, choices=PhysicalStatus.choices, default=PhysicalStatus.STORED)
+    stored_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    stored_at = models.DateTimeField(default=now)
+    file = models.ForeignKey(
+        File, null=True, blank=True, on_delete=models.PROTECT, related_name="physical_links"
+    )
+
+    class Meta:
+        db_table = "physical_records"
+        indexes = [models.Index(fields=["workspace", "status"], name="physrec_ws_status_ix")]
+
+    def __str__(self) -> str:
+        return self.number
+
+    @property
+    def place(self) -> str:
+        parts = [self.office, f"Block {self.block}", f"Shelf {self.shelf}"] + (
+            [f"Box {self.box}"] if self.box else []
+        )
+        return " > ".join(parts)
+
+
+class PhysicalMove(models.Model):
+    """Append-only: where a record was kept before and where it went. The first row is the initial storage."""
+
+    id = models.BigAutoField(primary_key=True)
+    record = models.ForeignKey(PhysicalRecord, on_delete=models.PROTECT, related_name="moves")
+    from_office = models.CharField(max_length=80, blank=True, default="")
+    from_block = models.CharField(max_length=40, blank=True, default="")
+    from_shelf = models.CharField(max_length=40, blank=True, default="")
+    from_box = models.CharField(max_length=40, blank=True, default="")
+    to_office = models.CharField(max_length=80)
+    to_block = models.CharField(max_length=40)
+    to_shelf = models.CharField(max_length=40)
+    to_box = models.CharField(max_length=40, blank=True, default="")
+    changed_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    changed_at = models.DateTimeField(default=now)
+    reason = models.CharField(max_length=200, blank=True, default="")
+
+    class Meta:
+        db_table = "physical_moves"
+        indexes = [models.Index(fields=["record", "changed_at"], name="physmove_record_ix")]
+
+    def __str__(self) -> str:
+        return f"{self.record_id}: {self.to_office}/{self.to_block}/{self.to_shelf}"

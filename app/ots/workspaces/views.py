@@ -219,6 +219,88 @@ def ids_move(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
     return _folder_write(request, ws, lambda: folders.place_document(request.user, ws, item, to, request))
 
 
+def _physical_page(request: HttpRequest, ws: Any, *, status: int = 200) -> HttpResponse:
+    from . import physical
+
+    if not physical.can_see(request.user, ws):
+        raise NotFound("Not found.")
+    role = effective_role(request.user, ws)
+    can_write = role in (Role.OWNER, Role.CONTRIBUTOR) and ws.status != WorkspaceStatus.ARCHIVED
+    docs = [d.file for d in selectors.active_documents(ws).select_related("file")[:300]] if can_write else []
+    recs = list(physical.records(request.user, ws).prefetch_related("moves__changed_by")[:300])
+    return render(
+        request,
+        "workspaces/physical.html",
+        {
+            "page_title": f"{ws.name}: physical records", "ws": ws, "role": role, "records": recs,
+            "can_write": can_write, "suggest": physical.suggestions(ws), "documents": docs,
+            "statuses": physical.PhysicalStatus.choices,
+            "crumbs": [("Files", "/files/mine"), ("File IDs", "/files/ids"), (ws.name, f"/files/ids/{ws.pk}"),
+                       ("Physical records", "")],
+        },
+        status=status,
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["GET"])
+def ids_physical(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
+    return _physical_page(request, _ws(request, ws_id))
+
+
+def _physical_write(request: HttpRequest, ws: Any, run: Any) -> HttpResponse:
+    from django.contrib import messages
+
+    try:
+        run()
+    except ValidationFailed as exc:
+        messages.error(request, str(exc))
+    return redirect(f"/files/ids/{ws.pk}/physical")
+
+
+@login_required
+@require_http_methods(["POST"])
+def ids_physical_create(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:
+    from . import physical
+
+    ws, p = _ws(request, ws_id), request.POST
+    return _physical_write(
+        request, ws,
+        lambda: physical.create(
+            request.user, ws, name=p.get("name", ""), office=p.get("office", ""), block=p.get("block", ""),
+            shelf=p.get("shelf", ""), box=p.get("box", ""), category=p.get("category", ""),
+            notes=p.get("notes", ""), file_id=p.get("file") or None, request=request,
+        ),
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["POST"])
+def ids_physical_move(request: HttpRequest, ws_id: uuid.UUID, record_id: uuid.UUID) -> HttpResponse:
+    from . import physical
+
+    ws, p = _ws(request, ws_id), request.POST
+    return _physical_write(
+        request, ws,
+        lambda: physical.move(
+            request.user, ws, record_id, office=p.get("office", ""), block=p.get("block", ""),
+            shelf=p.get("shelf", ""), box=p.get("box", ""), reason=p.get("reason", ""), request=request,
+        ),
+    )  # fmt: skip
+
+
+@login_required
+@require_http_methods(["POST"])
+def ids_physical_status(request: HttpRequest, ws_id: uuid.UUID, record_id: uuid.UUID) -> HttpResponse:
+    from . import physical
+
+    ws = _ws(request, ws_id)
+    status = request.POST.get("status", "")
+    return _physical_write(
+        request, ws, lambda: physical.set_status(request.user, ws, record_id, status, request)
+    )
+
+
 @login_required
 @require_http_methods(["POST"])
 def ids_edit(request: HttpRequest, ws_id: uuid.UUID) -> HttpResponse:

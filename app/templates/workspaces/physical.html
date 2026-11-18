@@ -1,0 +1,69 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% comment %}Physical records of a File ID (IMP-15.4): where each hard copy is kept. Cards, newest first.{% endcomment %}
+{% block content %}
+<div class="flex flex-col gap-4 max-w-page">
+  {% include "files/_nav.html" %}
+  {% include "workspaces/_header.html" with ws=ws role=role tab="physical" %}
+
+  <datalist id="offices">{% for v in suggest.office %}<option value="{{ v }}">{% endfor %}</datalist>
+  <datalist id="blocks">{% for v in suggest.block %}<option value="{{ v }}">{% endfor %}</datalist>
+  <datalist id="shelves">{% for v in suggest.shelf %}<option value="{{ v }}">{% endfor %}</datalist>
+  <datalist id="boxes">{% for v in suggest.box %}<option value="{{ v }}">{% endfor %}</datalist>
+
+  {% if can_write %}
+  <details class="bg-canvas border border-line rounded-md shadow-card">
+    <summary class="list-none cursor-pointer flex items-center gap-2 h-6 px-4 text-body font-medium text-accent">{% icon "plus" %}Add a physical record</summary>
+    <form method="post" action="/files/ids/{{ ws.pk }}/physical/new" class="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 border-t border-line">{% csrf_token %}
+      <label class="flex flex-col gap-1 text-cap text-ink-600 md:col-span-2">Physical record name<input name="name" required maxlength="200" placeholder="GST documents 2026" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Office<input name="office" required list="offices" maxlength="80" placeholder="Mumbai" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Block<input name="block" required list="blocks" maxlength="40" placeholder="B-02" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Shelf<input name="shelf" required list="shelves" maxlength="40" placeholder="S-04" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Box or folder (optional)<input name="box" list="boxes" maxlength="40" placeholder="BX-12" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Category<input name="category" maxlength="60" list="cats" placeholder="Invoice, Agreement, Tax, KYC" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"><datalist id="cats"><option value="Invoice"><option value="Agreement"><option value="Tax"><option value="KYC"><option value="Other"></datalist></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600">Linked digital document (optional)<select name="file" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body text-ink-900"><option value="">None</option>{% for f in documents %}<option value="{{ f.pk }}">{{ f.display_name }}</option>{% endfor %}</select></label>
+      <label class="flex flex-col gap-1 text-cap text-ink-600 md:col-span-2">Notes for finding it (optional)<textarea name="notes" rows="2" maxlength="2000" class="px-3 py-2 rounded-sm border border-line bg-canvas text-body text-ink-900"></textarea></label>
+      <p class="text-cap text-ink-600 md:col-span-2">The record number is made for you when you save. Stored by you, today.</p>
+      <div class="md:col-span-2">{% include "components/button.html" with label="Save record" type="submit" %}</div>
+    </form>
+  </details>
+  {% endif %}
+
+  {% if records %}
+  <ul class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-label="Physical records">
+    {% for r in records %}
+    <li class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3 min-w-0" data-record="{{ r.number }}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0"><p class="text-body font-semibold text-ink-900 break-words">{{ r.name }}</p><p class="text-cap text-ink-600">{{ r.number }}{% if r.category %} · {{ r.category }}{% endif %}</p></div>
+        <span class="shrink-0 inline-flex items-center h-4 px-3 rounded-full border text-cap {% if r.status == 'STORED' %}border-ok text-ok{% elif r.status == 'MISSING' %}border-bad text-bad{% else %}border-line text-ink-600{% endif %}">{{ r.get_status_display }}</span>
+      </div>
+      <p class="text-body text-ink-900 break-words" aria-label="Location">{{ r.place }}</p>
+      {% if r.notes %}<p class="text-cap text-ink-600 break-words">{{ r.notes }}</p>{% endif %}
+      <p class="text-cap text-ink-600">Stored by {{ r.stored_by.full_name }} on {{ r.stored_at|date:"d M Y, H:i" }}</p>
+      {% if r.file %}<a href="/files/{{ r.file_id }}/trail" class="inline-flex items-center gap-1 text-cap text-accent hover:underline">{% icon "file-text" %}Digital copy: {{ r.file.display_name }}</a>{% endif %}
+      <div class="flex flex-col gap-2 mt-auto">
+        <details class="border-t border-line pt-2"><summary class="cursor-pointer text-cap text-accent">Where it has been</summary>
+          <ol class="flex flex-col gap-1 pt-2">{% for m in r.moves.all reversed %}
+            <li class="text-cap text-ink-600">{% if m.from_office %}Moved to {{ m.to_office }} > Block {{ m.to_block }} > Shelf {{ m.to_shelf }}{% if m.to_box %} > Box {{ m.to_box }}{% endif %}, from {{ m.from_office }} > Block {{ m.from_block }} > Shelf {{ m.from_shelf }}{% else %}Stored at {{ m.to_office }} > Block {{ m.to_block }} > Shelf {{ m.to_shelf }}{% if m.to_box %} > Box {{ m.to_box }}{% endif %}{% endif %} · {{ m.changed_by.full_name }}, {{ m.changed_at|date:"d M Y, H:i" }}{% if m.reason %} · {{ m.reason }}{% endif %}</li>{% endfor %}
+          </ol></details>
+        {% if can_write %}
+        <details class="border-t border-line pt-2"><summary class="cursor-pointer text-cap text-accent">Move or change status</summary>
+          <form method="post" action="/files/ids/{{ ws.pk }}/physical/{{ r.pk }}/move" class="grid grid-cols-2 gap-2 pt-2">{% csrf_token %}
+            <input name="office" value="{{ r.office }}" list="offices" required aria-label="Office" class="h-5 px-2 rounded-sm border border-line text-body">
+            <input name="block" value="{{ r.block }}" list="blocks" required aria-label="Block" class="h-5 px-2 rounded-sm border border-line text-body">
+            <input name="shelf" value="{{ r.shelf }}" list="shelves" required aria-label="Shelf" class="h-5 px-2 rounded-sm border border-line text-body">
+            <input name="box" value="{{ r.box }}" list="boxes" aria-label="Box" class="h-5 px-2 rounded-sm border border-line text-body">
+            <input name="reason" maxlength="200" placeholder="Reason (optional)" aria-label="Reason" class="h-5 px-2 rounded-sm border border-line text-body col-span-2">
+            <div class="col-span-2">{% include "components/button.html" with label="Move" type="submit" variant="secondary" %}</div>
+          </form>
+          <form method="post" action="/files/ids/{{ ws.pk }}/physical/{{ r.pk }}/status" class="flex items-center gap-2 pt-2">{% csrf_token %}
+            <select name="status" aria-label="Status" class="h-5 px-2 rounded-sm border border-line text-body">{% for v, l in statuses %}<option value="{{ v }}"{% if v == r.status %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+            {% include "components/button.html" with label="Set status" type="submit" variant="ghost" %}
+          </form>
+        </details>
+        {% endif %}
+      </div>
+    </li>{% endfor %}
+  </ul>
+  {% else %}<p class="text-body text-ink-600 bg-canvas border border-line rounded-md p-5">No physical records yet.{% if can_write %} Use "Add a physical record" above to say where a hard copy is kept.{% endif %}</p>{% endif %}
+</div>
+{% endblock %}
