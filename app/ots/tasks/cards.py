@@ -355,3 +355,24 @@ def with_unread(cards: list[PersonCard], unread: dict[Any, dict[str, int]]) -> l
         u = unread.get(c.user.pk, {})
         c.unread_text, c.unread_voice = u.get("text", 0), u.get("voice", 0)
     return cards
+
+
+# whole-card colour (IMP-15.7, D-100): the assignment's own state decides it, never priority or the due date
+TONES = {
+    S.ASSIGNED: "grey",
+    S.IN_PROGRESS: "yellow",
+    S.PAUSED: "yellow",
+    S.BLOCKED: "red",
+    S.CHANGES_REQUESTED: "pink",
+    S.SUBMITTED: "blue",
+    S.APPROVED: "green",
+    S.CANCELLED: "muted",
+    S.REMOVED: "muted",
+}
+
+
+def card_tone(a: TaskAssignment) -> str:
+    """grey, yellow, red, pink, blue, green or muted. A cancelled task is muted whatever its people did."""
+    if getattr(a.task, "is_cancelled", False):
+        return "muted"
+    return TONES.get(S(a.status), "grey")

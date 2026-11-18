@@ -1,8 +1,9 @@
 {% extends "base.html" %}{% load ots_ui %}
 {% block content %}
 <div class="flex flex-col gap-4">
+  {% include "tasks/_view_switch.html" with view="table" %}
   <div class="flex items-center justify-between gap-3 flex-wrap">
-    <form method="get" action="/app/tasks" class="flex items-end gap-2 flex-wrap" aria-label="Filters">
+    <form method="get" action="/app/tasks/all" class="flex items-end gap-2 flex-wrap" aria-label="Filters">
       <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Search
         <input name="q" value="{{ f.q }}" maxlength="100" placeholder="Title or code" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
       <label class="flex flex-col gap-1 text-cap font-medium text-ink-900">Status

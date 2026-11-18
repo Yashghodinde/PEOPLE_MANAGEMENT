@@ -1,0 +1,5 @@
+{% comment %}The Tasks view switch (IMP-15.7): cards or table. `view` is "cards" or "table".{% endcomment %}
+<nav class="inline-flex rounded-full border border-line overflow-hidden" aria-label="Tasks view">
+  <a href="/app/tasks?view=cards" {% if view == "cards" %}aria-current="page"{% endif %} class="h-5 px-4 inline-flex items-center text-body {% if view == "cards" %}bg-accent text-canvas font-medium{% else %}text-ink-900 hover:bg-line{% endif %}">Card view</a>
+  <a href="/app/tasks/all?view=table" {% if view == "table" %}aria-current="page"{% endif %} class="h-5 px-4 inline-flex items-center text-body {% if view == "table" %}bg-accent text-canvas font-medium{% else %}text-ink-900 hover:bg-line{% endif %}">Table view</a>
+</nav>

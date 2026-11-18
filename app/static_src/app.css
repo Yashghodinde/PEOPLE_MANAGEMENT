@@ -118,3 +118,14 @@
 .fm-list[data-view="grid"] .fm-status { margin-top: 4px; }
 .fm-list[data-view="grid"] .fm-status:not([data-label]) dd { overflow: visible; }
 .fm-list[data-view="grid"] .fm-actions { margin-top: auto; }
+
+/* Task cards (IMP-15.7): the whole card takes a soft colour from the assignment's state; no side stripe. */
+.task-tone { color: theme("colors.ink-900"); }
+.task-tone-grey { background: #f1f2f4; }
+.task-tone-yellow { background: #fdf6d3; }
+.task-tone-red { background: #fde4e2; }
+.task-tone-pink { background: #fbe3ee; }
+.task-tone-blue { background: #dfeafb; }
+.task-tone-green { background: #dff3e4; }
+.task-tone-muted { background: #ececec; color: theme("colors.ink-600"); }
+.task-tone:hover { filter: brightness(0.97); }

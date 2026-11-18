@@ -162,6 +162,7 @@ def _decorate(viewer: Any, rows: list[TaskAssignment], shown_to: str) -> list[Ta
     for a in rows:
         a.accent = cards.accent(a, at)
         a.accent_label = ACCENT_LABELS[a.accent]
+        a.tone = cards.card_tone(a)
         a.status_text = _status_text(viewer, a)
         a.due_text = a.task.due_at.astimezone(IST).strftime("%d %b, %H:%M")
         a.dot = dots.get(str(a.task_id), "")
@@ -171,12 +172,29 @@ def _decorate(viewer: Any, rows: list[TaskAssignment], shown_to: str) -> list[Ta
     return rows
 
 
+def _remember_view(request: HttpRequest, page: str) -> str:
+    """The Tasks page has two views, cards and a table. `?view=` is an explicit choice and is remembered for
+    this person; opening the page without it uses what they chose last. Writes only the one column."""
+    from ots.accounts.models import User
+
+    asked = request.GET.get("view")
+    if asked in ("cards", "table"):
+        if asked != request.user.task_view:  # type: ignore[union-attr]
+            User.objects.filter(pk=request.user.pk).update(task_view=asked)
+            request.user.task_view = asked  # type: ignore[union-attr]
+        return asked
+    return str(request.user.task_view) if page == "cards" else page  # type: ignore[union-attr]
+
+
 @login_required
 @require_http_methods(["GET"])
 def task_landing(request: HttpRequest) -> HttpResponse:
     """/app/tasks: cards for the people who gave me work and the people I gave work to."""
     permissions.require(request.user, "task.view")
     viewer: Any = request.user
+    if _remember_view(request, "cards") == "table":  # they last chose the table: open it, as they left it
+        keep = {k: v for k, v in request.GET.items() if k != "view"}
+        return redirect("/app/tasks/all" + (f"?{urlencode(keep)}" if keep else ""))
     wider = viewer.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN)
     team = wider and request.GET.get("team") == "1"
     to_me = cards.with_unread(cards.assigned_to_me_groups(viewer), cards.unread_by_assigner(viewer))
@@ -265,6 +283,7 @@ def _task_group(request: HttpRequest, kind: str, user_id: str) -> HttpResponse:
 @require_http_methods(["GET"])
 def task_list(request: HttpRequest) -> HttpResponse:  # /app/tasks/all: the flat table
     permissions.require(request.user, "task.view")
+    _remember_view(request, "table")
     g = request.GET
     qs = (
         Task.objects.visible_to(request.user)

@@ -3,9 +3,9 @@
 <div class="flex flex-col gap-5">
   <div class="flex items-center justify-between gap-3 flex-wrap">
     <h2 class="sr-only">Tasks</h2>
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex items-center gap-3 flex-wrap">
+      {% include "tasks/_view_switch.html" with view="cards" %}
       {% if can_create %}{% include "components/button.html" with label="Add task" href="/app/tasks/new" icon="plus" %}{% endif %}
-      {% include "components/button.html" with label="All tasks (table)" href="/app/tasks/all" variant="secondary" %}
     </div>
   </div>
 

@@ -107,6 +107,9 @@ class User(AbstractBaseUser):
     )
 
     designation = models.CharField(max_length=120, blank=True, default="")
+    task_view = models.CharField(
+        max_length=5, default="cards"
+    )  # "cards" or "table": the Tasks page they last chose
     department = models.ForeignKey(
         Department, null=True, blank=True, on_delete=models.PROTECT, related_name="members"
     )
