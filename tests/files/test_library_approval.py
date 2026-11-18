@@ -12,7 +12,7 @@ from ots.notifications.models import Kind, Notification
 
 from tests.files.conftest import login, start, upload_all
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("dirs")]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.usefixtures("dirs")]
 DATA = bytes((i * 17) % 256 for i in range(700))
 
 

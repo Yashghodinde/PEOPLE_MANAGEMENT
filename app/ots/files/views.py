@@ -15,6 +15,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
@@ -467,9 +468,10 @@ def person_storage(request: HttpRequest, user_id: uuid.UUID) -> HttpResponse:
     if day is None:
         day = today_local() if today_rows else (days[0][0] if days else today_local())
     rows = personal.versions_on(target, day)
-    audit.record(
-        "storage.browsed", request.user, target, {"day": day.isoformat(), "files": len(rows)}, request
-    )
+    with transaction.atomic():  # the audit row is written with the visit, or the visit does not happen
+        audit.record(
+            "storage.browsed", request.user, target, {"day": day.isoformat(), "files": len(rows)}, request
+        )
     return render(
         request,
         "files/person_storage.html",

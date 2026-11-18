@@ -103,4 +103,25 @@
   });
 
   window.addEventListener("popstate", function () { go(location.pathname + location.search, false); });
+
+  // A picture that cannot load (missing file, 403, 404, expired) is replaced by the person's initials, never a broken
+  // image icon (IMP-16). `error` does not bubble, so it is caught on the way down.
+  function initialsFor(name) {
+    return (name || "").trim().split(/\s+/).slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join("");
+  }
+  function fallBack(img) {
+    if (!img || img.dataset.fellBack) return;
+    img.dataset.fellBack = "1";
+    var big = img.dataset.size === "5", span = document.createElement("span");
+    span.className = "inline-flex items-center justify-center rounded-full bg-line text-ink-900 font-semibold " + (big ? "w-6 h-6 text-sec" : "w-5 h-5 text-cap");
+    span.title = img.dataset.name || ""; span.setAttribute("aria-label", img.dataset.name || "");
+    span.textContent = initialsFor(img.dataset.name);
+    if (img.parentNode) img.parentNode.replaceChild(span, img);
+  }
+  document.addEventListener("error", function (e) { if (e.target && e.target.tagName === "IMG" && e.target.hasAttribute("data-avatar")) fallBack(e.target); }, true);
+  function sweepAvatars() {
+    Array.prototype.forEach.call(document.querySelectorAll("img[data-avatar]"), function (img) { if (img.complete && img.naturalWidth === 0) fallBack(img); });
+  }
+  document.addEventListener("DOMContentLoaded", sweepAvatars);
+  document.addEventListener("ots:page", sweepAvatars);  // after the shell swaps a page in
 })();

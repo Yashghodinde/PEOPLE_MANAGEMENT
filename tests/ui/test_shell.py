@@ -40,3 +40,18 @@ def test_a_plain_logout_is_still_a_manual_break(office):
         s.logout_reason in ("", SessionEndReason.MANUAL)
         for s in WorkSession.objects.filter(user=office["emp"]).exclude(logout_at=None)
     )
+
+
+def test_a_photo_that_cannot_load_has_an_initials_fallback_hook(office):
+    """IMP-16: a photo carries what the page script needs to swap in initials instead of a broken-image icon."""
+    from django.template.loader import render_to_string
+
+    html = render_to_string(
+        "components/avatar.html", {"name": "Priya Mehta", "photo": "/missing.jpg", "size": "5"}
+    )
+    assert "data-avatar" in html and 'data-name="Priya Mehta"' in html and 'alt=""' in html
+    assert "PM" in render_to_string(
+        "components/avatar.html", {"name": "Priya Mehta"}
+    )  # no photo: initials at once
+    js = (__import__("pathlib").Path(__file__).resolve().parents[2] / "app/static/js/app.js").read_text()
+    assert 'addEventListener("error"' in js and "fallBack" in js

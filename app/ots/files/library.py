@@ -256,11 +256,12 @@ def set_employee_upload(
     user: Any, folder_id: Any, allowed: bool, request: HttpRequest | None = None
 ) -> LibraryFolder:
     require(user, "library.manage", None)
-    folder = LibraryFolder.objects.filter(pk=folder_id).first()
-    if folder is None:
-        raise NotFound("No such folder.")
-    if folder.employee_upload != allowed:
-        folder.employee_upload = allowed
-        folder.save(update_fields=["employee_upload"])
-        audit.record("library.folder_uploads", user, folder, {"allowed": allowed}, request)
+    with transaction.atomic():
+        folder = LibraryFolder.objects.select_for_update().filter(pk=folder_id).first()
+        if folder is None:
+            raise NotFound("No such folder.")
+        if folder.employee_upload != allowed:
+            folder.employee_upload = allowed
+            folder.save(update_fields=["employee_upload"])
+            audit.record("library.folder_uploads", user, folder, {"allowed": allowed}, request)
     return folder

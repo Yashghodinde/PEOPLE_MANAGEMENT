@@ -12,7 +12,7 @@ from tests.accounts.factories import make_user
 from tests.files.conftest import login
 from tests.files.test_personal import mine_upload
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("dirs")]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.usefixtures("dirs")]
 
 
 def shared(office):
