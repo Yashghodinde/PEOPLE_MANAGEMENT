@@ -70,6 +70,17 @@ SERVICE_CASES = {
             services.remove_reference_photo(w["sa"], User.objects.get(pk=w["emp"].pk)),
         ),
     ),
+    "set_profile_photo": (
+        "user.profile_photo_updated",
+        lambda w: services.set_profile_photo(w["emp"], w["emp"], _photo()),
+    ),
+    "remove_profile_photo": (
+        "user.profile_photo_removed",
+        lambda w: (
+            services.set_profile_photo(w["emp"], w["emp"], _photo()),
+            services.remove_profile_photo(w["emp"], User.objects.get(pk=w["emp"].pk)),
+        ),
+    ),
     "change_password": (
         "user.password_changed",
         lambda w: services.change_password(w["emp"], "correct horse battery", "brand-new-pass-1"),

@@ -150,7 +150,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         size = int(data.get("size"))
     except (TypeError, ValueError):
         raise ValidationFailed("The size is not valid.", fields={"size": ["Invalid."]}) from None
-    scope_in = data.get("scope") if data.get("scope") in ("personal", "workspace", "library") else ""
+    scope_in = data.get("scope") if data.get("scope") in ("personal", "workspace", "library", "chat") else ""
     ws = None
     if (
         scope_in == "workspace"
@@ -173,6 +173,7 @@ def uploads(request: HttpRequest) -> JsonResponse:
         display_name=str(data.get("display_name") or ""),
         scope=scope_in,
         workspace=ws,
+        conversation_id=_uuid(data.get("conversation_id"), "conversation_id") if scope_in == "chat" else None,
         folder_id=_uuid(data.get("folder_id"), "folder_id")
         if scope_in in ("personal", "library", "workspace")
         else None,

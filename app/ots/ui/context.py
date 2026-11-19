@@ -15,4 +15,15 @@ def ui(request: HttpRequest) -> dict[str, object]:
         ],
         "unread_count": unread_count(user),
         "files_nav": files_strip(user, request.path) if role else None,
+        "chat_unread": _chat_unread(user) if role else 0,
     }
+
+
+def _chat_unread(user: object) -> int:
+    from django.conf import settings
+
+    if not getattr(settings, "OTS_CHAT_ENABLED", True):
+        return 0
+    from ots.chat.selectors import unread_conversation_count
+
+    return unread_conversation_count(user)

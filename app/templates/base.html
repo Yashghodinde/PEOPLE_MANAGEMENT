@@ -10,7 +10,7 @@
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% asset 'js/app.js' %}" defer></script>
   <script src="{% asset 'js/ui.js' %}"></script>
-  {% if request.user.is_authenticated %}<script src="{% asset 'js/attendance-idle.js' %}" defer></script><script src="{% asset 'js/live-core.js' %}" defer></script><script src="{% asset 'js/live.js' %}" defer></script><script src="{% asset 'js/sha256.js' %}" defer></script><script src="{% asset 'js/upload-core.js' %}" defer></script><script src="{% asset 'js/uploader.js' %}" defer></script><script src="{% asset 'js/filemanager.js' %}" defer></script><script src="{% asset 'js/taskchat.js' %}" defer></script><script src="{% asset 'js/voice-core.js' %}" defer></script><script src="{% asset 'js/voice.js' %}" defer></script>{% endif %}
+  {% if request.user.is_authenticated %}<script src="{% asset 'js/attendance-idle.js' %}" defer></script><script src="{% asset 'js/live-core.js' %}" defer></script><script src="{% asset 'js/live.js' %}" defer></script><script src="{% asset 'js/sha256.js' %}" defer></script><script src="{% asset 'js/upload-core.js' %}" defer></script><script src="{% asset 'js/uploader.js' %}" defer></script><script src="{% asset 'js/filemanager.js' %}" defer></script><script src="{% asset 'js/taskchat.js' %}" defer></script><script src="{% asset 'js/officechat.js' %}" defer></script><script src="{% asset 'js/voice-core.js' %}" defer></script><script src="{% asset 'js/voice.js' %}" defer></script>{% endif %}
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
 </head>
 {# hx-headers carries the CSRF token on every HTMX request #}
@@ -26,7 +26,7 @@
       <nav id="sidebar-nav" class="flex flex-col gap-1">
         {% for n in nav_items %}
         <a href="{{ n.item.path }}" class="flex items-center gap-3 h-5 rounded-sm text-body {% if n.active %}bg-line text-ink-900 font-medium{% else %}text-ink-600 hover:bg-line{% endif %}" {% if n.active %}aria-current="page"{% endif %} :class="linkClass" title="{{ n.item.label }}">
-          {% icon n.item.icon %}<span x-show="expanded">{{ n.item.label }}</span>
+          {% icon n.item.icon %}<span x-show="expanded">{{ n.item.label }}</span>{% if n.item.match == "/app/chat" %}<span class="ots-count" data-chat-badge style="position:static;{% if not chat_unread %}display:none{% endif %}">{{ chat_unread }}</span>{% endif %}
         </a>{% endfor %}
       </nav>
     </aside>

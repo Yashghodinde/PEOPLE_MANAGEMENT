@@ -1,0 +1,13 @@
+{% load ots_ui %}{% comment %}The conversation list. Params: rows, conv (the open one, optional).{% endcomment %}
+<ul class="flex flex-col" aria-label="Conversations">
+  {% for r in rows %}
+  <li><a href="/app/chat/c/{{ r.conv.pk }}" data-conv="{{ r.conv.pk }}" {% if conv and conv.pk == r.conv.pk %}aria-current="page"{% endif %} class="flex items-center gap-3 px-3 py-3 border-b border-line hover:bg-line {% if conv and conv.pk == r.conv.pk %}bg-line{% endif %}">
+    {% if r.other %}{% include "components/avatar.html" with name=r.title photo=r.other|photo_url size="5" %}{% else %}{% include "components/avatar.html" with name=r.title size="5" %}{% endif %}
+    <span class="min-w-0 flex-1 flex flex-col">
+      <span class="flex items-center justify-between gap-2"><strong class="text-body text-ink-900 truncate {% if r.unread %}font-bold{% endif %}">{{ r.title }}</strong><span class="text-cap text-ink-600 shrink-0">{% if r.last %}{{ r.last.created_at|date:"H:i" }}{% endif %}</span></span>
+      <span class="flex items-center justify-between gap-2"><span class="text-cap text-ink-600 truncate">{{ r.preview }}</span>
+        <span class="flex items-center gap-1 shrink-0">{% if r.member.pinned_at %}<span title="Pinned">{% icon "pin" "3" "text-ink-600" %}</span>{% endif %}{% if r.member.muted %}<span title="Muted">{% icon "bell-off" "3" "text-ink-600" %}</span>{% endif %}{% if r.unread %}<span class="ots-count" style="position:static" aria-label="{{ r.unread }} unread">{{ r.unread }}</span>{% endif %}</span></span>
+    </span>
+  </a></li>
+  {% empty %}<li class="p-5 text-body text-ink-600 text-center">{% if q %}Nothing matches "{{ q }}".{% else %}No conversations yet. Press New chat to start one.{% endif %}</li>{% endfor %}
+</ul>

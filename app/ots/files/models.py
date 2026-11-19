@@ -49,6 +49,7 @@ class FileVisibility(models.TextChoices):
     TASK = "TASK"
     LIBRARY = "LIBRARY"
     WORKSPACE = "WORKSPACE"  # uploaded into a File ID workspace: readable only through that link (IMP-04)
+    CHAT = "CHAT"  # sent in a conversation: readable only by its members, through the chat link (IMP-16.11)
 
 
 class LibraryState(models.TextChoices):
@@ -287,6 +288,7 @@ class UploadSession(models.Model):
         null=True, blank=True
     )  # the File ID workspace this goes into (scope "workspace")
     folder_id = models.UUIDField(null=True, blank=True)  # the personal folder the new file goes in (IMP-14.4)
+    conversation_id = models.UUIDField(null=True, blank=True)  # the chat a file is sent in (IMP-16.11)
     scope = models.CharField(max_length=10, blank=True, default="")  # "" = a task or the library; "personal"
     override_block = models.BooleanField(default=False)  # a Super Admin allowed a blocked type, audited
 

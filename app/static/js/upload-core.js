@@ -56,7 +56,7 @@
     }
 
     function fingerprint(it) {
-      return ["ots.up", it.taskId || "-", it.fileId || "new", it.relation, it.scope || "", it.workspaceId || "", it.folderId || "", it.relPath || "", it.displayName, it.size, it.modified].join("|");
+      return ["ots.up", it.taskId || "-", it.fileId || "new", it.relation, it.scope || "", it.workspaceId || "", it.conversationId || "", it.folderId || "", it.relPath || "", it.displayName, it.size, it.modified].join("|");
     }
     function keyFor(it, fresh) {
       var fp = fingerprint(it), key = fresh ? null : opts.storage.get(fp);
@@ -80,7 +80,7 @@
 
     function startBody(it, sha, key) {
       return JSON.stringify({
-        idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation, scope: it.scope || "", workspace_id: it.workspaceId || null, folder_id: it.folderId || null, relative_path: it.relPath || "", note: it.note || "",
+        idempotency_key: key, task_id: it.taskId || null, file_id: it.fileId || null, relation: it.relation, scope: it.scope || "", workspace_id: it.workspaceId || null, conversation_id: it.conversationId || null, folder_id: it.folderId || null, relative_path: it.relPath || "", note: it.note || "",
         original_filename: it.name, display_name: it.displayName, size: it.size, sha256: sha,
       });
     }
@@ -215,7 +215,7 @@
       add: function (file, meta) {
         var it = {
           id: nextId++, file: file, name: file.name, displayName: file.name, size: file.size, modified: file.lastModified || 0,
-          taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION", scope: meta.scope || "", workspaceId: meta.workspaceId || "", folderId: meta.folderId || "", relPath: meta.relPath || "", note: meta.note || "",
+          taskId: meta.taskId, fileId: meta.fileId || "", relation: meta.relation || "SUBMISSION", scope: meta.scope || "", workspaceId: meta.workspaceId || "", conversationId: meta.conversationId || "", folderId: meta.folderId || "", relPath: meta.relPath || "", note: meta.note || "",
           state: "queued", sent: 0, hashed: 0, started: false, cancelled: false,
         };
         if (!it.size) { it.state = "failed"; it.error = "This file is empty."; }

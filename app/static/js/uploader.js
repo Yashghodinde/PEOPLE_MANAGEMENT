@@ -78,7 +78,7 @@ document.addEventListener("alpine:init", function () {
       items: [], staged: [], stage: false, minimised: false, relation: "SUBMISSION", fileId: "", note: "", dragging: false, queue: null,
       init: function () {
         var self = this, d = this.$el.dataset; this.root = this.$el; // handlers on inner inputs see their own $el, so keep the root
-        this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; this.folderId = d.folderId || ""; this.locked = d.locked === "1"; this.stage = d.stage === "1"; this.staged = []; // scope "personal" = into My storage, no task
+        this.taskId = d.taskId; this.scope = d.scope || ""; this.workspaceId = d.workspaceId || ""; this.folderId = d.folderId || ""; this.conversationId = d.conversationId || ""; this.locked = d.locked === "1"; this.stage = d.stage === "1"; this.staged = []; // scope "personal" = into My storage, no task
         this.relation = d.defaultRelation || "SUBMISSION";
         this.queue = OtsUploadCore.create({
           fetch: window.fetch.bind(window), hashFile: hashFile, uuid: uuid, storage: storage(), csrf: csrf,
@@ -95,7 +95,10 @@ document.addEventListener("alpine:init", function () {
             if (busy && !self.hold && window.OtsLiveHold) self.hold = window.OtsLiveHold.acquire("uploading");
             else if (!busy && self.hold && window.OtsLiveHold) { window.OtsLiveHold.release(self.hold); self.hold = 0; }
           },
-          onDone: function () { document.body.dispatchEvent(new CustomEvent("ots:file-uploaded")); },
+          onDone: function (it, b) {
+            document.body.dispatchEvent(new CustomEvent("ots:file-uploaded"));
+            if (self.scope === "chat" && b && b.version_id) window.dispatchEvent(new CustomEvent("ots:chat-file", { detail: { versionId: b.version_id, conversationId: self.conversationId } }));
+          },
         });
       },
       get dropClass() { return this.dragging ? "border-accent bg-line" : "border-line"; },
@@ -103,7 +106,7 @@ document.addEventListener("alpine:init", function () {
       get anyFinished() { return this.items.some(function (i) { return i.finished; }); },
       take: function (fileList, paths) {
         if (this.locked) { if (window.otsToast) window.otsToast("warning", "Files can only be added to Today, or inside a folder."); return; }
-        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope, workspaceId: this.workspaceId, folderId: this.folderId, note: this.note };
+        var meta = { taskId: this.taskId, relation: this.relation, fileId: this.fileId, scope: this.scope, workspaceId: this.workspaceId, conversationId: this.conversationId, folderId: this.folderId, note: this.note };
         for (var i = 0; i < fileList.length; i++) {
           var f = fileList[i], rel = paths ? paths[i] : (f.webkitRelativePath || "");
           this.queue.add(f, Object.assign({}, meta, { relPath: rel }));

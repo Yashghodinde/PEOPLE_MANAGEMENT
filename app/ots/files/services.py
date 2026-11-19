@@ -114,6 +114,7 @@ def _require_meaningful_name(name: str, task: Task | None) -> None:
 
 PERSONAL = "personal"  # an upload into the sender's own private storage (IMP-02)
 WORKSPACE_SCOPE = "workspace"  # an upload into a File ID workspace (IMP-04)
+CHAT_SCOPE = "chat"  # a file sent in a conversation (IMP-16.11)
 LIBRARY_SCOPE = "library"  # an upload into a Library folder (IMP-14); who may is the usual library rule
 
 
@@ -207,6 +208,7 @@ def start_upload(
     workspace: Any = None,
     folder_id: uuid.UUID | None = None,
     relative_dirs: list[str] | None = None,
+    conversation_id: uuid.UUID | None = None,
     request: Any = None,
 ) -> tuple[UploadSession, bool]:
     """Open (or find) the upload for this key: (session, created). The same key returns the same session."""
@@ -248,7 +250,12 @@ def start_upload(
     personal = scope == PERSONAL
     in_workspace = scope == WORKSPACE_SCOPE
     in_library = scope == LIBRARY_SCOPE
-    if (personal or in_workspace or in_library) and task is not None:
+    in_chat = scope == CHAT_SCOPE
+    if in_chat:
+        from ots.chat.services import membership
+
+        membership(user, conversation_id)  # a stranger's conversation is a 404, before anything is stored
+    if (personal or in_workspace or in_library or in_chat) and task is not None:
         raise ValidationFailed("That upload does not belong to a task.", fields={"scope": ["Invalid."]})
     if in_workspace and workspace is None:
         raise NotFound("Not found.")
@@ -258,6 +265,9 @@ def start_upload(
     if in_workspace:
         target, assignment = _resolve_workspace_target(user, workspace, file_id), None
     elif lib_staff:
+        target, assignment = None, None
+    elif in_chat:
+        require(user, "file.upload_personal")  # anyone who may have personal files may send one
         target, assignment = None, None
     else:
         target, assignment = _resolve_target(user, task, file_id, assignment_id, relation, personal)
@@ -308,7 +318,8 @@ def start_upload(
                 expected_size=size,
                 expected_sha256=sha,
                 original_filename=name,
-                scope=scope if (personal or in_workspace or in_library) else "",
+                scope=scope if (personal or in_workspace or in_library or in_chat) else "",
+                conversation_id=conversation_id if in_chat else None,
                 workspace_id=workspace.pk if in_workspace else None,
                 folder_id=folder.pk if folder else None,
                 note=" ".join((note or "").split())[:200],
@@ -490,7 +501,9 @@ def _commit(s: UploadSession, part: Path, request: Any) -> FileVersion:
                 if s.scope == LIBRARY_SCOPE and user.role != Role.SUPER_ADMIN
                 else LibraryState.APPROVED
             ),
-            visibility=FileVisibility.PRIVATE
+            visibility=FileVisibility.CHAT
+            if s.scope == CHAT_SCOPE
+            else FileVisibility.PRIVATE
             if s.scope == PERSONAL
             else FileVisibility.WORKSPACE
             if s.scope == WORKSPACE_SCOPE

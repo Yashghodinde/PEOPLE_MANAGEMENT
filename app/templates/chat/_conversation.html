@@ -1,0 +1,77 @@
+{% load ots_ui %}{% comment %}The open conversation: header, tabs, messages or shared files, composer, details panel.{% endcomment %}
+<header class="flex items-center gap-3 px-3 py-2 border-b border-line">
+  <a href="/app/chat" class="md:hidden inline-flex items-center justify-center w-5 h-5 rounded-full hover:bg-line" aria-label="Back to the list">{% icon "arrow-left" %}</a>
+  {% if other %}{% include "components/avatar.html" with name=title photo=other|photo_url size="5" %}{% else %}{% include "components/avatar.html" with name=title size="5" %}{% endif %}
+  <div class="min-w-0 flex-1"><h2 class="text-body font-semibold text-ink-900 truncate">{{ title }}</h2><p class="text-cap text-ink-600 truncate" data-typing aria-live="polite">{% if other %}{{ other.designation|default:other.get_role_display }}{% else %}{{ members|length }} member{{ members|length|pluralize }}{% endif %}</p></div>
+  <nav class="flex items-center gap-2" aria-label="Conversation sections">
+    <a href="/app/chat/c/{{ conv.pk }}" {% if tab != "files" %}aria-current="page"{% endif %} class="h-5 px-3 inline-flex items-center rounded-full border text-cap {% if tab != 'files' %}border-accent bg-accent text-canvas{% else %}border-line hover:bg-line{% endif %}">Messages</a>
+    <a href="/app/chat/c/{{ conv.pk }}/files" {% if tab == "files" %}aria-current="page"{% endif %} class="h-5 px-3 inline-flex items-center rounded-full border text-cap {% if tab == 'files' %}border-accent bg-accent text-canvas{% else %}border-line hover:bg-line{% endif %}">Shared files</a>
+    <button type="button" @click="toggleDetails" class="h-5 px-3 inline-flex items-center rounded-full border border-line text-cap hover:bg-line">Details</button>
+  </nav>
+</header>
+
+{% if tab == "files" %}
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 motion-fade">
+  <div class="flex items-center justify-between"><h3 class="text-sec font-semibold">Shared files</h3><a class="text-cap text-accent" href="?order={% if newest %}oldest{% else %}newest{% endif %}">{% if newest %}Oldest first{% else %}Newest first{% endif %}</a></div>
+  <ul class="flex flex-col divide-y divide-line border-t border-line">
+    {% for a in files %}<li class="py-3 flex items-center justify-between gap-3 flex-wrap"><div class="min-w-0"><p class="text-body font-medium text-ink-900 break-words">{{ a.file.display_name }}</p><p class="text-cap text-ink-600">Sent by {{ a.message.sender.full_name }} · {{ a.message.created_at|date:"d M Y, H:i" }} · {{ a.version.size_bytes|filesizeformat }}</p></div>
+      <span class="flex gap-2"><a href="/files/v/{{ a.version_id }}/download" hx-boost="false" class="inline-flex items-center gap-1 h-5 px-3 rounded-full border border-accent text-accent text-cap font-medium hover:bg-line">{% icon "download" %}Download</a><a href="/files/v/{{ a.version_id }}/preview" hx-boost="false" target="_blank" class="inline-flex items-center h-5 px-3 rounded-full text-cap text-accent hover:bg-line">Preview</a></span></li>
+    {% empty %}<li class="py-4 text-body text-ink-600">No files have been shared in this chat yet.</li>{% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="relative flex-1 min-h-0 flex flex-col" {% if can_upload|default:True %}x-data="uploader" data-scope="chat" data-conversation-id="{{ conv.pk }}" data-default-relation="REFERENCE" data-stage="1" data-no-refresh="1" @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped"{% endif %}>
+  <div class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-2" data-chat-log data-url="/app/chat/c/{{ conv.pk }}/messages" data-conv="{{ conv.pk }}" data-first="{{ first_id }}" data-last="{{ last_id }}" data-more="{% if more %}1{% else %}0{% endif %}" role="log" aria-live="polite" aria-label="Messages">
+    {% if more %}<button type="button" data-action="older" class="self-center h-5 px-4 rounded-full border border-line text-cap hover:bg-line">Load older messages</button>{% endif %}
+    {% include "chat/_messages.html" %}
+    {% if not items %}<p class="m-auto text-body text-ink-600 text-center" data-empty>Start the conversation. Say hello, or share a file.</p>{% endif %}
+  </div>
+  <button type="button" x-show="hasNew" x-cloak @click="jumpToNew" class="absolute left-1/2 -translate-x-1/2 bottom-[96px] z-10 h-5 px-4 rounded-full bg-accent text-canvas text-cap font-medium shadow-card motion-pop"><span x-text="newLabel"></span> &darr;</button>
+  <div class="px-4 h-4 text-cap text-ink-600" aria-live="polite" x-show="typingShown" x-cloak><span x-text="typingText"></span> <span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span></div>
+  <div x-show="dragging" x-cloak class="absolute inset-0 z-20 border-2 border-dashed border-accent bg-canvas/80 flex items-center justify-center pointer-events-none"><p class="text-sec font-semibold text-accent">Drop files to send them</p></div>
+  <div x-show="hasStaged" x-cloak class="border-t border-line p-3 flex items-center gap-3 flex-wrap"><p class="text-cap text-ink-900">Send <span x-text="stagedLabel"></span> in this chat?</p><button type="button" @click="sendStaged" class="h-5 px-4 rounded-full bg-accent text-canvas text-cap font-medium">Send</button><button type="button" @click="clearStaged" class="h-5 px-4 rounded-full border border-line text-cap hover:bg-line">Remove</button></div>
+  <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to send">
+  <div class="border-t border-line p-3 flex flex-col gap-2">
+    <div x-show="replying" x-cloak class="flex items-center justify-between gap-2 border-l-2 border-accent pl-2 text-cap text-ink-600"><span class="truncate" x-text="replyText"></span><button type="button" @click="cancelReply" class="text-accent">Cancel</button></div>
+    <form class="chat-composer flex items-end gap-2 p-2" data-composer @submit="sendMessage">
+      {% csrf_token %}
+      <div x-data="dropdown" class="relative" @click.outside="close">
+        <button type="button" @click="toggle" aria-haspopup="menu" aria-label="Attach" class="h-5 w-5 inline-flex items-center justify-center rounded-full border border-line hover:bg-line">{% icon "plus" %}</button>
+        <div x-show="open" x-cloak @click="close" role="menu" class="absolute bottom-full left-0 mb-2 w-[260px] bg-canvas border border-line rounded-md shadow-card p-2 z-30">
+          <button type="button" role="menuitem" @click="choose" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "upload" %}Upload files</button>
+          <button type="button" role="menuitem" data-pick="storage" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "folder" %}Attach from My storage</button>
+          <button type="button" role="menuitem" data-pick="fileid" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "file-text" %}Attach a File ID document</button>
+        </div>
+      </div>
+      <textarea name="body" rows="1" placeholder="Type a message..." aria-label="Write a message" maxlength="4000" @keydown.enter="enterSends" @input="typed" class="flex-1 min-w-0 px-3 py-2 text-body max-h-[160px]"></textarea>
+      <button type="submit" :disabled="cantSend" class="send-btn h-5 px-5 rounded-full bg-accent text-canvas text-body font-medium">Send</button>
+    </form>
+    {% include "files/_queue.html" %}
+  </div>
+  <div x-show="pickOpen" x-cloak class="absolute inset-0 z-30 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Choose a file">
+    <div class="bg-canvas rounded-md shadow-card p-4 w-[420px] max-w-full max-h-[80%] flex flex-col gap-3"><h3 class="text-sec font-semibold" x-text="pickTitle"></h3>
+      <ul class="flex-1 overflow-y-auto divide-y divide-line border border-line rounded-sm" data-pick-list></ul>
+      <div class="flex justify-end"><button type="button" @click="closePick" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Close</button></div></div>
+  </div>
+</div>
+{% endif %}
+
+<aside x-show="detailsOpen" x-cloak class="fixed inset-y-0 right-0 z-40 w-[380px] max-w-full bg-canvas border-l border-line shadow-card overflow-y-auto p-4 flex flex-col gap-4 motion-fade" aria-label="Conversation details">
+  <div class="flex items-center justify-between"><h2 class="text-sec font-semibold">Details</h2><button type="button" @click="toggleDetails" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Close</button></div>
+  <div class="flex flex-col gap-2">
+    <label class="flex items-center justify-between text-body"><span>Mute notifications</span><input type="checkbox" data-setting="mute" {% if mem.muted %}checked{% endif %}></label>
+    <label class="flex items-center justify-between text-body"><span>Pin to the top</span><input type="checkbox" data-setting="pin" {% if mem.pinned_at %}checked{% endif %}></label>
+  </div>
+  {% if conv.kind == "GROUP" %}
+  {% if is_admin %}<form class="flex gap-2" data-rename-form><input name="title" value="{{ conv.title }}" maxlength="120" aria-label="Group name" class="flex-1 h-5 px-3 rounded-sm border border-line bg-canvas text-body"><button type="submit" class="h-5 px-4 rounded-full border border-accent text-accent text-cap font-medium">Rename</button></form>{% endif %}
+  <h3 class="text-body font-semibold">Members ({{ members|length }})</h3>
+  <ul class="flex flex-col divide-y divide-line border-t border-line">
+    {% for x in members %}<li class="py-2 flex items-center justify-between gap-2" data-member="{{ x.user_id }}"><span class="text-body text-ink-900">{{ x.user.full_name }} <span class="text-cap text-ink-600">· {{ x.get_role_display }}</span></span>
+      {% if is_admin and x.user_id != request.user.pk and x.role != "OWNER" %}<button type="button" data-setting="remove" class="text-cap text-bad">Remove</button>{% endif %}</li>{% endfor %}
+  </ul>
+  {% if is_admin %}<div class="flex flex-col gap-2"><input type="search" data-add-search placeholder="Add people" aria-label="Add people" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"><ul class="max-h-[180px] overflow-y-auto divide-y divide-line border border-line rounded-sm" data-add-list></ul>
+    <label class="flex items-center gap-2 text-cap text-ink-900"><input type="checkbox" data-add-history> Let new people see earlier messages</label></div>{% endif %}
+  <button type="button" data-setting="leave" class="h-5 px-4 rounded-full border border-bad text-bad text-body font-medium hover:bg-line">Leave group</button>
+  {% endif %}
+  {% if conv.kind == "DIRECT" or is_admin %}<button type="button" data-setting="archive" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Archive this chat</button>{% endif %}
+</aside>

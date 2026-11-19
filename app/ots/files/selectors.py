@@ -51,6 +51,24 @@ def _exchange_links(viewer: Any, visible_tasks: Any, team: Any = ()) -> QuerySet
     )
 
 
+def _in_my_chat(viewer: Any) -> Any:
+    """A version sent in a conversation the viewer is in, since they joined: exactly that version (D-107)."""
+    from ots.chat.models import ChatAttachment, Member
+
+    return Exists(
+        ChatAttachment.objects.filter(version=OuterRef("pk"), message__deleted_at__isnull=True).filter(
+            Exists(
+                Member.objects.filter(
+                    conversation_id=OuterRef("message__conversation_id"),
+                    user_id=viewer.pk,
+                    left_at__isnull=True,
+                    history_from__lte=OuterRef("message__created_at"),
+                )
+            )
+        )
+    )
+
+
 def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     """Versions `viewer` may download or preview (M08 section 8).
 
@@ -65,7 +83,8 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
         return FileVersion.objects.none()
     qs = FileVersion.objects.all()
     if viewer.role == Role.SUPER_ADMIN:
-        return qs
+        # everything except what was said in chats the Super Admin is not part of: chats follow no hierarchy
+        return qs.filter(~Q(file__visibility=FileVisibility.CHAT) | Q(_in_my_chat(viewer)))
     if viewer.role not in (Role.SUB_ADMIN, Role.EMPLOYEE):
         return FileVersion.objects.none()  # HR has no file access of any kind
     visible_tasks = Task.objects.visible_to(viewer).values("pk")
@@ -73,6 +92,7 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     # it was handed to keep what they were given, and the Super Admin (who returned above) sees everything.
     private = Q(file__visibility=FileVisibility.PRIVATE)
     in_a_workspace = Q(file__visibility=FileVisibility.WORKSPACE)  # reached only through its workspace
+    in_a_chat = Q(file__visibility=FileVisibility.CHAT)  # reached only through its conversation (D-107)
     mine = (
         Q(uploaded_by_id=viewer.pk)
         & ~(private & Q(file__status=FileStatus.DELETED))
@@ -91,8 +111,8 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     )
     if viewer.role == Role.SUB_ADMIN:
         wanted |= (
-            Q(uploaded_by_id__in=team) & ~private & ~in_a_workspace
-        )  # a team's private and File ID files are not the manager's by the team rule
+            Q(uploaded_by_id__in=team) & ~private & ~in_a_workspace & ~in_a_chat
+        )  # a team's private, File ID and chat files are not the manager's by the team rule
     # A voice note is heard only by people who can see the task it was sent on: not by its sender's manager
     # through the team rule, not by the sender after losing the task. Every other rule above ignores voice.
     from ots.workspaces.selectors import workspaces_visible_to
@@ -105,6 +125,8 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
         )
     )  # a document of a File ID the viewer belongs to (IMP-04); grants nothing on its other links
     wanted = wanted | in_workspace
+
+    wanted = wanted | _in_my_chat(viewer)
     heard = Exists(TaskComment.objects.filter(voice_version=OuterRef("pk"), task__in=visible_tasks))
     return qs.filter((Q(is_voice=False) & wanted) | (Q(is_voice=True) & heard)).exclude(
         file__visibility=FileVisibility.LIBRARY, file__library_state=LibraryState.REJECTED

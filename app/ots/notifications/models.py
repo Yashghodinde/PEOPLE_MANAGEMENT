@@ -29,6 +29,7 @@ class Kind(models.TextChoices):
     FILE_HANDED = "FILE_HANDED", "File sent to you"
     REMINDER = "REMINDER", "Reminder"
     ALERT = "ALERT", "System alert"
+    CHAT_MESSAGE = "CHAT_MESSAGE", "New chat message"
     LIBRARY_REVIEW = "LIBRARY_REVIEW", "Library file waiting"
     LIBRARY_DECISION = "LIBRARY_DECISION", "Library file decision"
     UNDELIVERED = "UNDELIVERED", "Not received yet"

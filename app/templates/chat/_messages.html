@@ -1,0 +1,32 @@
+{% load ots_ui %}{% comment %}Message rows. Params: items (decorated), reactions. Each row has data-mid and data-sig so a page can merge new ones.{% endcomment %}
+{% for it in items %}{% with m=it.m %}
+{% if it.sep %}<div class="self-center text-cap text-ink-600 px-3 py-1 rounded-full bg-line" data-sep>{{ it.sep }}</div>{% endif %}
+{% if it.system %}
+<div class="self-center text-cap text-ink-600 text-center" data-mid="{{ m.pk }}" data-sig="">{{ m.body }}</div>
+{% else %}
+<div class="flex {% if it.mine %}justify-end{% else %}justify-start{% endif %} group" data-mid="{{ m.pk }}" data-sig="{{ it.sig }}" data-mine="{% if it.mine %}1{% else %}0{% endif %}" data-sender="{{ m.sender_id }}">
+  <div class="bubble border {% if it.mine %}border-line bg-line{% else %}border-line bg-canvas{% endif %} max-w-[78%] min-w-0 p-3 flex flex-col gap-1">
+    {% if it.show_name %}<p class="text-cap font-semibold text-ink-900">{{ m.sender.full_name }}</p>{% endif %}
+    {% if m.reply_to and not m.deleted_at %}<button type="button" data-action="goto" data-target="{{ m.reply_to_id }}" class="text-left border-l-2 border-accent pl-2 text-cap text-ink-600 truncate"><strong>{{ m.reply_to.sender.full_name }}</strong>: {% if m.reply_to.deleted_at %}Deleted message{% elif m.reply_to.kind == "FILE" %}File{% else %}{{ m.reply_to.body|truncatechars:80 }}{% endif %}</button>{% endif %}
+    {% if m.deleted_at %}<p class="text-body text-ink-600 italic">This message was deleted</p>
+    {% else %}
+      {% for a in it.files %}
+      <div class="flex items-center gap-3 flex-wrap border border-line rounded-sm bg-canvas p-2">{% icon "file-text" "5" "text-ink-600" %}<div class="min-w-0"><p class="text-body font-medium text-ink-900 break-words">{{ a.file.display_name }}</p><p class="text-cap text-ink-600">{{ a.version.size_bytes|filesizeformat }}</p></div>
+        <span class="flex gap-2 ml-auto"><a href="/files/v/{{ a.version_id }}/download" hx-boost="false" class="inline-flex items-center gap-1 h-5 px-3 rounded-full border border-accent text-accent text-cap font-medium hover:bg-line">{% icon "download" %}Download</a><a href="/files/v/{{ a.version_id }}/preview" hx-boost="false" target="_blank" class="inline-flex items-center h-5 px-3 rounded-full text-cap text-accent hover:bg-line">Preview</a></span></div>
+      {% endfor %}
+      {% if m.body %}<p class="text-body text-ink-900 whitespace-pre-line break-words" data-body>{{ m.body }}</p>{% endif %}
+    {% endif %}
+    {% if it.reactions %}<div class="flex gap-1 flex-wrap">{% for r in it.reactions %}<button type="button" data-action="react" data-emoji="{{ r.emoji }}" class="inline-flex items-center gap-1 h-4 px-2 rounded-full border text-cap {% if r.mine %}border-accent bg-canvas{% else %}border-line{% endif %}">{{ r.emoji }} {{ r.n }}</button>{% endfor %}</div>{% endif %}
+    <div class="flex items-center justify-end gap-2 text-cap text-ink-600">
+      <span class="opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex items-center gap-1">
+        {% if not m.deleted_at %}<button type="button" data-action="reply" class="px-1 hover:text-ink-900" aria-label="Reply">{% icon "reply" "3" %}</button>
+        <details class="relative"><summary class="list-none cursor-pointer px-1" aria-label="React">{% icon "smile" "3" %}</summary><div class="fm-menu mt-1 bg-canvas border border-line rounded-md shadow-card p-1 flex gap-1">{% for e in reactions %}<button type="button" data-action="react" data-emoji="{{ e }}" class="px-1 hover:bg-line rounded-sm">{{ e }}</button>{% endfor %}</div></details>{% endif %}
+        {% if it.can_edit %}<button type="button" data-action="edit" class="px-1 hover:text-ink-900" aria-label="Edit">{% icon "pencil" "3" %}</button>{% endif %}
+        {% if it.can_delete %}<button type="button" data-action="delete" class="px-1 hover:text-bad" aria-label="Delete">{% icon "trash-2" "3" %}</button>{% endif %}
+      </span>
+      <span>{{ m.created_at|date:"H:i" }}{% if m.edited_at and not m.deleted_at %} · edited{% endif %}{% if it.status %} · {{ it.status }}{% endif %}</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endwith %}{% endfor %}

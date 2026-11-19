@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "ots.live",
     "ots.files",
     "ots.workspaces",
+    "ots.chat",
     "ots.backup",
     "ots.ui",
     "django.contrib.contenttypes",
@@ -129,6 +130,7 @@ OTS_SELFIE_DIR = Path(env("OTS_SELFIE_DIR", default=str(OTS_DATA_DIR / "selfies"
 OTS_REFERENCE_PHOTO_DIR = Path(
     env("OTS_REFERENCE_PHOTO_DIR", default=str(OTS_DATA_DIR / "selfies" / "reference"))
 )  # one small JPEG per person
+OTS_CHAT_ENABLED = env.bool("OTS_CHAT_ENABLED", default=True)  # Office Chat on or off
 OTS_PROFILE_PHOTO_DIR = Path(env("OTS_PROFILE_PHOTO_DIR", default=str(OTS_DATA_DIR / "profile")))
 # --- Files (M08) ---------------------------------------------------------------------------------
 OTS_STAGING_DIR = Path(env("OTS_STAGING_DIR", default=str(OTS_DATA_DIR / "staging")))  # uploads in progress

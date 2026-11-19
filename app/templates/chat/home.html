@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% load ots_ui %}
+{% comment %}Office Chat (IMP-16.9): the list on the left, one conversation on the right. On a phone only one shows.{% endcomment %}
+{% block pagehead %}{% endblock %}
+{% block content %}
+<div x-data="officeChat" data-conv="{{ conv.pk|default:'' }}" data-me="{{ request.user.pk }}" class="surface overflow-hidden grid grid-cols-1 md:grid-cols-[340px_minmax(0,1fr)] h-[calc(100vh-150px)] min-h-[480px]">
+  <aside class="border-r border-line flex-col min-h-0 {% if conv %}hidden md:flex{% else %}flex{% endif %}" aria-label="Conversations">
+    <div class="p-3 flex flex-col gap-3 border-b border-line">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-sec font-semibold text-ink-900">Chat</h2>
+        <button type="button" @click="openNew" class="inline-flex items-center gap-2 h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium hover:bg-ink-900">{% icon "plus" %}New chat</button>
+      </div>
+      <form method="get" action="/app/chat/search" role="search" class="flex">
+        <input type="search" name="q" value="{{ q }}" placeholder="Search people, chats and messages" aria-label="Search chat" maxlength="80" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body w-full">
+      </form>
+      <nav class="flex items-center gap-2" aria-label="Filter">
+        <a href="/app/chat{% if conv %}/c/{{ conv.pk }}{% endif %}" {% if not kind %}aria-current="page"{% endif %} class="h-5 px-3 inline-flex items-center rounded-full border text-cap {% if not kind %}border-accent bg-accent text-canvas{% else %}border-line text-ink-900 hover:bg-line{% endif %}">All</a>
+        <a href="?kind=DIRECT" {% if kind == "DIRECT" %}aria-current="page"{% endif %} class="h-5 px-3 inline-flex items-center rounded-full border text-cap {% if kind == 'DIRECT' %}border-accent bg-accent text-canvas{% else %}border-line text-ink-900 hover:bg-line{% endif %}">Direct</a>
+        <a href="?kind=GROUP" {% if kind == "GROUP" %}aria-current="page"{% endif %} class="h-5 px-3 inline-flex items-center rounded-full border text-cap {% if kind == 'GROUP' %}border-accent bg-accent text-canvas{% else %}border-line text-ink-900 hover:bg-line{% endif %}">Groups</a>
+      </nav>
+    </div>
+    <div id="chat-list" class="flex-1 overflow-y-auto" data-active="{{ conv.pk|default:'' }}">{% include "chat/_list.html" %}</div>
+  </aside>
+
+  <section class="min-w-0 min-h-0 flex-col {% if conv %}flex{% else %}hidden md:flex{% endif %}" aria-label="Conversation">
+    {% if conv %}{% include "chat/_conversation.html" %}
+    {% else %}
+    <div class="m-auto text-center flex flex-col items-center gap-3 p-6 text-ink-600">{% icon "message-circle" "5" %}<p class="text-sec font-semibold text-ink-900">Start a conversation</p><p class="text-body">Pick a colleague, or press New chat. Messages, files and voice notes you send stay between the people in the chat.</p></div>
+    {% endif %}
+  </section>
+
+  {# ---- new chat ---- #}
+  <div x-show="newOpen" x-cloak class="fixed inset-0 z-40 bg-ink-900/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="New chat">
+    <div class="bg-canvas rounded-md shadow-card p-5 w-[460px] max-w-full max-h-[90vh] flex flex-col gap-3">
+      <h2 class="text-sec font-semibold">New chat</h2>
+      <p class="text-cap text-ink-600">Choose one person for a private chat, or several for a group.</p>
+      <input type="search" x-ref="peopleSearch" @input="searchPeople" placeholder="Search by name, employee ID or designation" aria-label="Search people" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body">
+      <ul class="flex-1 min-h-[120px] max-h-[300px] overflow-y-auto divide-y divide-line border border-line rounded-sm" data-people-list></ul>
+      <label x-show="isGroup" x-cloak class="flex flex-col gap-1 text-cap font-medium text-ink-900">Group name<input x-ref="groupTitle" maxlength="120" class="h-5 px-3 rounded-sm border border-line bg-canvas text-body"></label>
+      <p class="text-cap text-bad" role="alert" x-text="newError"></p>
+      <div class="flex justify-end gap-2"><button type="button" @click="closeNew" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Cancel</button><button type="button" @click="startChat" :disabled="cantStart" class="send-btn h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium" x-text="startLabel"></button></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

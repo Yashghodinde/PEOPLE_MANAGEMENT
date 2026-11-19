@@ -164,5 +164,19 @@
   function state(name) { window.dispatchEvent(new CustomEvent("ots:live-state", { detail: { state: name } })); }
   es.addEventListener("hello", function () { state("connected"); });
   es.onerror = function () { state(navigator.onLine === false ? "offline" : "reconnecting"); };
+  es.addEventListener("chat", function (e) {   // Office Chat: ids only; the open chat fetches what it needs
+    var msg = {}; try { msg = JSON.parse(e.data); } catch (x) {}
+    window.dispatchEvent(new CustomEvent("ots:chat", { detail: msg }));
+    if (msg.what !== "typing") refreshChatBadge();
+  });
+  function refreshChatBadge() {
+    get("/app/chat/unread").then(function (t) { setBadge(JSON.parse(t).count); }).catch(function () {});
+  }
+  function setBadge(n) {
+    var b = document.querySelector("[data-chat-badge]");
+    if (!b) return;
+    b.textContent = String(n); b.style.display = n ? "" : "none";
+  }
+  window.addEventListener("ots:chat-badge", function (e) { setBadge((e.detail || {}).count || 0); });
   window.addEventListener("beforeunload", function () { es.close(); });
 })();
