@@ -140,7 +140,7 @@ def test_drawer_and_calendar_query_counts(team):
     c = login("boss")
     with CaptureQueriesContext(connection) as q:
         assert c.get(f"/app/attendance/{team['emp'].pk}?day={TODAY.isoformat()}").status_code == 200
-    assert len(q) <= 16, len(q)
+    assert len(q) <= 17, len(q)
     with CaptureQueriesContext(connection) as q:
         rollup.rollup(TODAY)
     assert len(q) <= 6

@@ -175,7 +175,7 @@
   function setBadge(n) {
     var b = document.querySelector("[data-chat-badge]");
     if (!b) return;
-    b.textContent = String(n); b.style.display = n ? "" : "none";
+    b.textContent = String(n); b.style.display = n ? "" : "none"; b.classList.toggle("ots-count", !!n);
   }
   window.addEventListener("ots:chat-badge", function (e) { setBadge((e.detail || {}).count || 0); });
   window.addEventListener("beforeunload", function () { es.close(); });

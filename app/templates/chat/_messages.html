@@ -20,7 +20,7 @@
     <div class="flex items-center justify-end gap-2 text-cap text-ink-600">
       <span class="opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex items-center gap-1">
         {% if not m.deleted_at %}<button type="button" data-action="reply" class="px-1 hover:text-ink-900" aria-label="Reply">{% icon "reply" "3" %}</button>
-        <details class="relative"><summary class="list-none cursor-pointer px-1" aria-label="React">{% icon "smile" "3" %}</summary><div class="fm-menu mt-1 bg-canvas border border-line rounded-md shadow-card p-1 flex gap-1">{% for e in reactions %}<button type="button" data-action="react" data-emoji="{{ e }}" class="px-1 hover:bg-line rounded-sm">{{ e }}</button>{% endfor %}</div></details>{% endif %}
+        <details class="relative"><summary class="list-none cursor-pointer px-1" aria-label="React">{% icon "smile" "3" %}</summary><div class="absolute bottom-full {% if it.mine %}right-0{% else %}left-0{% endif %} mb-1 z-30 bg-canvas border border-line rounded-md shadow-card p-1 flex gap-1">{% for e in reactions %}<button type="button" data-action="react" data-emoji="{{ e }}" class="px-1 hover:bg-line rounded-sm">{{ e }}</button>{% endfor %}</div></details>{% endif %}
         {% if it.can_edit %}<button type="button" data-action="edit" class="px-1 hover:text-ink-900" aria-label="Edit">{% icon "pencil" "3" %}</button>{% endif %}
         {% if it.can_delete %}<button type="button" data-action="delete" class="px-1 hover:text-bad" aria-label="Delete">{% icon "trash-2" "3" %}</button>{% endif %}
       </span>

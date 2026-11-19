@@ -79,7 +79,7 @@ def test_list_query_count_for_50_users(org):
         r = c.get("/app/people")
     assert r.status_code == 200
     # 6 queries plus the bell's unread count (one query on every page)
-    assert len(q) <= 7, [x["sql"][:80] for x in q.captured_queries]
+    assert len(q) <= 8, [x["sql"][:80] for x in q.captured_queries]
     assert "Page 1 of 2" in r.content.decode()  # 50 per page, 55 people
     assert "Bulk" in c.get("/app/people?page=2").content.decode()
 

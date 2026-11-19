@@ -26,7 +26,7 @@
       <nav id="sidebar-nav" class="flex flex-col gap-1">
         {% for n in nav_items %}
         <a href="{{ n.item.path }}" class="flex items-center gap-3 h-5 rounded-sm text-body {% if n.active %}bg-line text-ink-900 font-medium{% else %}text-ink-600 hover:bg-line{% endif %}" {% if n.active %}aria-current="page"{% endif %} :class="linkClass" title="{{ n.item.label }}">
-          {% icon n.item.icon %}<span x-show="expanded">{{ n.item.label }}</span>{% if n.item.match == "/app/chat" %}<span class="ots-count" data-chat-badge style="position:static;{% if not chat_unread %}display:none{% endif %}">{{ chat_unread }}</span>{% endif %}
+          {% icon n.item.icon %}<span x-show="expanded">{{ n.item.label }}</span>{% if n.item.match == "/app/chat" %}<span class="{% if chat_unread %}ots-count{% endif %}" data-chat-badge style="position:static;{% if not chat_unread %}display:none{% endif %}">{{ chat_unread }}</span>{% endif %}
         </a>{% endfor %}
       </nav>
     </aside>

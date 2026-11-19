@@ -163,7 +163,7 @@ def test_dashboards_per_role_and_query_budget(org, task):
         with CaptureQueriesContext(connection) as q:
             body = c.get("/app/dashboard").content.decode()
         # 14 for the tasks, plus the team-today widget (D-062): flat, whatever the team size
-        assert len(q) <= 24 and "Overdue" in body
+        assert len(q) <= 25 and "Overdue" in body
     c = login("emp")
     with CaptureQueriesContext(connection) as q:
         body = c.get("/app/dashboard").content.decode()

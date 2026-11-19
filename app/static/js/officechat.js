@@ -172,7 +172,7 @@ document.addEventListener("alpine:init", function () {
         var self = this; clearTimeout(readTimer);
         readTimer = setTimeout(function () {
           if (document.hidden || !self.convId || !self.atBottom()) return;
-          post("/app/chat/c/" + self.convId + "/read", {}).then(function (res) { if (res[1] && res[1].unread !== undefined) window.dispatchEvent(new CustomEvent("ots:chat-badge", { detail: { count: res[1].unread } })); });
+          post("/app/chat/c/" + self.convId + "/read", {}).then(function (res) { if (res[1] && res[1].unread !== undefined) window.dispatchEvent(new CustomEvent("ots:chat-badge", { detail: { count: res[1].unread } })); self.refreshList(); });
         }, 600);
       },
       refreshList: function () {
