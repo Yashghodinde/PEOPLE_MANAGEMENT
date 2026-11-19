@@ -24,6 +24,9 @@ actions around it. The manager's messages sit on the left, the people doing the 
     {% if task.description %}<p class="text-body text-ink-900 whitespace-pre-line break-words">{{ task.description }}</p>{% endif %}
   </section>
 
+  {# ---- the one action bar ---- #}
+  {% include "tasks/_action_bar.html" %}
+
   {# ---- tabs ---- #}
   <div class="flex items-center gap-2 flex-wrap" role="tablist" aria-label="Task sections">
     <button type="button" role="tab" @click="showChat" :aria-selected="isChat" class="h-5 px-5 rounded-full border text-body" :class="chatTab">Chat</button>
@@ -33,7 +36,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
 
   {# ---- chat ---- #}
   <div x-show="isChat" class="surface motion-fade relative flex flex-col"
-       {% if can_upload %}x-data="uploader" data-task-id="{{ task.pk }}" data-default-relation="{{ default_relation }}" data-refresh="1" data-stage="1" @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped"{% endif %}>
+       {% if can_upload %}x-data="uploader" data-task-id="{{ task.pk }}" data-default-relation="{{ default_relation }}" data-refresh="1" data-stage="1" @ots-send-staged="sendStaged" @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped"{% endif %}>
     <div x-ref="scroll" data-chat-log data-side-mine="{{ my_side }}" data-me="{{ request.user.full_name }}" data-url="/app/tasks/{{ task.pk }}" class="h-[56vh] min-h-[320px] overflow-y-auto flex flex-col gap-3 p-4" aria-label="Conversation" role="log" aria-live="polite">
       {% for m in chat %}
       {% if m.kind == "system" %}
@@ -77,59 +80,14 @@ actions around it. The manager's messages sit on the left, the people doing the 
       {% empty %}<p class="text-body text-ink-600 self-center">No messages yet. Say hello, or share a file.</p>{% endfor %}
     </div>
 
-    <button type="button" x-show="hasNew" x-cloak @click="jumpToNew" class="absolute left-1/2 -translate-x-1/2 bottom-[150px] z-10 h-5 px-4 rounded-full bg-accent text-canvas text-cap font-medium shadow-card motion-pop" aria-live="polite"><span x-text="newLabel"></span> &darr;</button>
-    {# dropped files wait here until the sender confirms #}
+    <button type="button" x-show="hasNew" x-cloak @click="jumpToNew" class="absolute left-1/2 -translate-x-1/2 bottom-[110px] z-10 h-5 px-4 rounded-full bg-accent text-canvas text-cap font-medium shadow-card motion-pop" aria-live="polite"><span x-text="newLabel"></span> &darr;</button>
     {% if can_upload %}
-    <div x-show="hasStaged" x-cloak class="border-t border-line p-3 flex items-center gap-3 flex-wrap" aria-label="Files ready to send">
-      <p class="text-cap text-ink-900">Send <span x-text="stagedLabel"></span> to this task?</p>
-      <button type="button" @click="sendStaged" class="h-5 px-4 rounded-full bg-accent text-canvas text-cap font-medium">Send</button>
-      <button type="button" @click="clearStaged" class="h-5 px-4 rounded-full border border-line text-cap hover:bg-line">Remove</button>
-    </div>
     <div x-show="dragging" x-cloak class="absolute inset-0 z-20 rounded-md border-2 border-dashed border-accent bg-canvas/80 flex items-center justify-center pointer-events-none"><p class="text-sec font-semibold text-accent">Drop files to add them to this task</p></div>
     <input type="file" multiple class="sr-only" x-ref="input" @change="picked" aria-label="Choose files to upload">
     {% endif %}
 
     {# ---- composer ---- #}
-    {% if can_comment %}
-    <div class="border-t border-line p-3 flex flex-col gap-3">
-      <form method="post" action="/app/tasks/{{ task.pk }}/comment" class="chat-composer flex items-end gap-2 p-2" x-ref="composer" @submit="sendMessage">{% csrf_token %}
-        {% if can_upload %}
-        <div x-data="dropdown" class="relative" @click.outside="close">
-          <button type="button" @click="toggle" aria-haspopup="menu" aria-label="Attach" class="h-5 w-5 inline-flex items-center justify-center rounded-full border border-line hover:bg-line">{% icon "plus" %}</button>
-          <div x-show="open" x-cloak @click="close" role="menu" class="absolute bottom-full left-0 mb-2 w-[240px] bg-canvas border border-line rounded-md shadow-card p-2 z-30">
-            <button type="button" role="menuitem" @click="choose" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "upload" %}Upload files</button>
-            <a role="menuitem" href="/files/search?attach={{ task.pk }}" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "file-text" %}Attach an existing file</a>
-          </div>
-        </div>
-        {% endif %}
-        <textarea name="body" rows="1" required placeholder="Type a message..." aria-label="Write a message" @keydown.enter="enterSends" @input="typed" class="flex-1 min-w-0 px-3 py-2 text-body max-h-[160px]"></textarea>
-        <button type="submit" :disabled="cantSend" class="send-btn h-5 px-5 rounded-full bg-accent text-canvas text-body font-medium">Send</button>
-      </form>
-      {% include "tasks/_voice_recorder.html" %}
-      {% if can_upload %}{% include "files/_queue.html" %}{% endif %}
-    </div>
-    {% endif %}
-
-    {# ---- the actions that move the work along ---- #}
-    <div class="border-t border-line p-3 flex flex-col gap-2" aria-label="Task actions" data-live-region="actions">
-      {% for a in lines %}{% if a.actions and not a.removed_at %}
-      <div class="flex items-center gap-2 flex-wrap" data-actions-for="{{ a.pk }}">
-        <span class="text-cap text-ink-600 mr-1">{{ a.user.full_name }}: {{ a.status_text }}</span>
-        {% for act in a.actions %}
-          {% if act.action == "block" %}<button type="button" @click="openHelp" data-assignment="{{ a.pk }}" class="h-5 px-4 rounded-full border border-warn text-warn text-body font-medium hover:bg-line">I'm waiting</button>
-          {% else %}
-          <details class="inline-block"{% if open_action and open_action.0 == a.pk|stringformat:"s" and open_action.1 == act.action %} open{% endif %}>
-            <summary class="list-none cursor-pointer inline-flex items-center h-5 px-4 rounded-full text-body font-medium {% if act.danger %}border border-bad text-bad{% elif act.action == 'submit' or act.action == 'approve' %}bg-accent text-canvas{% else %}border border-accent text-accent{% endif %}">{{ act.label }}</summary>
-            <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}" class="flex flex-col gap-2 p-3 mt-2 border border-line rounded-md bg-canvas max-w-[420px]">
-              {% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}">
-              {% include "tasks/_inputs.html" with inputs=act.inputs %}
-              {% if open_action and open_action.0 == a.pk|stringformat:"s" and open_action.1 == act.action %}{% for k, errs in errors.items %}<p class="text-cap text-bad" role="alert">{{ errs.0 }}</p>{% endfor %}{% endif %}
-              <div>{% include "components/button.html" with label=act.label type="submit" variant=act.danger|yesno:"danger,primary" %}</div>
-            </form>
-          </details>{% endif %}
-        {% endfor %}
-      </div>{% endif %}{% endfor %}
-    </div>
+    {% if can_comment %}{% include "tasks/_composer.html" %}{% endif %}
   </div>
 
   {# ---- files ---- #}
@@ -167,6 +125,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
         <div class="flex items-center justify-between gap-2 flex-wrap"><strong>{{ a.user.full_name }}</strong><span class="text-cap">{{ a.status_text }}</span></div>
         {% if a.mark %}<p class="text-cap {% if a.mark.state == 'late' %}text-bad font-medium{% elif a.mark.state == 'seen' %}text-ok{% else %}text-ink-600{% endif %}" data-receipt="{{ a.mark.state }}"><span aria-hidden="true">{% if a.mark.state == 'saved' %}✓{% elif a.mark.state == 'late' %}!{% else %}✓✓{% endif %}</span> {{ a.mark.text }}</p>{% endif %}
         {% if a.status == "BLOCKED" %}<p class="text-cap text-ink-600">{{ a.get_block_reason_display }}: {{ a.block_note }}{% if a.waiting_hours %} · waiting {{ a.waiting_hours }} h{% endif %}</p>{% endif %}
+        {% if a.admin_actions %}<div class="flex gap-2 flex-wrap pt-1">{% for act in a.admin_actions %}<button type="button" data-open-dialog="act-{{ a.pk }}-{{ act.action }}" class="action-btn action-btn-danger">{{ act.label }}</button>{% endfor %}</div>{% endif %}
       </div>{% endfor %}
       {% if can_add and addable %}
       <form method="post" action="/app/tasks/{{ task.pk }}/people" class="flex flex-col gap-2 border border-line rounded-md p-3">{% csrf_token %}<input type="hidden" name="version" value="{{ task.version }}">

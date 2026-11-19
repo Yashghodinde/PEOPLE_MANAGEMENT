@@ -157,3 +157,17 @@
     img.src = URL.createObjectURL(input.files[0]); img.hidden = false;
   });
 })();
+
+/* Native dialogs: any [data-open-dialog="id"] opens that <dialog>; [data-close-dialog] closes its own. Delegated on the
+   document, so it keeps working after the shell swaps a page in. Escape and the backdrop come from the browser. */
+document.addEventListener("click", function (e) {
+  var open = e.target.closest && e.target.closest("[data-open-dialog]");
+  if (open) {
+    var d = document.getElementById(open.getAttribute("data-open-dialog"));
+    if (d && d.showModal && !d.open) { e.preventDefault(); d.showModal(); var f = d.querySelector("textarea, select, input:not([type=hidden]), button[type=submit]"); if (f) f.focus(); }
+    return;
+  }
+  var close = e.target.closest && e.target.closest("[data-close-dialog]");
+  if (close) { var dlg = close.closest("dialog"); if (dlg) { e.preventDefault(); dlg.close(); } return; }
+  if (e.target.tagName === "DIALOG" && e.target.classList.contains("ots-dialog")) e.target.close();   // a click on the backdrop
+});

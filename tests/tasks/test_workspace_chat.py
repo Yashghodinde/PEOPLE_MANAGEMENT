@@ -38,7 +38,7 @@ def test_the_workspace_has_a_header_tabs_chat_and_action_buttons(org, task):
     a = started(org, task)
     page = login("emp").get(f"/app/tasks/{task.pk}").content.decode()
     for needle in (task.title, task.task_code, "People", "Details", "Activity", ">Chat<", ">Files<",
-                   "Type a message", "I'm waiting", "Submit task for review", 'role="log"'):  # fmt: skip
+                   "Type a message", "I&#x27;m waiting", "Submit task for review", 'role="log"'):  # fmt: skip
         assert needle in page, needle
     assert "Edit task" not in page and "Cancel task" not in page  # an employee has no manager buttons
     mgr = login("mgr").get(f"/app/tasks/{task.pk}").content.decode()

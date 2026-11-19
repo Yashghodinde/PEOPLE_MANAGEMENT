@@ -177,3 +177,48 @@
   .chat-composer, .send-btn, .bubble, .hover-lift { transition: none; }
 }
 .conn-dot-connected { background: #2e7d4f; } .conn-dot-reconnecting { background: #b7791f; } .conn-dot-offline { background: #b3261e; }
+
+/* ---- Shared menu rows (profile menu, attachment menus). One row = one button or link: the hover, press and focus
+   states belong to that element, so the colour always covers the whole row, icon to right edge. ---- */
+.menu-panel { background: rgba(255, 255, 255, 0.97); border: 1px solid theme("colors.line"); border-radius: var(--radius-menu); box-shadow: 0 8px 24px rgba(25, 40, 60, 0.12); padding: 8px; max-width: calc(100vw - 24px); }
+.menu-panel form { display: block; margin: 0; padding: 0; }
+.menu-item { display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0; min-height: 44px; padding: 10px 14px; box-sizing: border-box; border: 0; border-radius: 10px; background: transparent; color: theme("colors.ink-900"); font: inherit; text-align: left; text-decoration: none; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.menu-item:hover { background: rgba(35, 48, 68, 0.09); }
+.menu-item:active { background: rgba(35, 48, 68, 0.14); }
+.menu-item:focus-visible { outline: 2px solid theme("colors.accent"); outline-offset: -2px; background: rgba(35, 48, 68, 0.07); }
+.menu-item > svg, .menu-item .menu-icon { flex: 0 0 22px; width: 22px; height: 22px; }
+.menu-label { flex: 1 1 auto; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.menu-attach { min-width: 320px; }
+.task-composer, .chat-composer { position: relative; }
+@media (max-width: 640px) { .attach-anchor { position: static; } .menu-attach { left: 0; right: 0; width: auto; min-width: 0; } }
+
+/* ---- Dialogs: a native <dialog>, so Escape, focus and the backdrop come from the browser ---- */
+.ots-dialog { border: 1px solid theme("colors.line"); border-radius: var(--radius-panel); padding: 21px; width: 460px; max-width: calc(100vw - 24px); background: #fff; color: theme("colors.ink-900"); box-shadow: 0 16px 48px rgba(20, 30, 50, 0.22); }
+.ots-dialog::backdrop { background: rgba(17, 17, 17, 0.4); }
+.ots-dialog[open] { animation: ots-pop-in var(--motion-normal) var(--ease-enter) both; }
+
+/* ---- One composer: attach, text, mic or send; recording and preview take the place of the text row ---- */
+.task-composer { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; border: 1px solid rgba(35, 48, 68, 0.2); border-radius: 22px; background: #fff; background: rgba(255, 255, 255, 0.9); box-shadow: 0 4px 16px rgba(25, 40, 60, 0.06); transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard); box-sizing: border-box; }
+@supports (backdrop-filter: blur(1px)) { .task-composer { backdrop-filter: blur(12px) saturate(130%); -webkit-backdrop-filter: blur(12px) saturate(130%); } }
+.task-composer:focus-within { border-color: theme("colors.accent"); box-shadow: 0 0 0 3px rgba(47, 62, 86, 0.14), 0 4px 16px rgba(25, 40, 60, 0.06); }
+.composer-row { display: flex; align-items: center; gap: 12px; min-height: 48px; }
+.composer-row textarea { flex: 1 1 auto; min-width: 0; outline: none; border: 0; background: transparent; resize: none; padding: 10px 4px; font: inherit; max-height: 160px; }
+.composer-btn { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 9999px; border: 1px solid theme("colors.line"); background: #fff; color: theme("colors.ink-900"); cursor: pointer; transition: background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.composer-btn:hover { background: rgba(35, 48, 68, 0.09); }
+.composer-btn:focus-visible { outline: 2px solid theme("colors.accent"); outline-offset: 2px; }
+.composer-btn-primary { background: theme("colors.accent"); border-color: theme("colors.accent"); color: #fff; }
+.composer-btn-primary:hover { background: theme("colors.ink-900"); }
+.composer-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.composer-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 6px 10px; border: 1px solid theme("colors.line"); border-radius: 12px; background: rgba(35, 48, 68, 0.05); animation: ots-fade-in var(--motion-normal) var(--ease-enter) both; }
+.rec-dot { width: 10px; height: 10px; border-radius: 9999px; background: theme("colors.bad"); animation: ots-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } .ots-dialog[open], .composer-chip { animation: none; } .composer-btn, .menu-item, .task-composer { transition: none; } }
+
+/* ---- Task action bar: the one place the workflow buttons live ---- */
+.action-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 18px; border-radius: 9999px; border: 1px solid theme("colors.accent"); background: #fff; color: theme("colors.accent"); font: inherit; font-weight: 500; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-standard); }
+.action-btn:hover { background: rgba(35, 48, 68, 0.09); }
+.action-btn:focus-visible { outline: 2px solid theme("colors.accent"); outline-offset: 2px; }
+.action-btn-primary { background: theme("colors.accent"); color: #fff; }
+.action-btn-primary:hover { background: theme("colors.ink-900"); }
+.action-btn-danger { border-color: theme("colors.bad"); color: theme("colors.bad"); }
+.action-btn-warn { border-color: theme("colors.warn"); color: theme("colors.warn"); }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }

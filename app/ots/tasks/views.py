@@ -422,6 +422,19 @@ def _actions_for(viewer: Any, a: TaskAssignment) -> list[dict[str, Any]]:
     return out
 
 
+PRIMARY_ACTIONS = ("start", "resume", "submit", "approve")
+
+
+def _split_actions(actions: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Each action has exactly one home: moving the work along goes in the action bar (the main button last),
+    removing or cancelling a part goes in the People panel."""
+    workflow = [x for x in actions if not x["danger"]]
+    workflow.sort(key=lambda x: x["action"] in PRIMARY_ACTIONS)
+    for x in workflow:
+        x["primary"] = x["action"] in PRIMARY_ACTIONS
+    return workflow, [x for x in actions if x["danger"]]
+
+
 def _detail_ctx(
     request: HttpRequest, task: Task, *, message: str = "", errors: dict[str, Any] | None = None,
     open_action: tuple[str, str] | None = None,
@@ -435,6 +448,7 @@ def _detail_ctx(
         a.mark = marks.get(a.user_id)
         a.status_text = _status_text(viewer, a)
         a.actions = _actions_for(viewer, a) if a.removed_at is None else []
+        a.wf_actions, a.admin_actions = _split_actions(a.actions)
         a.waiting_hours = dashboard.blocked_hours(a, at) if a.status == AssignmentStatus.BLOCKED else 0
     comments = list(task.comments.select_related("author").order_by("created_at"))
     overdue = task.due_at < at and not task.is_cancelled and any(a.status in OPEN_STATUSES for a in lines)
@@ -450,10 +464,13 @@ def _detail_ctx(
             m["can_answer"] = support.may_answer(viewer, sr) and sr.status in support.OPEN_STATES
             m["can_reply"] = viewer.pk == sr.raised_by_id and sr.status in support.OPEN_STATES
     can_add = permissions.can(viewer, "assignment.add", task) and not task.is_cancelled
+    mine = {a.user_id for a in lines if a.user_id == viewer.pk and a.removed_at is None}
+    bar_lines = [a for a in lines if a.removed_at is None and (a.wf_actions or a.user_id in mine)]
     return {
         "page_title": task.task_code,
         "task": task,
         "lines": lines,
+        "bar_lines": bar_lines,
         "comments": comments,
         "message": message,
         "errors": errors or {},

@@ -35,12 +35,12 @@
     <div x-show="replying" x-cloak class="flex items-center justify-between gap-2 border-l-2 border-accent pl-2 text-cap text-ink-600"><span class="truncate" x-text="replyText"></span><button type="button" @click="cancelReply" class="text-accent">Cancel</button></div>
     <form class="chat-composer flex items-end gap-2 p-2" data-composer @submit="sendMessage">
       {% csrf_token %}
-      <div x-data="dropdown" class="relative" @click.outside="close">
+      <div x-data="dropdown" class="attach-anchor relative" @click.outside="close" @keydown.escape="close">
         <button type="button" @click="toggle" aria-haspopup="menu" aria-label="Attach" class="h-5 w-5 inline-flex items-center justify-center rounded-full border border-line hover:bg-line">{% icon "plus" %}</button>
-        <div x-show="open" x-cloak @click="close" role="menu" class="absolute bottom-full left-0 mb-2 w-[260px] bg-canvas border border-line rounded-md shadow-card p-2 z-30">
-          <button type="button" role="menuitem" @click="choose" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "upload" %}Upload files</button>
-          <button type="button" role="menuitem" data-pick="storage" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "folder" %}Attach from My storage</button>
-          <button type="button" role="menuitem" data-pick="fileid" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body hover:bg-line">{% icon "file-text" %}Attach a File ID document</button>
+        <div x-show="open" x-cloak @click="close" role="menu" class="menu-panel menu-attach absolute bottom-full left-0 mb-2 z-30 motion-pop">
+          <button type="button" role="menuitem" @click="choose" class="menu-item">{% icon "upload" %}<span class="menu-label">Upload files</span></button>
+          <button type="button" role="menuitem" data-pick="storage" class="menu-item">{% icon "folder" %}<span class="menu-label">Attach from My storage</span></button>
+          <button type="button" role="menuitem" data-pick="fileid" class="menu-item">{% icon "file-text" %}<span class="menu-label">Attach a File ID document</span></button>
         </div>
       </div>
       <textarea name="body" rows="1" placeholder="Type a message..." aria-label="Write a message" maxlength="4000" @keydown.enter="enterSends" @input="typed" class="flex-1 min-w-0 px-3 py-2 text-body max-h-[160px]"></textarea>

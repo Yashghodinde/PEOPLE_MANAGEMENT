@@ -1,0 +1,51 @@
+{% load ots_ui %}{% comment %}
+The one task-chat composer: [+]  message  [mic | send]. Recording and the recording preview take the place of the text
+row inside the same rounded box; there is no separate voice card. Chosen or dropped files wait here as chips until Send.
+Scopes: taskWorkspace (hasText, showSend, showMic, sendMessage) > uploader (staged files) > voiceRecorder (this root).
+{% endcomment %}
+<div class="px-3 pb-3 pt-2" x-data="voiceRecorder" data-task-id="{{ task.pk }}" data-max-seconds="{{ voice_max_seconds }}">
+  <div class="task-composer" data-composer>
+    {% if can_upload %}
+    <ul class="flex flex-wrap gap-2" x-show="hasStaged" x-cloak aria-label="Files ready to send">
+      <template x-for="f in stagedItems" :key="f.index"><li class="composer-chip">{% icon "file-text" "4" "text-ink-600" %}<span class="text-cap font-medium text-ink-900 break-all" x-text="f.name"></span><button type="button" class="text-cap text-accent font-medium" :data-index="f.index" @click="removeStaged" aria-label="Remove this file">Remove</button></li></template>
+    </ul>
+    {% endif %}
+
+    {# text row #}
+    <form method="post" action="/app/tasks/{{ task.pk }}/comment" class="composer-row" x-show="idleVoice" x-ref="composer" @submit="sendMessage">{% csrf_token %}
+      {% if can_upload %}
+      <div x-data="dropdown" class="attach-anchor relative" @click.outside="close" @keydown.escape="close">
+        <button type="button" @click="toggle" aria-haspopup="menu" aria-label="Attach" class="composer-btn">{% icon "plus" %}</button>
+        <div x-show="open" x-cloak @click="close" role="menu" class="menu-panel menu-attach absolute bottom-full left-0 mb-2 z-30 motion-pop">
+          <button type="button" role="menuitem" @click="choose" class="menu-item">{% icon "upload" %}<span class="menu-label">Upload files</span></button>
+          <a role="menuitem" href="/files/search?attach={{ task.pk }}" class="menu-item">{% icon "file-text" %}<span class="menu-label">Attach an existing file</span></a>
+        </div>
+      </div>
+      {% endif %}
+      <textarea name="body" rows="1" placeholder="Type a message..." aria-label="Write a message" @keydown.enter="enterSends" @input="typed"></textarea>
+      <button type="button" x-show="showMic" @click="start" aria-label="Record a voice message" title="Record a voice message" class="composer-btn">{% icon "mic" %}</button>
+      <button type="submit" x-show="showSend" x-cloak :disabled="cantSend" aria-label="Send" class="composer-btn composer-btn-primary send-btn">{% icon "send" %}</button>
+    </form>
+
+    {# recording #}
+    <div class="composer-row" x-show="isRecording" x-cloak role="status">
+      <button type="button" @click="discard" class="composer-btn" aria-label="Cancel the recording" title="Cancel">{% icon "x" %}</button>
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="text-body text-ink-900">Recording voice message</span>
+      <span class="ml-auto text-body tabular-nums text-ink-600" x-text="timerText">0:00</span>
+      <button type="button" @click="stop" class="action-btn action-btn-primary">Stop</button>
+    </div>
+
+    {# preview: listen before sending #}
+    <div class="composer-row" x-show="isPreview" x-cloak>
+      <button type="button" @click="discard" class="composer-btn" aria-label="Discard the recording" title="Discard">{% icon "trash-2" %}</button>
+      <audio controls :src="previewUrl" class="flex-1 min-w-0 h-[40px]" aria-label="Listen before sending"></audio>
+      <button type="button" @click="send" aria-label="Send the voice message" class="composer-btn composer-btn-primary">{% icon "send" %}</button>
+    </div>
+
+    <div class="composer-row" x-show="isUploading" x-cloak role="status"><span class="rec-dot" aria-hidden="true"></span><span class="text-body text-ink-600">Sending the recording...</span></div>
+    <div class="composer-row" x-show="isFailed" x-cloak role="alert"><span class="text-body text-bad min-w-0" x-text="note"></span><span class="ml-auto flex gap-2"><button type="button" @click="retry" class="action-btn action-btn-primary">Retry</button><button type="button" @click="discard" class="action-btn">Discard</button></span></div>
+    <p class="text-cap" :class="noteClass" x-show="isBlocked" x-cloak role="status" x-text="note"></p>
+  </div>
+  {% if can_upload %}{% include "files/_queue.html" %}{% endif %}
+</div>

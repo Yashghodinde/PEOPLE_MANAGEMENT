@@ -72,6 +72,7 @@ document.addEventListener("alpine:init", function () {
         });
       },
       get dirty() { return ["recording", "preview", "uploading", "failed"].indexOf(this.st.state) !== -1; },
+      get idleVoice() { return !(this.st.state === "recording" || this.st.state === "preview" || this.st.state === "uploading" || this.st.state === "failed"); },
       get isReady() { return this.st.state === "ready" || this.st.state === "sent"; },
       get isRecording() { return this.st.state === "recording"; },
       get isPreview() { return this.st.state === "preview"; },

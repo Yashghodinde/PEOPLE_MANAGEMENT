@@ -41,20 +41,27 @@
             <button type="button" @click="toggle" class="flex items-center gap-2 rounded-full hover:bg-line p-1" aria-haspopup="menu" aria-label="User menu">
               {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" photo=request.user|photo_url %}{% icon "chevron-down" "3" %}
             </button>
-            <div x-show="open" x-cloak class="absolute right-0 mt-2 w-[233px] bg-canvas border border-line rounded-md shadow-card p-2 z-40" role="menu">
+            <div x-show="open" x-cloak class="menu-panel absolute right-0 mt-2 w-[330px] z-40" role="menu">
               <div class="px-3 py-2 border-b border-line mb-1" aria-label="Signed in as">
                 <p class="text-body font-semibold text-ink-900 break-words">{{ request.user.get_full_name|default:"Office User" }}</p>
                 <p class="text-cap text-ink-600">{{ request.user.get_role_display }}</p>
               </div>
-              <a href="/app/people/{{ request.user.pk }}" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "user" %}Profile</a>
-              <a href="#" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "download" %}Install app</a>
-              <form method="post" action="/logout">{% csrf_token %}<input type="hidden" name="reason" value="lunch"><button type="submit" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out for the lunch break</button></form>
-              <a href="/app/day-close" class="flex items-center gap-2 h-5 px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out for the day</a>
-              <form method="post" action="/logout">{% csrf_token %}<button type="submit" class="flex items-center gap-2 h-5 w-full px-3 rounded-sm text-body text-ink-900 hover:bg-line" role="menuitem">{% icon "log-out" %}Log out</button></form>
+              <a href="/app/people/{{ request.user.pk }}" class="menu-item" role="menuitem">{% icon "user" %}<span class="menu-label">Profile</span></a>
+              <a href="#" class="menu-item" role="menuitem">{% icon "download" %}<span class="menu-label">Install app</span></a>
+              <button type="button" class="menu-item" role="menuitem" data-open-dialog="lunch-confirm" @click="close">{% icon "log-out" %}<span class="menu-label">Log out for the lunch break</span></button>
+              <a href="/app/day-close" class="menu-item" role="menuitem">{% icon "log-out" %}<span class="menu-label">Log out for the day</span></a>
+              <form method="post" action="/logout">{% csrf_token %}<button type="submit" class="menu-item" role="menuitem">{% icon "log-out" %}<span class="menu-label">Log out</span></button></form>
             </div>
           </div>
         </div>
       </header>
+      <dialog id="lunch-confirm" class="ots-dialog" aria-labelledby="lunch-confirm-t">
+        <form method="post" action="/logout" class="flex flex-col gap-3">{% csrf_token %}<input type="hidden" name="reason" value="lunch">
+          <h2 id="lunch-confirm-t" class="text-sec font-semibold">Log out for the lunch break?</h2>
+          <p class="text-body text-ink-600">Your lunch break is recorded and you are signed out. Sign in again when you are back.</p>
+          <div class="flex justify-end gap-2"><button type="button" data-close-dialog class="action-btn">Cancel</button><button type="submit" class="action-btn action-btn-primary">Log out for lunch</button></div>
+        </form>
+      </dialog>
       <main id="main" class="flex-1 p-5 w-full max-w-page mx-auto">{% block pagehead %}{% pagehead %}{% endblock %}{% block content %}{% endblock %}</main>
     </div>
   </div>

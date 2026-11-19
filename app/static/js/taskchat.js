@@ -12,7 +12,7 @@ document.addEventListener("alpine:init", function () {
     var logEl = null, rootEl = null;   // plain variables: a DOM node kept on Alpine's reactive data becomes a proxy and breaks
     return {
       tab: "chat", drawer: "", helpOpen: false, helpAssignment: "", atBottom: true,
-      hasText: false, sending: false, newBelow: 0, conn: "connected", connShown: false, connTimer: null,
+      hasText: false, stagedN: 0, sending: false, newBelow: 0, conn: "connected", connShown: false, connTimer: null,
       init: function () {
         var self = this;
         rootEl = this.$el;
@@ -26,7 +26,8 @@ document.addEventListener("alpine:init", function () {
           });
           // the live connection tells a page when something changed: merge new messages in place (never a page swap)
           window.OtsLiveMerge = function () { if (!document.querySelector("[data-chat-log]")) return false; self.refreshLog(); return true; };
-          window.addEventListener("ots:live-state", function (ev) { self.setConn(ev.detail && ev.detail.state); });
+          window.addEventListener("ots:staged", function (ev) { if (ev.detail) self.stagedN = ev.detail.n; });
+        window.addEventListener("ots:live-state", function (ev) { self.setConn(ev.detail && ev.detail.state); });
           window.addEventListener("online", function () { self.setConn("reconnecting"); });
           window.addEventListener("offline", function () { self.setConn("offline"); });
           var open = rootEl.dataset.openRequest;  // a notification opened a particular request: show it
@@ -42,7 +43,9 @@ document.addEventListener("alpine:init", function () {
       get showEdit() { return this.drawer === "edit"; },
       get showCancel() { return this.drawer === "cancel"; },
       get showActivity() { return this.drawer === "activity"; },
-      get cantSend() { return !this.hasText || this.sending; },
+      get showSend() { return this.hasText || this.stagedN > 0; },
+      get showMic() { return !this.showSend; },
+      get cantSend() { return !this.showSend || this.sending; },
       get connVisible() { return this.conn !== "connected" || this.connShown; },
       get connText() { return this.conn === "connected" ? "Connected" : this.conn === "offline" ? "Offline" : "Reconnecting..."; },
       get connDot() { return "conn-dot-" + this.conn; },
@@ -69,7 +72,10 @@ document.addEventListener("alpine:init", function () {
       sendMessage: function (e) {
         e.preventDefault();
         var form = e.target, ta = form.querySelector("textarea"), body = ta.value.trim();
-        if (!body || this.sending) return;
+        var hasFiles = this.stagedN > 0;
+        if ((!body && !hasFiles) || this.sending) return;
+        if (hasFiles) form.dispatchEvent(new CustomEvent("ots-send-staged", { bubbles: true }));   // the chosen files go with the message
+        if (!body) return;
         var log = logEl, self = this, key = uuid();
         var row = document.createElement("div");
         row.className = "flex " + (log.dataset.sideMine === "right" ? "justify-end" : "justify-start") + " motion-msg-in";
@@ -160,7 +166,7 @@ document.addEventListener("alpine:init", function () {
         if (e.shiftKey || e.isComposing) return;
         e.preventDefault();
         var form = e.target.closest("form");
-        if (e.target.value.trim() && form) form.requestSubmit();
+        if ((e.target.value.trim() || this.stagedN > 0) && form) form.requestSubmit();
       },
     };
   });

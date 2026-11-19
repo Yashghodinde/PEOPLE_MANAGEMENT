@@ -114,12 +114,16 @@ document.addEventListener("alpine:init", function () {
         this.refresh = this.root.dataset.refresh === "1";
         this.fileId = ""; this.note = ""; this.relation = this.root.dataset.defaultRelation || "SUBMISSION";
       },
-      picked: function (e) { this.take(e.target.files); e.target.value = ""; },
+      picked: function (e) {
+        if (this.stage) { this.staged = this.staged.concat(Array.prototype.slice.call(e.target.files)); this.announce(); } else this.take(e.target.files);
+        e.target.value = "";
+      },
+      announce: function () { window.dispatchEvent(new CustomEvent("ots:staged", { detail: { n: this.staged.length } })); },
       dropped: function (e) {
         this.dragging = false;
         this.fileId = ""; // dropped files are new files, even if "Upload a new version" was clicked and then cancelled
         if (!e.dataTransfer) return;
-        if (this.stage) { this.staged = this.staged.concat(Array.prototype.slice.call(e.dataTransfer.files)); return; } // wait for a yes
+        if (this.stage) { this.staged = this.staged.concat(Array.prototype.slice.call(e.dataTransfer.files)); this.announce(); return; } // wait for a yes
         var self = this, items = e.dataTransfer.items, entries = [];
         if (items && items.length && items[0].webkitGetAsEntry) {  // folders keep their tree
           for (var i = 0; i < items.length; i++) { var en = items[i].webkitGetAsEntry(); if (en) entries.push(en); }
@@ -135,8 +139,10 @@ document.addEventListener("alpine:init", function () {
       },
       get hasStaged() { return this.staged.length > 0; },
       get stagedLabel() { var n = this.staged.length; return n === 1 ? this.staged[0].name : n + " files"; },
-      sendStaged: function () { var f = this.staged; this.staged = []; this.take(f); },
-      clearStaged: function () { this.staged = []; },
+      sendStaged: function () { var f = this.staged; this.staged = []; this.announce(); if (f.length) this.take(f); },
+      clearStaged: function () { this.staged = []; this.announce(); },
+      removeStaged: function (e) { var i = Number(e.currentTarget.dataset.index); this.staged = this.staged.filter(function (x, n) { return n !== i; }); this.announce(); },
+      get stagedItems() { return this.staged.map(function (f, i) { return { name: f.name, index: i }; }); },
       get trayClass() { return this.minimised ? "hidden" : "flex flex-col gap-2"; },
       get trayLabel() { return this.minimised ? "Show uploads" : "Minimise"; },
       toggleTray: function () { this.minimised = !this.minimised; },

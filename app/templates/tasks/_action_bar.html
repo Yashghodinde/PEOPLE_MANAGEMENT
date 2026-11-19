@@ -1,0 +1,49 @@
+{% load ots_ui %}{% comment %}
+The one place the buttons that move the work along live (IMP-17). Every action appears exactly once, for the person who may use it:
+  workflow actions (start, I'm waiting, back to work, submit, approve, request changes)  -> this bar
+  remove from task / cancel this part                                                   -> the People panel
+Actions that ask for something open a native dialog; the dialogs are rendered here, inside the live region, so their
+version field is always the current one. Sending a chat message never touches any of this.
+Needs: task, lines, bar_lines, request, block_reasons, errors, open_action.
+{% endcomment %}
+<div data-live-region="actions" data-task-actions>
+  {% if bar_lines %}
+  <section class="surface p-4 flex flex-col gap-3" aria-label="Task actions">
+    {% for a in bar_lines %}
+    <div class="flex items-center justify-between gap-3 flex-wrap" data-actions-for="{{ a.pk }}">
+      <p class="text-body text-ink-900 min-w-0">{% if a.user_id != request.user.pk %}<strong>{{ a.user.full_name }}</strong> <span class="text-ink-600">· </span>{% endif %}<span class="{% if a.status == 'BLOCKED' %}text-warn font-medium{% else %}text-ink-600{% endif %}">{{ a.status_text }}</span></p>
+      <div class="flex items-center gap-2 flex-wrap">
+        {% for act in a.wf_actions %}
+          {% if act.action == "block" %}
+          <button type="button" @click="openHelp" data-assignment="{{ a.pk }}" class="action-btn action-btn-warn">{{ act.label }}</button>
+          {% elif act.inputs %}
+          <button type="button" data-open-dialog="act-{{ a.pk }}-{{ act.action }}" class="action-btn{% if act.primary %} action-btn-primary{% endif %}">{{ act.label }}</button>
+          {% else %}
+          <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}">{% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}"><button type="submit" class="action-btn{% if act.primary %} action-btn-primary{% endif %}">{{ act.label }}</button></form>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {# one dialog per action that asks for something: workflow actions and the destructive ones in the People panel #}
+  {% for a in lines %}{% for act in a.actions %}{% if act.inputs and act.action != "block" %}
+  {% with key=a.pk|stringformat:"s" %}
+  <dialog id="act-{{ a.pk }}-{{ act.action }}" class="ots-dialog"{% if open_action and open_action.0 == key and open_action.1 == act.action %} open{% endif %} aria-labelledby="act-{{ a.pk }}-{{ act.action }}-t">
+    <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}" class="flex flex-col gap-3">
+      {% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}">
+      <h2 id="act-{{ a.pk }}-{{ act.action }}-t" class="text-sec font-semibold">{{ act.label }}</h2>
+      <p class="text-cap text-ink-600">{{ a.user.full_name }}{% if act.danger %} · this cannot be undone{% endif %}</p>
+      {% include "tasks/_inputs.html" with inputs=act.inputs %}
+      {% if open_action and open_action.0 == key and open_action.1 == act.action %}{% for k, errs in errors.items %}<p class="text-cap text-bad" role="alert">{{ errs.0 }}</p>{% endfor %}{% endif %}
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close-dialog class="action-btn">Cancel</button>
+        <button type="submit" class="action-btn {% if act.danger %}action-btn-danger{% else %}action-btn-primary{% endif %}">{{ act.label }}</button>
+      </div>
+    </form>
+  </dialog>
+  {% endwith %}
+  {% endif %}{% endfor %}{% endfor %}
+</div>
