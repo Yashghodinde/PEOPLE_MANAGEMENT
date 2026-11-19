@@ -7,7 +7,7 @@
     <button type="button" @click="start" class="inline-flex items-center gap-2 h-5 px-4 rounded-full border border-accent text-accent bg-canvas hover:bg-line text-body font-medium">{% icon "mic" %} Record</button>
   </div>
   <div class="flex items-center gap-3 flex-wrap" x-show="isRecording" x-cloak role="status">
-    <span class="ots-dot ots-dot-chat" aria-hidden="true"></span><span class="text-body tabular-nums" x-text="timerText">0:00</span>
+    <span class="ots-dot ots-dot-chat motion-pulse" aria-hidden="true"></span><span class="text-body tabular-nums" x-text="timerText">0:00</span>
     <button type="button" @click="stop" class="h-5 px-4 rounded-full bg-accent text-canvas text-body font-medium">Stop</button>
   </div>
   <div class="flex flex-col gap-2" x-show="isPreview" x-cloak>

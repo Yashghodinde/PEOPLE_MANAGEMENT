@@ -25,7 +25,8 @@
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || a.isContentEditable) return false;
     }
     if (window.OtsLiveHold && window.OtsLiveHold.held()) return false; // an upload, a recording or a playing note
-    if (document.querySelector("dialog[open], [aria-modal='true']")) return false;
+    var modals = document.querySelectorAll("dialog[open], [aria-modal='true']");  // only a dialog that is showing counts
+    for (var i = 0; i < modals.length; i++) if (modals[i].offsetParent !== null || getComputedStyle(modals[i]).position === "fixed" && modals[i].getClientRects().length) return false;
     return true;
   }
 
@@ -64,6 +65,7 @@
     });
   }
   function refreshPage() {
+    if (window.OtsLiveMerge && window.OtsLiveMerge()) return Promise.resolve();  // a chat merges new messages itself
     var url = window.location.pathname + window.location.search;
     return get(url).then(function (html) {
       var doc = new DOMParser().parseFromString(html, "text/html");
@@ -99,7 +101,8 @@
   document.addEventListener("ots:comment-added", function () { page.request(); }); // my own voice message just sent
 
   function act(w) {
-    if (w.page) page.request();
+    // a conversation merges new messages itself: it never replaces the page, so typing and scroll are safe
+    if (w.page) { if (!(window.OtsLiveMerge && window.OtsLiveMerge())) page.request(); }
     if (w.bell || w.page) refreshBell().catch(function () {}); // opening a task also marks its notifications read
     if (w.files) document.body.dispatchEvent(new CustomEvent("ots:files-changed"));
   }
@@ -158,5 +161,8 @@
     if (opened) act({ page: Core.pageKind(window.location.pathname).kind !== "other", bell: true, files: true });
     opened = true;
   });
+  function state(name) { window.dispatchEvent(new CustomEvent("ots:live-state", { detail: { state: name } })); }
+  es.addEventListener("hello", function () { state("connected"); });
+  es.onerror = function () { state(navigator.onLine === false ? "offline" : "reconnecting"); };
   window.addEventListener("beforeunload", function () { es.close(); });
 })();

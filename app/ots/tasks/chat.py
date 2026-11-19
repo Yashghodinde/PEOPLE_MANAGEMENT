@@ -43,6 +43,8 @@ def build(
         out.append(
             {
                 "at": c.created_at, "kind": kind, "side": side_of(c.author_id, task, assignee_ids),
+                "mid": f"c-{c.pk}", "sig": sr.status if sr and kind == "request" else "",
+                "mine": c.author_id == viewer.pk,
                 "who": c.author.full_name, "comment": c, "body": c.body, "request": sr,
                 "reply_to_request": bool(sr) and kind == "text",
             }
@@ -52,7 +54,7 @@ def build(
         who = e.actor.full_name if e.actor else "The system"
         out.append(
             {
-                "at": e.created_at, "kind": "system", "side": "center",
+                "at": e.created_at, "kind": "system", "side": "center", "mid": f"s-{e.pk}", "sig": "",
                 "who": who, "body": f"{who} {EVENT_LINES[e.event_type]}", "note": taskstorage._event_note(e),
             }
         )  # fmt: skip
@@ -68,6 +70,7 @@ def build(
         out.append(
             {
                 "at": v.uploaded_at, "kind": "file", "side": side_of(v.uploaded_by_id, task, assignee_ids),
+                "mid": f"f-{v.pk}", "sig": "", "mine": v.uploaded_by_id == viewer.pk,
                 "who": v.uploaded_by.full_name, "version": v, "file": v.file, "note": v.note,
             }
         )  # fmt: skip

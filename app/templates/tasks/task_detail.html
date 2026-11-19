@@ -6,7 +6,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
   {% if message %}<p role="alert" class="text-body text-bad">{{ message }}</p>{% endif %}
 
   {# ---- header ---- #}
-  <section class="bg-canvas border border-line rounded-md shadow-card p-4 flex flex-col gap-3" aria-label="Task">
+  <section class="surface p-4 flex flex-col gap-3" aria-label="Task" data-live-region="header">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <div class="flex flex-col gap-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">{% badge task.derived_status %}{% if overdue %}<span class="text-cap font-medium text-bad">Overdue</span>{% endif %}<span class="inline-flex items-center h-4 px-3 rounded-full border border-line text-cap text-ink-900">{{ task.get_priority_display }} priority</span>{% if task.category %}<span class="text-cap text-ink-600">{{ task.category }}</span>{% endif %}</div>
@@ -25,21 +25,22 @@ actions around it. The manager's messages sit on the left, the people doing the 
   </section>
 
   {# ---- tabs ---- #}
-  <div class="flex items-center gap-2" role="tablist" aria-label="Task sections">
+  <div class="flex items-center gap-2 flex-wrap" role="tablist" aria-label="Task sections">
     <button type="button" role="tab" @click="showChat" :aria-selected="isChat" class="h-5 px-5 rounded-full border text-body" :class="chatTab">Chat</button>
     <button type="button" role="tab" @click="showFiles" :aria-selected="isFiles" class="h-5 px-5 rounded-full border text-body" :class="filesTab">Files</button>
+    <span class="ml-auto inline-flex items-center gap-2 text-cap text-ink-600" role="status" aria-live="polite" x-show="connVisible" x-cloak data-connection><span class="inline-block w-2 h-2 rounded-full" :class="connDot"></span><span x-text="connText"></span></span>
   </div>
 
   {# ---- chat ---- #}
-  <div x-show="isChat" class="relative bg-canvas border border-line rounded-md shadow-card flex flex-col"
+  <div x-show="isChat" class="surface motion-fade relative flex flex-col"
        {% if can_upload %}x-data="uploader" data-task-id="{{ task.pk }}" data-default-relation="{{ default_relation }}" data-refresh="1" data-stage="1" @dragover.prevent="dragOver" @dragleave.self="dragLeave" @drop.prevent="dropped"{% endif %}>
-    <div x-ref="scroll" class="h-[56vh] min-h-[320px] overflow-y-auto flex flex-col gap-3 p-4" aria-label="Conversation" role="log" aria-live="polite">
+    <div x-ref="scroll" data-chat-log data-side-mine="{{ my_side }}" data-me="{{ request.user.full_name }}" data-url="/app/tasks/{{ task.pk }}" class="h-[56vh] min-h-[320px] overflow-y-auto flex flex-col gap-3 p-4" aria-label="Conversation" role="log" aria-live="polite">
       {% for m in chat %}
       {% if m.kind == "system" %}
-      <div class="self-center max-w-[85%] text-center"><p class="inline-block px-3 py-1 rounded-full bg-line text-cap text-ink-600">{{ m.body }} · {{ m.at|date:"d M, H:i" }}</p>{% if m.note %}<p class="text-cap text-ink-600 whitespace-pre-line pt-1">{{ m.note }}</p>{% endif %}</div>
+      <div class="self-center max-w-[85%] text-center" data-mid="{{ m.mid }}" data-sig=""><p class="inline-block px-3 py-1 rounded-full bg-line text-cap text-ink-600">{{ m.body }} · {{ m.at|date:"d M, H:i" }}</p>{% if m.note %}<p class="text-cap text-ink-600 whitespace-pre-line pt-1">{{ m.note }}</p>{% endif %}</div>
       {% else %}
-      <div class="flex {% if m.side == 'right' %}justify-end{% else %}justify-start{% endif %}" data-side="{{ m.side }}"{% if m.request %} data-request="{{ m.request.pk }}"{% endif %}>
-        <div class="max-w-[80%] min-w-0 rounded-md border p-3 flex flex-col gap-1 {% if m.kind == 'request' %}border-bad task-tone-red{% elif m.side == 'right' %}border-line bg-line{% else %}border-line bg-canvas{% endif %}">
+      <div class="flex {% if m.side == 'right' %}justify-end{% else %}justify-start{% endif %}" data-side="{{ m.side }}" data-mid="{{ m.mid }}" data-sig="{{ m.sig }}"{% if m.request %} data-request="{{ m.request.pk }}"{% endif %}>
+        <div class="bubble max-w-[80%] min-w-0 border p-3 flex flex-col gap-1 {% if m.kind == 'request' %}border-bad task-tone-red{% elif m.side == 'right' %}border-line bg-line{% else %}border-line bg-canvas{% endif %}">
           <p class="text-cap font-semibold text-ink-900">{{ m.who }} <span class="font-normal text-ink-600">· {% if m.side == "right" %}Employee{% else %}Manager{% endif %}</span></p>
           {% if m.kind == "voice" %}{% include "tasks/_voice_player.html" with c=m.comment %}
           {% elif m.kind == "file" %}
@@ -76,6 +77,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
       {% empty %}<p class="text-body text-ink-600 self-center">No messages yet. Say hello, or share a file.</p>{% endfor %}
     </div>
 
+    <button type="button" x-show="hasNew" x-cloak @click="jumpToNew" class="absolute left-1/2 -translate-x-1/2 bottom-[150px] z-10 h-5 px-4 rounded-full bg-accent text-canvas text-cap font-medium shadow-card motion-pop" aria-live="polite"><span x-text="newLabel"></span> &darr;</button>
     {# dropped files wait here until the sender confirms #}
     {% if can_upload %}
     <div x-show="hasStaged" x-cloak class="border-t border-line p-3 flex items-center gap-3 flex-wrap" aria-label="Files ready to send">
@@ -90,7 +92,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
     {# ---- composer ---- #}
     {% if can_comment %}
     <div class="border-t border-line p-3 flex flex-col gap-3">
-      <form method="post" action="/app/tasks/{{ task.pk }}/comment" class="flex items-end gap-2" x-ref="composer">{% csrf_token %}
+      <form method="post" action="/app/tasks/{{ task.pk }}/comment" class="chat-composer flex items-end gap-2 p-2" x-ref="composer" @submit="sendMessage">{% csrf_token %}
         {% if can_upload %}
         <div x-data="dropdown" class="relative" @click.outside="close">
           <button type="button" @click="toggle" aria-haspopup="menu" aria-label="Attach" class="h-5 w-5 inline-flex items-center justify-center rounded-full border border-line hover:bg-line">{% icon "plus" %}</button>
@@ -100,8 +102,8 @@ actions around it. The manager's messages sit on the left, the people doing the 
           </div>
         </div>
         {% endif %}
-        <textarea name="body" rows="1" required placeholder="Type a message..." aria-label="Write a message" @keydown.enter="enterSends" class="flex-1 min-w-0 px-3 py-2 rounded-md border border-line bg-canvas text-body max-h-[160px]"></textarea>
-        <button type="submit" class="h-5 px-5 rounded-full bg-accent text-canvas text-body font-medium">Send</button>
+        <textarea name="body" rows="1" required placeholder="Type a message..." aria-label="Write a message" @keydown.enter="enterSends" @input="typed" class="flex-1 min-w-0 px-3 py-2 text-body max-h-[160px]"></textarea>
+        <button type="submit" :disabled="cantSend" class="send-btn h-5 px-5 rounded-full bg-accent text-canvas text-body font-medium">Send</button>
       </form>
       {% include "tasks/_voice_recorder.html" %}
       {% if can_upload %}{% include "files/_queue.html" %}{% endif %}
@@ -109,7 +111,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
     {% endif %}
 
     {# ---- the actions that move the work along ---- #}
-    <div class="border-t border-line p-3 flex flex-col gap-2" aria-label="Task actions">
+    <div class="border-t border-line p-3 flex flex-col gap-2" aria-label="Task actions" data-live-region="actions">
       {% for a in lines %}{% if a.actions and not a.removed_at %}
       <div class="flex items-center gap-2 flex-wrap" data-actions-for="{{ a.pk }}">
         <span class="text-cap text-ink-600 mr-1">{{ a.user.full_name }}: {{ a.status_text }}</span>
@@ -131,8 +133,8 @@ actions around it. The manager's messages sit on the left, the people doing the 
   </div>
 
   {# ---- files ---- #}
-  <div x-show="isFiles" x-cloak>
-    <div hx-get="/app/tasks/{{ task.pk }}/files" hx-trigger="intersect once" hx-swap="outerHTML" aria-live="polite"><p class="text-cap text-ink-600">Loading files...</p></div>
+  <div x-show="isFiles" x-cloak class="motion-fade">
+    <div hx-get="/app/tasks/{{ task.pk }}/files" hx-trigger="intersect once" hx-swap="outerHTML" aria-live="polite" aria-busy="true"><div class="surface p-4 flex flex-col gap-3"><div class="skeleton h-5 w-1/3"></div><div class="skeleton h-5 w-full"></div><div class="skeleton h-5 w-5/6"></div></div></div>
   </div>
 
   {# ---- "I'm waiting": a structured request ---- #}
@@ -156,10 +158,10 @@ actions around it. The manager's messages sit on the left, the people doing the 
   </div>
 
   {# ---- side panel: people, details, activity ---- #}
-  <aside x-show="drawer !== ''" x-cloak class="fixed inset-y-0 right-0 z-40 w-[420px] max-w-full bg-canvas border-l border-line shadow-card overflow-y-auto p-4 flex flex-col gap-4" aria-label="Task panel">
+  <aside x-show="drawerOpen" x-cloak class="fixed inset-y-0 right-0 z-40 w-[420px] max-w-full bg-canvas border-l border-line shadow-card overflow-y-auto p-4 flex flex-col gap-4" aria-label="Task panel">
     <div class="flex items-center justify-between"><h2 class="text-sec font-semibold" x-text="drawerTitle"></h2><button type="button" @click="closeDrawer" class="h-5 px-4 rounded-full border border-line text-body hover:bg-line">Close</button></div>
 
-    <section x-show="drawer === 'people'" class="flex flex-col gap-3" aria-label="People">
+    <section x-show="showPeople" class="flex flex-col gap-3" aria-label="People">
       {% for a in lines %}
       <div class="border border-line rounded-md p-3 flex flex-col gap-1{% if a.removed_at %} opacity-60{% endif %}">
         <div class="flex items-center justify-between gap-2 flex-wrap"><strong>{{ a.user.full_name }}</strong><span class="text-cap">{{ a.status_text }}</span></div>
@@ -174,7 +176,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
       {% endif %}
     </section>
 
-    <section x-show="drawer === 'details'" class="flex flex-col gap-2" aria-label="Details">
+    <section x-show="showDetails" class="flex flex-col gap-2" aria-label="Details">
       <dl class="flex flex-col gap-2 text-body">
         <div><dt class="text-cap text-ink-600">Task</dt><dd>{{ task.task_code }}</dd></div>
         <div><dt class="text-cap text-ink-600">Priority</dt><dd>{{ task.get_priority_display }}</dd></div>
@@ -186,7 +188,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
     </section>
 
     {% if can_manage %}
-    <section x-show="drawer === 'edit'" class="flex flex-col gap-2" aria-label="Edit task">
+    <section x-show="showEdit" class="flex flex-col gap-2" aria-label="Edit task">
       <form method="post" action="/app/tasks/{{ task.pk }}/update" class="flex flex-col gap-2">{% csrf_token %}<input type="hidden" name="version" value="{{ task.version }}">
         {% include "components/form_field.html" with name="title" label="Title" value=task.title required=True %}
         {% include "components/form_field.html" with name="description" label="Description" type="textarea" value=task.description %}
@@ -195,7 +197,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
         {% include "components/form_field.html" with name="due_at" label="Due" type="datetime-local" value=due_local required=True %}
         <div>{% include "components/button.html" with label="Save" type="submit" %}</div></form>
     </section>
-    <section x-show="drawer === 'cancel'" class="flex flex-col gap-2" aria-label="Cancel task">
+    <section x-show="showCancel" class="flex flex-col gap-2" aria-label="Cancel task">
       <p class="text-body text-ink-900">Cancelling stops the task for everyone. The chat and the files stay.</p>
       <form method="post" action="/app/tasks/{{ task.pk }}/cancel" class="flex flex-col gap-2">{% csrf_token %}<input type="hidden" name="version" value="{{ task.version }}">
         <label class="flex flex-col gap-1 text-cap font-medium">Reason<textarea name="reason" rows="2" required class="px-3 py-2 rounded-sm border border-line bg-canvas text-body"></textarea></label>
@@ -203,7 +205,7 @@ actions around it. The manager's messages sit on the left, the people doing the 
     </section>
     {% endif %}
 
-    <section x-show="drawer === 'activity'" class="flex flex-col gap-2" aria-label="Activity">
+    <section x-show="showActivity" class="flex flex-col gap-2" aria-label="Activity">
       <ol class="flex flex-col divide-y divide-line">
         {% for m in chat %}{% if m.kind == "system" or m.kind == "request" or m.kind == "file" %}
         <li class="py-2 text-cap text-ink-900">{% if m.kind == "system" %}{{ m.body }}{% elif m.kind == "request" %}{{ m.who }} asked for help: {{ m.request.get_kind_display }}{% else %}{{ m.who }} shared {{ m.file.display_name }}{% endif %}<span class="text-ink-600"> · {{ m.at|date:"d M, H:i" }}</span></li>{% endif %}{% empty %}<li class="py-2 text-cap text-ink-600">Nothing yet.</li>{% endfor %}

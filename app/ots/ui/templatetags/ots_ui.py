@@ -100,6 +100,24 @@ def dot(dots: Any, task_id: Any) -> Any:
     )
 
 
+@register.simple_tag
+def asset(path: str) -> str:
+    """A static file URL with its modification time, so a browser fetches a changed script or style at once
+    and keeps an unchanged one (no manual cache clearing after an update)."""
+    from django.contrib.staticfiles import finders
+
+    url = static(path)
+    try:
+        found = finders.find(path)
+        if found:
+            import os
+
+            return f"{url}?v={int(os.path.getmtime(found))}"
+    except OSError:
+        pass
+    return url
+
+
 @register.filter
 def photo_url(user: Any) -> str:
     """A person's picture URL (own photo, else the reference photo), or "" so initials show. The `?v=` is the

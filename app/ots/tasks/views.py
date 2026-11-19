@@ -468,6 +468,7 @@ def _detail_ctx(
         "addable": selectors.assignable_users(viewer) if can_add else [],
         "priorities": Priority.choices,
         "chat": chat_items,
+        "my_side": chat.side_of(viewer.pk, task, assignee_ids),
         "can_upload": permissions.can(viewer, "file.upload", task) and not task.is_cancelled,
         "default_relation": "SUBMISSION" if viewer.role == "EMPLOYEE" else "DELIVERABLE",
         "max_mb": settings.OTS_UPLOAD_MAX_MB,
@@ -612,6 +613,15 @@ def task_add_people(request: HttpRequest, task_id: str) -> HttpResponse:
 @idempotency_optional
 @require_http_methods(["POST"])
 def task_comment(request: HttpRequest, task_id: str) -> HttpResponse:
+    if (
+        request.headers.get("X-Requested-With") == "ots-chat"
+    ):  # the chat composer sends without leaving the page
+        task = _task_or_404(request, task_id)
+        try:
+            c = services.add_comment(request.user, task.pk, request.POST.get("body", ""))
+        except ValidationFailed as exc:
+            return JsonResponse({"ok": False, "message": str(exc)}, status=422)
+        return JsonResponse({"ok": True, "id": f"c-{c.pk}"})
     return _task_post(
         request, task_id, lambda t, p: services.add_comment(request.user, t.pk, p.get("body", ""))
     )

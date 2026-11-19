@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#FFFFFF">
   <title>{% block title %}{{ page_title|default:"Office Task System" }} · OTS{% endblock %}</title>
   <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% asset 'css/app.css' %}">
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
-  <script src="{% static 'js/app.js' %}" defer></script>
-  <script src="{% static 'js/ui.js' %}"></script>
-  {% if request.user.is_authenticated %}<script src="{% static 'js/attendance-idle.js' %}" defer></script><script src="{% static 'js/live-core.js' %}" defer></script><script src="{% static 'js/live.js' %}" defer></script><script src="{% static 'js/sha256.js' %}" defer></script><script src="{% static 'js/upload-core.js' %}" defer></script><script src="{% static 'js/uploader.js' %}" defer></script><script src="{% static 'js/filemanager.js' %}" defer></script><script src="{% static 'js/taskchat.js' %}" defer></script><script src="{% static 'js/voice-core.js' %}" defer></script><script src="{% static 'js/voice.js' %}" defer></script>{% endif %}
+  <script src="{% asset 'js/app.js' %}" defer></script>
+  <script src="{% asset 'js/ui.js' %}"></script>
+  {% if request.user.is_authenticated %}<script src="{% asset 'js/attendance-idle.js' %}" defer></script><script src="{% asset 'js/live-core.js' %}" defer></script><script src="{% asset 'js/live.js' %}" defer></script><script src="{% asset 'js/sha256.js' %}" defer></script><script src="{% asset 'js/upload-core.js' %}" defer></script><script src="{% asset 'js/uploader.js' %}" defer></script><script src="{% asset 'js/filemanager.js' %}" defer></script><script src="{% asset 'js/taskchat.js' %}" defer></script><script src="{% asset 'js/voice-core.js' %}" defer></script><script src="{% asset 'js/voice.js' %}" defer></script>{% endif %}
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
 </head>
 {# hx-headers carries the CSRF token on every HTMX request #}
