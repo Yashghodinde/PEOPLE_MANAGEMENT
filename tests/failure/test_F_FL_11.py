@@ -58,10 +58,12 @@ def test_it_does_not_appear_in_the_team_view_of_the_owners_manager(office, secre
     assert login("sub").get(f"/files/{secret.file_id}/trail").status_code == 404
 
 
-def test_hr_gets_nothing_at_all(office, secret):
+def test_hr_sees_none_of_it_and_only_their_own_storage(office, secret):
     hr = User_by(office, "hrx")
     assert not selectors.versions_visible_to(hr).exists()
-    assert login("hrx").get("/files/mine").status_code == 403
+    assert login("hrx").get("/files/mine").status_code == 200
+    assert login("hrx").get(f"/files/v/{secret.pk}/download").status_code in (403, 404)
+    assert login("hrx").get(f"/files/{secret.file_id}/trail").status_code in (403, 404)
 
 
 def test_the_owner_and_the_super_admin_can_open_it_and_every_read_is_logged(office, secret):

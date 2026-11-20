@@ -6,7 +6,7 @@ import uuid
 import pytest
 from ots.accounts.models import Role
 from ots.audit.models import AuditLog
-from ots.core.errors import Conflict, NotFound, PermissionDenied, ValidationFailed
+from ots.core.errors import Conflict, NotFound, ValidationFailed
 from ots.files import folders
 from ots.files.models import File, FileVisibility, Folder
 
@@ -65,10 +65,12 @@ def test_nobody_else_can_name_or_open_my_folder(office):
         folders.my_folder(office["emp"], uuid.uuid4())
 
 
-def test_hr_has_no_personal_storage(office):
+def test_hr_keeps_their_own_personal_folders_but_cannot_touch_anyone_elses(office):
     hr = make_user(Role.HR, reports_to=office["sa"], login_id="hrx")
-    with pytest.raises(PermissionDenied):
-        folders.create_personal(hr, "x")
+    assert folders.create_personal(hr, "x").name == "x"
+    other = folders.create_personal(office["emp"], "theirs")
+    with pytest.raises(NotFound):
+        folders.my_folder(hr, other.pk)
 
 
 def test_rename_and_duplicate_rename(office):

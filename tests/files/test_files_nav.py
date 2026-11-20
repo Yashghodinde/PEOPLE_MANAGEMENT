@@ -44,9 +44,13 @@ def test_the_deleted_section_is_for_the_super_admin_only(office):
     assert ">Deleted</a>" not in login("sub").get("/files/mine").content.decode()
 
 
-def test_hr_has_no_files_area_and_the_sidebar_points_at_my_storage(office):
+def test_hr_has_only_my_storage_in_files_and_the_sidebar_points_at_it(office):
     make_user(Role.HR, reports_to=office["sa"], login_id="hr")
     hr = login("hr")
-    assert hr.get("/files/mine").status_code in (403, 404)
-    assert 'href="/files/mine"' not in hr.get("/app/dashboard").content.decode()
+    page = hr.get("/files/mine")
+    assert page.status_code == 200
+    html = page.content.decode()
+    for label in ("Task files", "File IDs", "Library", "Shared with me", "People's storage", "Deleted"):
+        assert f">{label}</a>" not in html, label
+    assert 'href="/files/mine"' in hr.get("/app/dashboard").content.decode()
     assert 'href="/files/mine"' in login("emp").get("/app/dashboard").content.decode()

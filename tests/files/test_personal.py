@@ -252,8 +252,24 @@ def test_a_hidden_personal_file_is_gone_from_the_owners_selector_but_not_the_dat
     assert selectors.versions_visible_to(office["sa"]).filter(pk=v.pk).exists()
 
 
-def test_hr_has_no_my_storage(office):
-    make_user(Role.HR, reports_to=office["sa"], login_id="hrx")
-    assert login("hrx").get("/files/mine").status_code == 403
-    r = start(login("hrx"), DATA, uuid.uuid4(), None, name="2026-11-17_Notes.txt", scope="personal")
-    assert r.status_code == 403
+def test_hr_has_my_storage_of_their_own_and_nothing_else(office):
+    hr = make_user(Role.HR, reports_to=office["sa"], login_id="hrx")
+    c = login("hrx")
+    assert c.get("/files/mine").status_code == 200
+    assert c.get("/files/mine/personal").status_code == 200
+    emp_v = mine_upload("emp", name="2026-11-17_Emp-only.txt")
+    v = mine_upload("hrx", name="2026-11-17_Hr-notes.txt")
+    assert v.uploaded_by_id == hr.pk and v.file.owner_id == hr.pk
+    assert list(selectors.versions_visible_to(hr)) == [v]  # their own file, never the employee's
+    assert not selectors.versions_visible_to(office["emp"]).filter(pk=v.pk).exists()
+    assert selectors.versions_visible_to(office["sa"]).filter(pk=v.pk).exists()
+    assert c.get(f"/files/v/{emp_v.pk}/download").status_code in (403, 404)
+    for path in (
+        "/files/tasks",
+        "/files/library",
+        "/files/shared",
+        "/files/ids",
+        "/files/people",
+        "/files/deleted",
+    ):
+        assert c.get(path).status_code in (403, 404), path

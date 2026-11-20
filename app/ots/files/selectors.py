@@ -85,8 +85,14 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     if viewer.role == Role.SUPER_ADMIN:
         # everything except what was said in chats the Super Admin is not part of: chats follow no hierarchy
         return qs.filter(~Q(file__visibility=FileVisibility.CHAT) | Q(_in_my_chat(viewer)))
+    if (
+        viewer.role == Role.HR
+    ):  # only their own private files: nothing on tasks, in workspaces, chats or the library
+        return qs.filter(
+            uploaded_by_id=viewer.pk, file__owner_id=viewer.pk, file__visibility=FileVisibility.PRIVATE
+        ).exclude(file__status=FileStatus.DELETED)
     if viewer.role not in (Role.SUB_ADMIN, Role.EMPLOYEE):
-        return FileVersion.objects.none()  # HR has no file access of any kind
+        return FileVersion.objects.none()
     visible_tasks = Task.objects.visible_to(viewer).values("pk")
     # A personal (PRIVATE) file belongs to its owner. Hiding it takes it out of the owner's own view; people
     # it was handed to keep what they were given, and the Super Admin (who returned above) sees everything.

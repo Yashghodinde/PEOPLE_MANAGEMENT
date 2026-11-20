@@ -54,10 +54,15 @@ def test_every_task_page_and_action_is_closed_to_hr(world):
     assert c.get(f"/app/tasks/{uuid.uuid4()}").status_code == 403  # a guessed id learns nothing either
 
 
-def test_every_file_route_is_closed_to_hr(world):
+def test_every_file_route_is_closed_to_hr_except_their_own_storage(world):
     c, v, t = login("hr"), world["version"], world["task"]
+    for url in (  # someone else's file: the fence lets the address through, the data layer answers 404
+        f"/files/v/{v.pk}/download",
+        f"/files/v/{v.pk}/preview",
+    ):
+        assert c.get(url).status_code in (403, 404), url
     for url in (
-        f"/files/v/{v.pk}/download", f"/files/v/{v.pk}/preview", f"/files/{v.file_id}/trail",
+        f"/files/{v.file_id}/trail",
         "/files/search?q=Budget", "/files/library", "/files/library/folders", f"/files/attach/{t.pk}",
     ):  # fmt: skip
         assert c.get(url).status_code == 403, url
@@ -65,8 +70,7 @@ def test_every_file_route_is_closed_to_hr(world):
         {"idempotency_key": str(uuid.uuid4()), "original_filename": "2026-11-17_Budget-Plan.xlsx",
          "size": 10, "sha256": "a" * 64, "task_id": str(t.pk)}
     )  # fmt: skip
-    assert c.post("/files/uploads", body, content_type="application/json").status_code == 403
-    assert c.post("/files/check-name", "{}", content_type="application/json").status_code == 403
+    assert c.post("/files/uploads", body, content_type="application/json").status_code in (403, 404)
     assert c.post(f"/files/v/{v.pk}/handover", {"to": str(world["sub"].pk)}).status_code == 403
 
 

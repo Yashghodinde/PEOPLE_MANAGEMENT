@@ -146,7 +146,7 @@ def _resolve_target(
     """Check the task, the existing file (for a new version) and the assignment the upload belongs to."""
     if (
         personal
-    ):  # one's own storage: every active person but HR; a new version only of one's own private file
+    ):  # one's own storage: every active person, HR included; a new version only of one's own private file
         require(user, "file.upload_personal")
         existing = None
         if file_id:
