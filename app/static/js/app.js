@@ -131,12 +131,12 @@
     if (!f || !f.hasAttribute || !f.hasAttribute("data-once")) return;
     if (f.dataset.sent) { e.preventDefault(); return; }
     f.dataset.sent = "1";
-    setTimeout(function () { Array.prototype.forEach.call(f.querySelectorAll("button[type=submit],input[type=submit]"), function (b) { b.disabled = true; }); }, 0);
+    setTimeout(function () { Array.prototype.forEach.call(f.querySelectorAll("button[type=submit],input[type=submit]"), function (b) { b.disabled = true; b.setAttribute("aria-busy", "true"); }); }, 0);
   });
   window.addEventListener("pageshow", function () {  // back button: the form is usable again
     Array.prototype.forEach.call(document.querySelectorAll("form[data-once]"), function (f) {
       delete f.dataset.sent;
-      Array.prototype.forEach.call(f.querySelectorAll("button[type=submit],input[type=submit]"), function (b) { b.disabled = false; });
+      Array.prototype.forEach.call(f.querySelectorAll("button[type=submit],input[type=submit]"), function (b) { b.disabled = false; b.removeAttribute("aria-busy"); });
     });
   });
 

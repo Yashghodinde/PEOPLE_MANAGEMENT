@@ -41,7 +41,7 @@
             <button type="button" @click="toggle" class="flex items-center gap-2 rounded-full hover:bg-line p-1" aria-haspopup="menu" aria-label="User menu">
               {% include "components/avatar.html" with name=request.user.get_full_name|default:"Office User" photo=request.user|photo_url %}{% icon "chevron-down" "3" %}
             </button>
-            <div x-show="open" x-cloak class="menu-panel absolute right-0 mt-2 w-[330px] z-40" role="menu">
+            <div x-show="open" x-cloak x-transition:enter="menu-enter" x-transition:enter-start="menu-from" x-transition:leave="menu-leave" x-transition:leave-end="menu-gone" class="menu-panel absolute right-0 mt-2 w-[330px] z-40 menu-origin-tr" role="menu">
               <div class="px-3 py-2 border-b border-line mb-1" aria-label="Signed in as">
                 <p class="text-body font-semibold text-ink-900 break-words">{{ request.user.get_full_name|default:"Office User" }}</p>
                 <p class="text-cap text-ink-600">{{ request.user.get_role_display }}</p>

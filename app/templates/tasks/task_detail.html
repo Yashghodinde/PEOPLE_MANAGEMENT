@@ -42,9 +42,9 @@ actions around it. The manager's messages sit on the left, the people doing the 
       {% if m.kind == "system" %}
       <div class="self-center max-w-[85%] text-center" data-mid="{{ m.mid }}" data-sig=""><p class="inline-block px-3 py-1 rounded-full bg-line text-cap text-ink-600">{{ m.body }} · {{ m.at|date:"d M, H:i" }}</p>{% if m.note %}<p class="text-cap text-ink-600 whitespace-pre-line pt-1">{{ m.note }}</p>{% endif %}</div>
       {% else %}
-      <div class="flex {% if m.side == 'right' %}justify-end{% else %}justify-start{% endif %}" data-side="{{ m.side }}" data-mid="{{ m.mid }}" data-sig="{{ m.sig }}"{% if m.request %} data-request="{{ m.request.pk }}"{% endif %}>
+      <div class="flex {% if m.side == 'right' %}justify-end{% else %}justify-start{% endif %}"{% if m.cont %} data-cont="1"{% endif %} data-side="{{ m.side }}" data-mid="{{ m.mid }}" data-sig="{{ m.sig }}"{% if m.request %} data-request="{{ m.request.pk }}"{% endif %}>
         <div class="bubble max-w-[80%] min-w-0 border p-3 flex flex-col gap-1 {% if m.kind == 'request' %}border-bad task-tone-red{% elif m.side == 'right' %}border-line bg-line{% else %}border-line bg-canvas{% endif %}">
-          <p class="text-cap font-semibold text-ink-900">{{ m.who }} <span class="font-normal text-ink-600">· {% if m.side == "right" %}Employee{% else %}Manager{% endif %}</span></p>
+          {% if not m.cont %}<p class="text-cap font-semibold text-ink-900">{{ m.who }} <span class="font-normal text-ink-600">· {% if m.side == "right" %}Employee{% else %}Manager{% endif %}</span></p>{% endif %}
           {% if m.kind == "voice" %}{% include "tasks/_voice_player.html" with c=m.comment %}
           {% elif m.kind == "file" %}
             <div class="flex items-center gap-3 flex-wrap">{% icon "file-text" "5" "text-ink-600" %}<div class="min-w-0"><p class="text-body font-medium text-ink-900 break-words">{{ m.file.display_name }}</p><p class="text-cap text-ink-600">Version {{ m.version.version_number }} · {{ m.version.size_bytes|filesizeformat }}</p></div></div>

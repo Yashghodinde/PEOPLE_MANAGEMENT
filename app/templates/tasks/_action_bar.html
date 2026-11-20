@@ -19,7 +19,7 @@ Needs: task, lines, bar_lines, request, block_reasons, errors, open_action.
           {% elif act.inputs %}
           <button type="button" data-open-dialog="act-{{ a.pk }}-{{ act.action }}" class="action-btn{% if act.primary %} action-btn-primary{% endif %}">{{ act.label }}</button>
           {% else %}
-          <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}">{% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}"><button type="submit" class="action-btn{% if act.primary %} action-btn-primary{% endif %}">{{ act.label }}</button></form>
+          <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}" data-once>{% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}"><button type="submit" class="action-btn{% if act.primary %} action-btn-primary{% endif %}">{{ act.label }}</button></form>
           {% endif %}
         {% endfor %}
       </div>
@@ -32,7 +32,7 @@ Needs: task, lines, bar_lines, request, block_reasons, errors, open_action.
   {% for a in lines %}{% for act in a.actions %}{% if act.inputs and act.action != "block" %}
   {% with key=a.pk|stringformat:"s" %}
   <dialog id="act-{{ a.pk }}-{{ act.action }}" class="ots-dialog"{% if open_action and open_action.0 == key and open_action.1 == act.action %} open{% endif %} aria-labelledby="act-{{ a.pk }}-{{ act.action }}-t">
-    <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}" class="flex flex-col gap-3">
+    <form method="post" action="/app/assignments/{{ a.pk }}/{{ act.action }}" class="flex flex-col gap-3" data-once>
       {% csrf_token %}<input type="hidden" name="version" value="{{ a.version }}">
       <h2 id="act-{{ a.pk }}-{{ act.action }}-t" class="text-sec font-semibold">{{ act.label }}</h2>
       <p class="text-cap text-ink-600">{{ a.user.full_name }}{% if act.danger %} · this cannot be undone{% endif %}</p>

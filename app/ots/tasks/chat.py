@@ -75,4 +75,11 @@ def build(
             }
         )  # fmt: skip
     out.sort(key=lambda m: m["at"])
+    prev: dict[str, Any] | None = None
+    for (
+        m
+    ) in out:  # one person's messages close together read as one run: they sit closer and the name shows once
+        same = bool(prev) and prev["who"] == m["who"] and "system" not in (prev["kind"], m["kind"])
+        m["cont"] = same and (m["at"] - prev["at"]).total_seconds() <= 300  # type: ignore[index]
+        prev = m
     return out

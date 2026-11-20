@@ -64,6 +64,7 @@ def decorate(messages: list[Any], mem: Any, viewer: Any) -> list[dict[str, Any]]
     group = mem.conversation.kind == Kind.GROUP
     out: list[dict[str, Any]] = []
     prev_day = prev_sender = None
+    prev_system = True
     for m in messages:
         day = m.created_at.astimezone(IST).date()
         mine = m.sender_id == viewer.pk
@@ -98,9 +99,10 @@ def decorate(messages: list[Any], mem: Any, viewer: Any) -> list[dict[str, Any]]
                 and (now() - m.created_at).total_seconds() <= services.EDIT_WINDOW_SECONDS,
                 "can_delete": mine and m.deleted_at is None and not system,
                 "files": [] if m.deleted_at else list(m.attachments.all()),
+                "cont": (not system) and (not prev_system) and m.sender_id == prev_sender and day == prev_day,
             }
         )
-        prev_day, prev_sender = day, m.sender_id
+        prev_day, prev_sender, prev_system = day, m.sender_id, system
     return out
 
 

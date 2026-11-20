@@ -37,7 +37,7 @@
       {% csrf_token %}
       <div x-data="dropdown" class="attach-anchor relative" @click.outside="close" @keydown.escape="close">
         <button type="button" @click="toggle" aria-haspopup="menu" aria-label="Attach" class="h-5 w-5 inline-flex items-center justify-center rounded-full border border-line hover:bg-line">{% icon "plus" %}</button>
-        <div x-show="open" x-cloak @click="close" role="menu" class="menu-panel menu-attach absolute bottom-full left-0 mb-2 z-30 motion-pop">
+        <div x-show="open" x-cloak x-transition:enter="menu-enter" x-transition:enter-start="menu-from" x-transition:leave="menu-leave" x-transition:leave-end="menu-gone" @click="close" role="menu" class="menu-panel menu-attach absolute bottom-full left-0 mb-2 z-30 menu-origin-bl">
           <button type="button" role="menuitem" @click="choose" class="menu-item">{% icon "upload" %}<span class="menu-label">Upload files</span></button>
           <button type="button" role="menuitem" data-pick="storage" class="menu-item">{% icon "folder" %}<span class="menu-label">Attach from My storage</span></button>
           <button type="button" role="menuitem" data-pick="fileid" class="menu-item">{% icon "file-text" %}<span class="menu-label">Attach a File ID document</span></button>

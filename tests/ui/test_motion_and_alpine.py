@@ -6,7 +6,8 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2] / "app"
 SIMPLE = re.compile(r"^!?[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*(\(\))?$")
-ATTR = re.compile(r'(?:x-show|x-text|x-html|:[a-z-]+|x-bind:[a-z-]+)="([^"]*)"')
+# `:attr` is a binding only when it stands alone; `x-transition:enter="menu-enter"` holds class names, not an expression
+ATTR = re.compile(r'(?:x-show|x-text|x-html|(?<![\w-]):[a-z-]+|x-bind:[a-z-]+)="([^"]*)"')
 
 
 def templates():

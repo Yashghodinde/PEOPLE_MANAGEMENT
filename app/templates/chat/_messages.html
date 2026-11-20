@@ -4,7 +4,7 @@
 {% if it.system %}
 <div class="self-center text-cap text-ink-600 text-center" data-mid="{{ m.pk }}" data-sig="">{{ m.body }}</div>
 {% else %}
-<div class="flex {% if it.mine %}justify-end{% else %}justify-start{% endif %} group" data-mid="{{ m.pk }}" data-sig="{{ it.sig }}" data-mine="{% if it.mine %}1{% else %}0{% endif %}" data-sender="{{ m.sender_id }}">
+<div class="flex {% if it.mine %}justify-end{% else %}justify-start{% endif %} group" data-mid="{{ m.pk }}"{% if it.cont %} data-cont="1"{% endif %} data-sig="{{ it.sig }}" data-mine="{% if it.mine %}1{% else %}0{% endif %}" data-sender="{{ m.sender_id }}">
   <div class="bubble border {% if it.mine %}border-line bg-line{% else %}border-line bg-canvas{% endif %} max-w-[78%] min-w-0 p-3 flex flex-col gap-1">
     {% if it.show_name %}<p class="text-cap font-semibold text-ink-900">{{ m.sender.full_name }}</p>{% endif %}
     {% if m.reply_to and not m.deleted_at %}<button type="button" data-action="goto" data-target="{{ m.reply_to_id }}" class="text-left border-l-2 border-accent pl-2 text-cap text-ink-600 truncate"><strong>{{ m.reply_to.sender.full_name }}</strong>: {% if m.reply_to.deleted_at %}Deleted message{% elif m.reply_to.kind == "FILE" %}File{% else %}{{ m.reply_to.body|truncatechars:80 }}{% endif %}</button>{% endif %}
