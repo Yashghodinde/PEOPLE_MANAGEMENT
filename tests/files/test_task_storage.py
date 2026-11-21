@@ -156,10 +156,10 @@ def test_viewer_scoping_unrelated_people_hr_and_the_team_rule(office):
     put("emp", office["task"], D1)
     stranger = make_user(Role.EMPLOYEE, reports_to=office["sub"], login_id="stranger")
     other_mgr = make_user(Role.SUB_ADMIN, reports_to=office["sa"], login_id="mgr2")
-    make_user(Role.HR, reports_to=office["sa"], login_id="hrx")
+    hr = make_user(Role.HR, reports_to=office["sa"], login_id="hrx")
     assert taskstorage.task_storage(stranger)[0] == [] and taskstorage.task_storage(other_mgr)[0] == []
     assert taskstorage.task_storage(office["sub"])[0] and taskstorage.task_storage(office["sa"])[0]
-    assert login("hrx").get("/files/tasks").status_code == 403
+    assert taskstorage.task_storage(hr)[0] == []  # HR has no tasks, so no task files
     assert login("stranger").get(f"/files/tasks/{office['task'].pk}").status_code == 404
 
 

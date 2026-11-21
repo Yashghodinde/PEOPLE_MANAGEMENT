@@ -151,7 +151,7 @@ def attach_existing(
 
 
 def may_upload(user: Any, folder: LibraryFolder | None) -> bool:
-    """The Super Admin anywhere; staff (not HR) only inside a folder that allows it."""
+    """The Super Admin anywhere; everyone else only inside a folder that allows it."""
     from ots.accounts.models import Role
     from ots.core.permissions import can
 
@@ -160,7 +160,7 @@ def may_upload(user: Any, folder: LibraryFolder | None) -> bool:
     return bool(
         user is not None
         and getattr(user, "is_active", False)
-        and user.role in (Role.SUB_ADMIN, Role.EMPLOYEE)
+        and user.role in (Role.SUB_ADMIN, Role.HR, Role.EMPLOYEE)
         and folder is not None
         and folder.employee_upload
     )

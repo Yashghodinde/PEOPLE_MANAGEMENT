@@ -30,11 +30,10 @@ def world():
     return {"sa": sa, "hr": hr, "sub": sub, "emp": emp, "task": task, "version": FileVersion.objects.get()}
 
 
-def test_the_scoped_queries_return_nothing_for_hr(world):
+def test_hr_has_no_tasks_and_therefore_no_task_files(world):
     hr = world["hr"]
     assert not Task.objects.visible_to(hr).exists()
-    assert not file_selectors.versions_visible_to(hr).exists()
-    assert not file_selectors.handover_targets(hr).exists()
+    assert not file_selectors.versions_visible_to(hr).exists()  # nothing of the office's reaches HR
     assert file_selectors.search(hr, "Budget", limit=20, offset=0) == []
 
 
@@ -54,24 +53,24 @@ def test_every_task_page_and_action_is_closed_to_hr(world):
     assert c.get(f"/app/tasks/{uuid.uuid4()}").status_code == 403  # a guessed id learns nothing either
 
 
-def test_every_file_route_is_closed_to_hr_except_their_own_storage(world):
+def test_hr_opens_files_like_an_employee_but_never_someone_elses_task_file(world):
     c, v, t = login("hr"), world["version"], world["task"]
-    for url in (  # someone else's file: the fence lets the address through, the data layer answers 404
+    for url in (
         f"/files/v/{v.pk}/download",
         f"/files/v/{v.pk}/preview",
-    ):
-        assert c.get(url).status_code in (403, 404), url
-    for url in (
         f"/files/{v.file_id}/trail",
-        "/files/search?q=Budget", "/files/library", "/files/library/folders", f"/files/attach/{t.pk}",
-    ):  # fmt: skip
-        assert c.get(url).status_code == 403, url
+    ):  # a task file HR is not on: closed, exactly as for any Employee not on that task
+        assert c.get(url).status_code in (403, 404), url
+    assert c.post(f"/files/attach/{t.pk}", {"version": str(v.pk)}).status_code in (403, 404)
+    for url in ("/files/mine", "/files/library", "/files/shared", "/files/ids", "/files/tasks"):
+        assert c.get(url).status_code == 200, url
+    assert b"Budget-Review-Q3" not in c.get("/files/search?q=Budget").content
     body = json.dumps(
         {"idempotency_key": str(uuid.uuid4()), "original_filename": "2026-11-17_Budget-Plan.xlsx",
          "size": 10, "sha256": "a" * 64, "task_id": str(t.pk)}
     )  # fmt: skip
     assert c.post("/files/uploads", body, content_type="application/json").status_code in (403, 404)
-    assert c.post(f"/files/v/{v.pk}/handover", {"to": str(world["sub"].pk)}).status_code == 403
+    assert c.post(f"/files/v/{v.pk}/handover", {"to": str(world["sub"].pk)}).status_code in (403, 404)
 
 
 def test_the_data_layer_alone_still_keeps_hr_out_of_tasks_and_files(world, settings):
@@ -84,9 +83,10 @@ def test_the_data_layer_alone_still_keeps_hr_out_of_tasks_and_files(world, setti
     assert b"Budget-Review-Q3" not in c.get("/files/search?q=Budget").content
 
 
-def test_nobody_can_hand_a_file_to_hr(world):
-    for who in ("sa", "sub", "emp"):
-        assert not file_selectors.handover_targets(world[who]).filter(pk=world["hr"].pk).exists()
+def test_a_manager_can_hand_a_file_to_hr_and_hr_can_send_back_to_their_manager(world):
+    assert file_selectors.handover_targets(world["sa"]).filter(pk=world["hr"].pk).exists()
+    assert file_selectors.handover_targets(world["sub"]).filter(pk=world["hr"].pk).exists()
+    assert file_selectors.handover_targets(world["hr"]).exists()
 
 
 def test_hr_still_has_its_own_screens(world):

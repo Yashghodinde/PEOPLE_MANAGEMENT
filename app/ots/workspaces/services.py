@@ -100,8 +100,8 @@ def _lock(ws: FileIdWorkspace) -> FileIdWorkspace:
 
 
 def _eligible(user: User) -> bool:
-    """Who may be a member: an active Super Admin, Sub-Admin or Employee; never HR or break-glass."""
-    return user.is_active and user.role != UserRole.HR and not user.is_break_glass
+    """Who may be a member: any active Super Admin, Sub-Admin, HR or Employee; never break-glass."""
+    return user.is_active and not user.is_break_glass
 
 
 @transaction.atomic

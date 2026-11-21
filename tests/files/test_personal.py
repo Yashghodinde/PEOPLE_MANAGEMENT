@@ -252,7 +252,7 @@ def test_a_hidden_personal_file_is_gone_from_the_owners_selector_but_not_the_dat
     assert selectors.versions_visible_to(office["sa"]).filter(pk=v.pk).exists()
 
 
-def test_hr_has_my_storage_of_their_own_and_nothing_else(office):
+def test_hr_keeps_private_files_like_an_employee_and_sees_nobody_elses(office):
     hr = make_user(Role.HR, reports_to=office["sa"], login_id="hrx")
     c = login("hrx")
     assert c.get("/files/mine").status_code == 200
@@ -264,12 +264,5 @@ def test_hr_has_my_storage_of_their_own_and_nothing_else(office):
     assert not selectors.versions_visible_to(office["emp"]).filter(pk=v.pk).exists()
     assert selectors.versions_visible_to(office["sa"]).filter(pk=v.pk).exists()
     assert c.get(f"/files/v/{emp_v.pk}/download").status_code in (403, 404)
-    for path in (
-        "/files/tasks",
-        "/files/library",
-        "/files/shared",
-        "/files/ids",
-        "/files/people",
-        "/files/deleted",
-    ):
-        assert c.get(path).status_code in (403, 404), path
+    assert c.get("/files/people").status_code in (403, 404)
+    assert c.get("/files/deleted").status_code in (403, 404)

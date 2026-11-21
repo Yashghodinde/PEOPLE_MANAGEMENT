@@ -66,8 +66,6 @@ def ids_list(request: HttpRequest) -> HttpResponse:
     from ots.files import browser
     from ots.files.views import manager_response
 
-    if request.user.role == UserRole.HR:
-        raise NotFound("Not found.")
     m = browser.workspace_list(request.user, permissions.can(request.user, "fileid.create"))
     return manager_response(request, m)
 
@@ -129,7 +127,7 @@ def _page(request: HttpRequest, ws: Any, *, error: str = "", status: int = 200) 
     members = selectors.members(ws)
     taken = {m.user_id for m in members}
     candidates = (
-        User.objects.filter(is_active=True, role__in=[UserRole.SUB_ADMIN, UserRole.EMPLOYEE])
+        User.objects.filter(is_active=True, role__in=[UserRole.SUB_ADMIN, UserRole.HR, UserRole.EMPLOYEE])
         .exclude(pk__in=taken)
         .order_by("full_name")[:300]
         if role == Role.OWNER

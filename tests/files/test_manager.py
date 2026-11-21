@@ -101,11 +101,12 @@ def test_someone_elses_folder_is_a_404_for_every_route(office):
     assert not login("boss").get(f"/files/mine/f/{theirs.pk}").status_code == 200
 
 
-def test_hr_has_only_their_own_storage_pages(office):
+def test_hr_opens_the_same_storage_pages_as_an_employee(office):
     make_user(Role.HR, reports_to=office["sa"], login_id="hrz")
     c = login("hrz")
-    assert c.get("/files/mine").status_code == 200
-    assert c.get("/files/library").status_code in (302, 403, 404)
+    for path in ("/files/mine", "/files/library", "/files/shared", "/files/ids", "/files/tasks"):
+        assert c.get(path).status_code == 200, path
+    assert c.get("/files/people").status_code in (403, 404)
 
 
 def test_a_folder_opens_from_anywhere_on_its_card_and_a_file_does_not(office):

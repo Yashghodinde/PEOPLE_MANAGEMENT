@@ -85,13 +85,7 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
     if viewer.role == Role.SUPER_ADMIN:
         # everything except what was said in chats the Super Admin is not part of: chats follow no hierarchy
         return qs.filter(~Q(file__visibility=FileVisibility.CHAT) | Q(_in_my_chat(viewer)))
-    if (
-        viewer.role == Role.HR
-    ):  # only their own private files: nothing on tasks, in workspaces, chats or the library
-        return qs.filter(
-            uploaded_by_id=viewer.pk, file__owner_id=viewer.pk, file__visibility=FileVisibility.PRIVATE
-        ).exclude(file__status=FileStatus.DELETED)
-    if viewer.role not in (Role.SUB_ADMIN, Role.EMPLOYEE):
+    if viewer.role not in (Role.SUB_ADMIN, Role.HR, Role.EMPLOYEE):
         return FileVersion.objects.none()
     visible_tasks = Task.objects.visible_to(viewer).values("pk")
     # A personal (PRIVATE) file belongs to its owner. Hiding it takes it out of the owner's own view; people
@@ -141,17 +135,15 @@ def versions_visible_to(viewer: Any) -> QuerySet[FileVersion]:
 
 def handover_targets(sender: Any) -> QuerySet[Any]:
     """Whom `sender` may send a file to (M08 section 8): Super/Sub Admin anyone active; an Employee their
-    manager and the people assigned to the same tasks."""
+    manager and the people assigned to the same tasks. HR counts as an Employee, for sending and receiving."""
     from ots.accounts.models import Role, User
     from ots.tasks.models import TaskAssignment
 
     if sender is None or not getattr(sender, "is_active", False):
         return User.objects.none()
-    if sender.role not in (Role.SUPER_ADMIN, Role.SUB_ADMIN, Role.EMPLOYEE):
-        return User.objects.none()  # HR has no files to send
-    others = (
-        User.objects.filter(is_active=True).exclude(pk=sender.pk).exclude(role=Role.HR)
-    )  # HR can't receive
+    if sender.role not in (Role.SUPER_ADMIN, Role.SUB_ADMIN, Role.HR, Role.EMPLOYEE):
+        return User.objects.none()
+    others = User.objects.filter(is_active=True).exclude(pk=sender.pk)
     if sender.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN):
         return others
     mine = TaskAssignment.objects.filter(user=sender).values("task_id")
@@ -224,7 +216,7 @@ def trail(viewer: Any, file_id: Any) -> list[dict[str, Any]] | None:
             by_id[t.version_id],
         )
     log = FileAccessLog.objects.filter(version_id__in=ids).select_related("user").order_by("-id")
-    if viewer.role == Role.EMPLOYEE:
+    if viewer.role in (Role.EMPLOYEE, Role.HR):
         log = log.filter(user_id=viewer.pk)
     for a in log[:TRAIL_LIMIT]:
         verb = "downloaded" if a.action == "DOWNLOAD" else "previewed"

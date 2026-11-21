@@ -144,9 +144,7 @@ def _resolve_target(
     personal: bool = False,
 ) -> tuple[File | None, TaskAssignment | None]:
     """Check the task, the existing file (for a new version) and the assignment the upload belongs to."""
-    if (
-        personal
-    ):  # one's own storage: every active person, HR included; a new version only of one's own private file
+    if personal:  # one's own storage: every active person; a new version only of one's own private file
         require(user, "file.upload_personal")
         existing = None
         if file_id:

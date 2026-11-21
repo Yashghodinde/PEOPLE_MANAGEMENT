@@ -28,8 +28,8 @@ def member_role(user: Any, ws: FileIdWorkspace) -> str | None:
 
 
 def effective_role(user: Any, ws: FileIdWorkspace) -> str | None:
-    """OWNER-level for the Super Admin (even if archived); a member's role otherwise; HR never."""
-    if not _active(user) or user.role == UserRole.HR:
+    """OWNER-level for the Super Admin (even if archived); a member's role otherwise."""
+    if not _active(user):
         return None
     if user.role == UserRole.SUPER_ADMIN:
         return Role.OWNER

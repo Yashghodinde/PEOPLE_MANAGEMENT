@@ -18,7 +18,7 @@ def _active(user: Any) -> bool:
 
 @policy("file.upload_personal")
 def can_upload_personal(user: Any, obj: Any = None) -> bool:
-    """Everybody with a working account may keep private files of their own, HR included."""
+    """Everybody with a working account may keep private files of their own."""
     return _active(user) and user.role in (Role.SUPER_ADMIN, Role.SUB_ADMIN, Role.HR, Role.EMPLOYEE)
 
 

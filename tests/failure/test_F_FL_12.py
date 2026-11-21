@@ -73,11 +73,12 @@ def test_an_archived_file_id_is_closed_to_members_but_not_to_the_super_admin(wor
     assert login("sub").post(url(world, "/status"), {"status": "ACTIVE"}).status_code in (403, 404)
 
 
-def test_an_employee_cannot_create_one_and_hr_sees_nothing(world):
+def test_an_employee_and_hr_cannot_create_one_but_hr_opens_the_list(world):
     from ots.accounts.models import Role
 
     from tests.accounts.factories import make_user
 
     make_user(Role.HR, reports_to=world["sa"], login_id="hr", full_name="Hr Person")
     assert login("emp").post("/files/ids/new", {"name": "X"}).status_code in (403, 404)
-    assert login("hr").get("/files/ids").status_code in (403, 404)
+    assert login("hr").post("/files/ids/new", {"name": "X"}).status_code in (403, 404)
+    assert login("hr").get("/files/ids").status_code == 200  # HR is a normal member like an Employee

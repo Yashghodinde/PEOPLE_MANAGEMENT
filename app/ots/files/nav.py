@@ -1,5 +1,5 @@
 """The Files section strip (IMP-06.1): built from the path, so every /files page shows the same strip,
-the right section lit, with nothing to pass in. HR has only the My storage tab."""
+the right section lit, with nothing to pass in. HR has the same sections as an Employee."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def files_strip(user: Any, path: str) -> list[dict[str, Any]] | None:
     ):
         return None
     on = active_section(path)
-    tabs = SECTIONS[:1] if user.role == Role.HR else list(SECTIONS)
+    tabs = list(SECTIONS)
     if user.role == Role.SUPER_ADMIN:
         tabs.append(("people", "People's storage", "/files/people"))
         tabs.append(("deleted", "Deleted", "/files/deleted"))

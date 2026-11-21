@@ -15,12 +15,12 @@ from .models import FileIdDocument, FileIdMember, FileIdWorkspace, WorkspaceStat
 
 def workspaces_visible_to(user: Any) -> QuerySet[FileIdWorkspace]:
     """Super Admin: all (archived too). Anyone else: ACTIVE workspaces where they are a current member.
-    HR and unknown roles: none. Being a manager, a task creator or knowing the File ID gives nothing."""
+    Unknown roles: none. Being a manager, a task creator or knowing the File ID gives nothing."""
     if user is None or not getattr(user, "is_active", False) or not getattr(user, "is_authenticated", True):
         return FileIdWorkspace.objects.none()
     if user.role == UserRole.SUPER_ADMIN:
         return FileIdWorkspace.objects.all()
-    if user.role not in (UserRole.SUB_ADMIN, UserRole.EMPLOYEE):
+    if user.role not in (UserRole.SUB_ADMIN, UserRole.HR, UserRole.EMPLOYEE):
         return FileIdWorkspace.objects.none()
     mine = FileIdMember.objects.filter(user=user, revoked_at__isnull=True).values("workspace_id")
     return FileIdWorkspace.objects.filter(pk__in=mine, status=WorkspaceStatus.ACTIVE)

@@ -19,7 +19,7 @@ class NavItem:
 ITEMS = [
     NavItem("Dashboard", "layout-dashboard", "/app/dashboard", ALL_ROLES),
     NavItem("Tasks", "list-checks", "/app/tasks"),  # HR has no tasks
-    NavItem("Files", "folder", "/files/mine", ALL_ROLES, match="/files"),  # HR: own personal files only
+    NavItem("Files", "folder", "/files/mine", ALL_ROLES, match="/files"),
     NavItem("Chat", "message-circle", "/app/chat", ALL_ROLES, match="/app/chat"),
     NavItem("Attendance", "calendar", "/app/attendance", ALL_ROLES),
     NavItem("People", "users", "/app/people", ("SUPER_ADMIN", "HR", "SUB_ADMIN")),

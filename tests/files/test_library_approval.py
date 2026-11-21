@@ -142,16 +142,19 @@ def test_staff_cannot_upload_to_the_library_root_make_folders_or_add_versions(of
     assert r.status_code == 403
 
 
-def test_hr_cannot_upload_to_the_library(office, lib):
+def test_hr_uploads_to_the_library_like_an_employee(office, lib):
     from ots.accounts.models import Role
 
     from tests.accounts.factories import make_user
 
-    make_user(Role.HR, reports_to=office["sa"], login_id="hrlib")
+    hr = make_user(Role.HR, reports_to=office["sa"], login_id="hrlib")
+    f = send("hrlib", lib)
+    assert f.library_state == LibraryState.PENDING and f.library_folder_id == lib.pk and f.owner_id == hr.pk
+    library.set_employee_upload(office["sa"], lib.pk, False)
     r = start(
         login("hrlib"), DATA, uuid.uuid4(), name="2026-11-17_X.txt", scope="library", folder_id=str(lib.pk)
     )
-    assert r.status_code in (403, 404)
+    assert r.status_code == 403
 
 
 def test_with_no_active_manager_the_super_admin_is_told(office):
